@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   Switch,
   Alert,
   Platform,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import Layout from '../../components/layout';
-import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
-import styles from './commonStyle';
-import axios from 'axios';
-import { API_URL_LOCAL_ENDPOINT } from '../../constant/api';
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import Layout from "../../components/layout";
+import * as Haptics from "expo-haptics";
+import * as Notifications from "expo-notifications";
+import styles from "./commonStyle";
+import axios from "axios";
+import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 
 export function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -23,7 +23,7 @@ export function Settings() {
   const [whatsappNotifications, setWhatsappNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
-  const [downloadQuality, setDownloadQuality] = useState('HD');
+  const [downloadQuality, setDownloadQuality] = useState("HD");
 
   // Trigger haptic feedback
   const triggerHaptic = () => {
@@ -39,7 +39,7 @@ export function Settings() {
         [key]: value,
       });
     } catch (error) {
-      console.error('❌ Failed to update setting:', key, error);
+      console.error("❌ Failed to update setting:", key, error);
     }
   };
 
@@ -49,25 +49,26 @@ export function Settings() {
 
     if (!value) {
       setPushNotifications(false);
-      updateUserSetting('pushNotifications', false);
+      updateUserSetting("pushNotifications", false);
       return;
     }
 
     // Check permission
     const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') {
-      const { status: newStatus } = await Notifications.requestPermissionsAsync();
-      if (newStatus !== 'granted') {
+    if (status !== "granted") {
+      const { status: newStatus } =
+        await Notifications.requestPermissionsAsync();
+      if (newStatus !== "granted") {
         Alert.alert(
-          'Permission required',
-          'Please enable notifications in system settings to receive push notifications'
+          "Permission required",
+          "Please enable notifications in system settings to receive push notifications"
         );
         return;
       }
     }
 
     setPushNotifications(true);
-    updateUserSetting('pushNotifications', true);
+    updateUserSetting("pushNotifications", true);
   };
 
   // Generic toggle handler
@@ -80,66 +81,97 @@ export function Settings() {
   // Download quality options
   const showQualityOptions = () => {
     triggerHaptic();
-    Alert.alert('Download Quality', 'Choose video download quality', [
-      { text: 'SD', onPress: () => { setDownloadQuality('SD'); updateUserSetting('downloadQuality', 'SD'); } },
-      { text: 'HD', onPress: () => { setDownloadQuality('HD'); updateUserSetting('downloadQuality', 'HD'); } },
-      { text: 'Full HD', onPress: () => { setDownloadQuality('Full HD'); updateUserSetting('downloadQuality', 'Full HD'); } },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert("Download Quality", "Choose video download quality", [
+      {
+        text: "SD",
+        onPress: () => {
+          setDownloadQuality("SD");
+          updateUserSetting("downloadQuality", "SD");
+        },
+      },
+      {
+        text: "HD",
+        onPress: () => {
+          setDownloadQuality("HD");
+          updateUserSetting("downloadQuality", "HD");
+        },
+      },
+      {
+        text: "Full HD",
+        onPress: () => {
+          setDownloadQuality("Full HD");
+          updateUserSetting("downloadQuality", "Full HD");
+        },
+      },
+      { text: "Cancel", style: "cancel" },
     ]);
   };
 
   // Clear app cache
   const handleClearCache = async () => {
     triggerHaptic();
-    Alert.alert('Clear Cache', 'This will clear all cached data. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: async () => {
+    Alert.alert("Clear Cache", "This will clear all cached data. Continue?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: async () => {
           try {
-            await axios.get(`http://192.168.1.12:5001/flush-all`);
-            Alert.alert('Cache cleared successfully');
+            await axios.get(`https://www.dikapi.olyox.in/flush-all`);
+            Alert.alert("Cache cleared successfully");
           } catch (error) {
-            console.error('❌ Clear cache failed', error);
+            console.error("❌ Clear cache failed", error);
           }
-        } 
+        },
       },
     ]);
   };
 
   const settingsSections = [
     {
-      title: 'Notifications',
-      icon: 'bell',
+      title: "Notifications",
+      icon: "bell",
       items: [
         {
-          label: 'Push Notifications',
-          description: 'Receive notifications on your device',
+          label: "Push Notifications",
+          description: "Receive notifications on your device",
           value: pushNotifications,
           onToggle: () => togglePushNotification(pushNotifications),
         },
         {
-          label: 'Email Notifications',
-          description: 'Receive updates via email',
+          label: "Email Notifications",
+          description: "Receive updates via email",
           value: emailNotifications,
-          onToggle: () => handleToggle(setEmailNotifications, 'emailNotifications', emailNotifications),
+          onToggle: () =>
+            handleToggle(
+              setEmailNotifications,
+              "emailNotifications",
+              emailNotifications
+            ),
         },
         {
-          label: 'WhatsApp Notifications',
-          description: 'Receive updates via WhatsApp',
+          label: "WhatsApp Notifications",
+          description: "Receive updates via WhatsApp",
           value: whatsappNotifications,
-          onToggle: () => handleToggle(setWhatsappNotifications, 'whatsappNotifications', whatsappNotifications),
+          onToggle: () =>
+            handleToggle(
+              setWhatsappNotifications,
+              "whatsappNotifications",
+              whatsappNotifications
+            ),
         },
       ],
     },
 
     {
-      title: 'Video Playback',
-      icon: 'play-circle',
+      title: "Video Playback",
+      icon: "play-circle",
       items: [
         {
-          label: 'Auto-Play Videos',
-          description: 'Automatically play next video',
+          label: "Auto-Play Videos",
+          description: "Automatically play next video",
           value: autoPlay,
-          onToggle: () => handleToggle(setAutoPlay, 'autoPlay', autoPlay),
+          onToggle: () => handleToggle(setAutoPlay, "autoPlay", autoPlay),
         },
       ],
     },
@@ -147,14 +179,14 @@ export function Settings() {
 
   const actionItems = [
     {
-      icon: 'download',
-      label: 'Download Quality',
+      icon: "download",
+      label: "Download Quality",
       value: downloadQuality,
       onPress: showQualityOptions,
     },
     {
-      icon: 'trash-2',
-      label: 'Clear Cache',
+      icon: "trash-2",
+      label: "Clear Cache",
       danger: true,
       onPress: handleClearCache,
     },
@@ -183,18 +215,21 @@ export function Settings() {
                   key={itemIdx}
                   style={[
                     styles.settingItem,
-                    itemIdx !== section.items.length - 1 && styles.settingItemBorder,
+                    itemIdx !== section.items.length - 1 &&
+                      styles.settingItemBorder,
                   ]}
                 >
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingLabel}>{item.label}</Text>
-                    <Text style={styles.settingDescription}>{item.description}</Text>
+                    <Text style={styles.settingDescription}>
+                      {item.description}
+                    </Text>
                   </View>
                   <Switch
                     value={item.value}
                     onValueChange={item.onToggle}
-                    trackColor={{ false: '#cbd5e1', true: '#DC3545' }}
-                    thumbColor={item.value ? '#DC3545' : '#f1f5f9'}
+                    trackColor={{ false: "#cbd5e1", true: "#DC3545" }}
+                    thumbColor={item.value ? "#DC3545" : "#f1f5f9"}
                   />
                 </View>
               ))}
@@ -230,7 +265,7 @@ export function Settings() {
                     <Feather
                       name={item.icon}
                       size={20}
-                      color={item.danger ? '#ef4444' : '#DC3545'}
+                      color={item.danger ? "#ef4444" : "#DC3545"}
                     />
                   </View>
                   <Text

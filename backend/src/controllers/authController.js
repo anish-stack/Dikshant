@@ -7,7 +7,7 @@ const { Op } = require("sequelize");
 // ==================== HELPER FUNCTIONS ====================
 
 function genOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return 123456;
 }
 
 function generateTokens(user) {
@@ -733,6 +733,47 @@ exports.updateFcmToken = async (req, res) => {
     console.error("Update FCM Token Error:", err);
     return res.status(500).json({
       error: "Unable to update FCM token. Please try again.",
+    });
+  }
+};
+
+
+exports.updatePassword = async (req, res) => {
+  try {
+    const { mobile, newPassword } = req.body;
+
+    if (!mobile || !newPassword) {
+      return res.status(400).json({
+        error: "Mobile number and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        error: "New password must be at least 6 characters long",
+      });
+    }
+
+    // Find user by mobile
+    const user = await User.findOne({ where: { mobile } });
+
+    if (!user) {
+      return res.status(404).json({ error: "User with this mobile not found" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({
+      status: "success",
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    console.error("Update Password Error:", err);
+    res.status(500).json({
+      error: "Unable to update password. Please try again",
     });
   }
 };

@@ -188,8 +188,18 @@ export default function Login({ navigation }) {
       setPasswordError("");
       setIsLoading(true);
 
+      const deviceInfo = await getDeviceInfo();
+      const tokenFcm = await getFCMToken();
       // Call Password Login API
-      const res = await loginWithPassword(phoneOrEmail, password);
+      const res = await login(
+        phoneOrEmail,
+        "",
+        password,
+        deviceInfo?.device_id,
+        tokenFcm,
+        deviceInfo?.platform,
+        Application.nativeApplicationVersion
+      );
 
       if (!res.success) {
         setPasswordError(res.message || "Invalid credentials");

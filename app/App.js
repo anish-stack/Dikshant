@@ -41,7 +41,12 @@ import {
 import axios from "axios";
 import { API_URL_LOCAL_ENDPOINT } from "./constant/api";
 import { useAuthStore } from "./stores/auth.store";
-import { HelpSupportScreen, RateUsScreen, ShareAppScreen } from "./pages/Profile/ShareApp";
+import {
+  HelpSupportScreen,
+  RateUsScreen,
+  ShareAppScreen,
+} from "./pages/Profile/ShareApp";
+import ForgotPassword from "./screens/auth/ForgotPassword";
 
 const Stack = createNativeStackNavigator();
 
@@ -302,13 +307,11 @@ export default function App() {
         <Stack.Screen name="Signup" component={Signup} />
         <Stack.Screen name="Home" component={Home} />
 
+        <Stack.Screen name="ShareApp" component={ShareAppScreen} />
+        <Stack.Screen name="RateUs" component={RateUsScreen} />
+        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
 
-
-<Stack.Screen name="ShareApp" component={ShareAppScreen} />
-<Stack.Screen name="RateUs" component={RateUsScreen} />
-<Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-
-
+        <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
 
         <Stack.Screen name="CourseDetail" component={CourseDetail} />
         <Stack.Screen name="Courses" component={CoursePage} />
