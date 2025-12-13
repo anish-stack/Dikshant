@@ -1,50 +1,108 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Layout from '../../components/layout';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import styles from './commonStyle';
+import axios from 'axios';
+import { API_URL_LOCAL_ENDPOINT } from '../../constant/api';
 
 export function Settings() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [whatsappNotifications, setWhatsappNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [autoPlay, setAutoPlay] = useState(true);
   const [downloadQuality, setDownloadQuality] = useState('HD');
 
+  // Trigger haptic feedback
   const triggerHaptic = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {}
+    } catch {}
   };
 
-  const handleToggle = (setter, value) => {
+  // Update user settings via API
+  const updateUserSetting = async (key, value) => {
+    try {
+      await axios.post(`${API_URL_LOCAL_ENDPOINT}/userSetting`, {
+        [key]: value,
+      });
+    } catch (error) {
+      console.error('❌ Failed to update setting:', key, error);
+    }
+  };
+
+  // Check notification permission before enabling
+  const togglePushNotification = async (value) => {
+    triggerHaptic();
+
+    if (!value) {
+      setPushNotifications(false);
+      updateUserSetting('pushNotifications', false);
+      return;
+    }
+
+    // Check permission
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      const { status: newStatus } = await Notifications.requestPermissionsAsync();
+      if (newStatus !== 'granted') {
+        Alert.alert(
+          'Permission required',
+          'Please enable notifications in system settings to receive push notifications'
+        );
+        return;
+      }
+    }
+
+    setPushNotifications(true);
+    updateUserSetting('pushNotifications', true);
+  };
+
+  // Generic toggle handler
+  const handleToggle = (setter, key, value) => {
     triggerHaptic();
     setter(!value);
+    updateUserSetting(key, !value);
   };
 
+  // Download quality options
   const showQualityOptions = () => {
     triggerHaptic();
-    Alert.alert(
-      'Download Quality',
-      'Choose video download quality',
-      [
-        { text: 'SD', onPress: () => setDownloadQuality('SD') },
-        { text: 'HD', onPress: () => setDownloadQuality('HD') },
-        { text: 'Full HD', onPress: () => setDownloadQuality('Full HD') },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Download Quality', 'Choose video download quality', [
+      { text: 'SD', onPress: () => { setDownloadQuality('SD'); updateUserSetting('downloadQuality', 'SD'); } },
+      { text: 'HD', onPress: () => { setDownloadQuality('HD'); updateUserSetting('downloadQuality', 'HD'); } },
+      { text: 'Full HD', onPress: () => { setDownloadQuality('Full HD'); updateUserSetting('downloadQuality', 'Full HD'); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  // Clear app cache
+  const handleClearCache = async () => {
+    triggerHaptic();
+    Alert.alert('Clear Cache', 'This will clear all cached data. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: async () => {
+          try {
+            await axios.get(`http://192.168.1.12:5001/flush-all`);
+            Alert.alert('Cache cleared successfully');
+          } catch (error) {
+            console.error('❌ Clear cache failed', error);
+          }
+        } 
+      },
+    ]);
   };
 
   const settingsSections = [
@@ -56,34 +114,23 @@ export function Settings() {
           label: 'Push Notifications',
           description: 'Receive notifications on your device',
           value: pushNotifications,
-          onToggle: () => handleToggle(setPushNotifications, pushNotifications),
+          onToggle: () => togglePushNotification(pushNotifications),
         },
         {
           label: 'Email Notifications',
           description: 'Receive updates via email',
           value: emailNotifications,
-          onToggle: () => handleToggle(setEmailNotifications, emailNotifications),
+          onToggle: () => handleToggle(setEmailNotifications, 'emailNotifications', emailNotifications),
         },
         {
-          label: 'Course Updates',
-          description: 'Get notified about new courses',
-          value: notificationsEnabled,
-          onToggle: () => handleToggle(setNotificationsEnabled, notificationsEnabled),
+          label: 'WhatsApp Notifications',
+          description: 'Receive updates via WhatsApp',
+          value: whatsappNotifications,
+          onToggle: () => handleToggle(setWhatsappNotifications, 'whatsappNotifications', whatsappNotifications),
         },
       ],
     },
-    {
-      title: 'Appearance',
-      icon: 'sun',
-      items: [
-        {
-          label: 'Dark Mode',
-          description: 'Switch to dark theme',
-          value: darkMode,
-          onToggle: () => handleToggle(setDarkMode, darkMode),
-        },
-      ],
-    },
+
     {
       title: 'Video Playback',
       icon: 'play-circle',
@@ -92,7 +139,7 @@ export function Settings() {
           label: 'Auto-Play Videos',
           description: 'Automatically play next video',
           value: autoPlay,
-          onToggle: () => handleToggle(setAutoPlay, autoPlay),
+          onToggle: () => handleToggle(setAutoPlay, 'autoPlay', autoPlay),
         },
       ],
     },
@@ -105,22 +152,11 @@ export function Settings() {
       value: downloadQuality,
       onPress: showQualityOptions,
     },
-
     {
       icon: 'trash-2',
       label: 'Clear Cache',
       danger: true,
-      onPress: () => {
-        triggerHaptic();
-        Alert.alert(
-          'Clear Cache',
-          'This will clear all cached data. Continue?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Clear', style: 'destructive', onPress: () => {} },
-          ]
-        );
-      },
+      onPress: handleClearCache,
     },
   ];
 

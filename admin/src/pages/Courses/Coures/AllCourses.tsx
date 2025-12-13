@@ -512,19 +512,24 @@ const AllBatches = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-center items-center gap-1">
-                        <Button size="sm" variant="ghost" asChild>
+                        <Button size="sm" variant="outline">
+                          <Link to={`/all-courses/add-video/${batch.id}`} className="text-xs truncate">
+                            Add Videos
+                          </Link>
+                        </Button>
+                           <Button size="sm" variant="outline">
                           <Link to={`/all-courses/view/${batch.id}`} className="text-xs">
                             View
                           </Link>
                         </Button>
-                        <Button size="sm" variant="ghost" asChild>
+                        <Button size="sm" variant="outline">
                           <Link to={`/all-courses/edit/${batch.id}`} className="text-xs">
                             Edit
                           </Link>
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           onClick={() => toggleStatus(batch)}
                           className={cn(
                             "text-xs",
@@ -542,7 +547,7 @@ const AllBatches = () => {
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
+                          variant="outline"
                           className="text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-xs"
                           onClick={() => setDeleteModal({ open: true, batch })}
                           title="Delete"
@@ -634,10 +639,15 @@ const AllBatches = () => {
                     </span>
                   </div>
                   <div className="pt-3 flex gap-2 flex-wrap border-t border-gray-200 dark:border-gray-800">
-                    <Button size="sm" asChild className="text-xs">
+                    <Button size="sm"  className="text-xs">
                       <Link to={`/all-courses/view/${batch.id}`}>View</Link>
                     </Button>
-                    <Button size="sm" variant="outline" asChild className="text-xs">
+                     <Button size="sm" className="text-xs" variant="outline">
+                          <Link to={`/all-courses/add-video/${batch.id}`} className="text-xs truncate">
+                            Add Videos
+                          </Link>
+                        </Button>
+                    <Button size="sm" variant="outline"  className="text-xs">
                       <Link to={`/all-courses/edit/${batch.id}`}>Edit</Link>
                     </Button>
                     <Button
@@ -698,7 +708,7 @@ const AllBatches = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999 p-4">
           <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full shadow-xl border border-gray-200 dark:border-gray-800">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">

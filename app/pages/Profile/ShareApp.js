@@ -222,7 +222,7 @@ const ShareAppScreen = () => {
 const RateUsScreen = () => {
   const [selectedRating, setSelectedRating] = useState(0);
   const [feedback, setFeedback] = useState("");
-
+  const { token } = useAuthStore();
   const { settings } = useSettings();
 
   const appLinks = {
@@ -242,13 +242,38 @@ const RateUsScreen = () => {
     }
 
     try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const payload = {
+        rating: selectedRating,
+        feedback: feedback || null,
+        platform: Platform.OS === "ios" ? "ios" : "android",
+      };
+
+      const res = await axios.post(
+        `${API_URL_LOCAL_ENDPOINT}/app-ratings`,
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // ✅ FIX
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("✅ Rating submitted:", res.data);
 
       Alert.alert("Thank You!", "Your rating has been submitted successfully.");
+
       setSelectedRating(0);
       setFeedback("");
     } catch (error) {
-      Alert.alert("Error", "Failed to submit rating");
+      console.error("❌ Rating Submit Error:", error?.response || error);
+
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to submit rating"
+      );
     }
   };
 
@@ -403,6 +428,9 @@ const RateUsScreen = () => {
 
 import { TextInput } from "react-native";
 import { useSettings } from "../../hooks/useSettings";
+import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
+import { useAuthStore } from "../../stores/auth.store";
+import axios from "axios";
 
 const HelpSupportScreen = () => {
   const [formData, setFormData] = React.useState({
@@ -429,54 +457,71 @@ const HelpSupportScreen = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmitForm = async () => {
-    if (
-      !formData.name ||
-      !formData.email ||
-      !formData.subject ||
-      !formData.message
-    ) {
-      Alert.alert("Error", "Please fill in all required fields");
-      return;
-    }
+const handleSubmitForm = async () => {
+  if (
+    !formData.name ||
+    !formData.email ||
+    !formData.subject ||
+    !formData.message
+  ) {
+    Alert.alert("Error", "Please fill in all required fields");
+    return;
+  }
 
-    try {
-      setIsSubmitting(true);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  try {
+    setIsSubmitting(true);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      // API call to submit support ticket
-      // const response = await fetch('/api/support-tickets', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...formData,
-      //     timestamp: new Date().toISOString()
-      //   })
-      // });
+    const payload = {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      subject: formData.subject.trim(),
+      category: formData.category || "general",
+      message: formData.message.trim(),
+    };
 
-      // Simulating API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    const res = await axios.post(
+      `${API_URL_LOCAL_ENDPOINT}/support`,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          // Authorization: `Bearer ${token}`, // 🔐 if needed
+        },
+        timeout: 10000,
+      }
+    );
 
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        "Success",
+    await Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Success
+    );
+
+    Alert.alert(
+      "Success",
+      res?.data?.message ||
         "Your support ticket has been submitted. We'll get back to you soon!"
-      );
+    );
 
-      // Reset form
-      setFormData({
-        name: "",
-        email: "",
-        subject: "",
-        category: "general",
-        message: "",
-      });
-    } catch (error) {
-      Alert.alert("Error", "Failed to submit support ticket");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // Reset form
+    setFormData({
+      name: "",
+      email: "",
+      subject: "",
+      category: "general",
+      message: "",
+    });
+  } catch (error) {
+    console.error("❌ Support Submit Error:", error);
+
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message ||
+        "Failed to submit support ticket"
+    );
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const openLink = async (type, value) => {
     if (!value) {

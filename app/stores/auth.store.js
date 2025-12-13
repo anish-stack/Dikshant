@@ -9,6 +9,7 @@ axios.defaults.headers.common["Content-Type"] = "application/json";
 export const useAuthStore = create((set, get) => ({
   phone: "",
   token: null,
+  refreshtoken: null,
   loggedIn: false,
   otpSent: false,
   user: null,
@@ -20,8 +21,16 @@ export const useAuthStore = create((set, get) => ({
   // 🔹 Step 1: Signup - Register new user
   signup: async (formData) => {
     try {
-      const { name, email, phone, password } = formData;
-
+      const {
+        name,
+        email,
+        mobile: phone,
+        password,
+        device_id,
+        fcm_token,
+        platform,
+        appVersion,
+      } = formData;
       // Validation
       if (!name || !email || !phone || !password) {
         throw new Error("All fields are required");
@@ -44,6 +53,10 @@ export const useAuthStore = create((set, get) => ({
         email,
         mobile: phone,
         password,
+        device_id,
+        fcm_token,
+        platform,
+        appVersion,
       });
       const { id } = response.data.user;
 
@@ -57,9 +70,9 @@ export const useAuthStore = create((set, get) => ({
         message: "Signup successful! OTP sent to your phone.",
       };
     } catch (error) {
-      console.error("Signup Error:", error);
+      console.error("Signup Error:", error.response?.data.error);
       const errorMessage =
-        error.response?.data?.message || error.message || "Signup failed";
+        error.response?.data.error || error.message || "Signup failed";
       throw new Error(errorMessage);
     }
   },
@@ -147,7 +160,15 @@ export const useAuthStore = create((set, get) => ({
   },
 
   // 🔹 Step 4: Direct Login with Password
-  login: async (phone,otp, password) => {
+  login: async (
+    phone,
+    otp,
+    password,
+    device_id,
+    fcm_token,
+    platform,
+    appVersion
+  ) => {
     try {
       if (!phone) {
         throw new Error("Phone number is required");
@@ -161,6 +182,10 @@ export const useAuthStore = create((set, get) => ({
         mobile: phone,
         otp: otp ? otp : "",
         password: password ? password : "",
+        device_id,
+        fcm_token,
+        platform,
+        appVersion,
       });
 
       console.log("response.data", response.data);
@@ -168,7 +193,8 @@ export const useAuthStore = create((set, get) => ({
       // If OTP was sent (NO TOKEN)
       if (
         response.data.success &&
-        response.data.message === "OTP sent successfully"
+        response.data.message ===
+          "OTP sent successfully! Please check your messages."
       ) {
         return {
           success: true,
@@ -179,19 +205,21 @@ export const useAuthStore = create((set, get) => ({
       }
 
       // Password login - save token
-      const { token, user } = response.data;
+      const { token, user, refresh_token } = response.data;
 
       if (!token) {
         throw new Error("Token missing in response");
       }
 
       await AsyncStorage.setItem("authToken", token);
+      await AsyncStorage.setItem("refresh_token", refresh_token);
 
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
       set({
         loggedIn: true,
         token: token,
+        refreshtoken: refresh_token,
         user: user,
         phone: phone,
         userId: user.id,
@@ -217,7 +245,6 @@ export const useAuthStore = create((set, get) => ({
 
   getProfileApi: async () => {
     try {
-
       // Fetch token
       const authToken = await AsyncStorage.getItem("authToken");
 
@@ -232,7 +259,6 @@ export const useAuthStore = create((set, get) => ({
       // API Call
       console.log("🌍 [getProfile] Calling API: /auth/profile-details");
       const response = await axios.get("/auth/profile-details");
-
 
       const user = response.data.data;
       // console.log("👤 [getProfile] Extracted User:", user);
@@ -263,36 +289,40 @@ export const useAuthStore = create((set, get) => ({
   },
 
   // 🔹 Check login state on app start
-checkLogin: async () => {
-  try {
-    const tokenValue = await AsyncStorage.getItem("authToken");
-    
-    if (!tokenValue) {
+  checkLogin: async () => {
+    try {
+      const tokenValue = await AsyncStorage.getItem("authToken");
+
+      if (!tokenValue) {
+        return false;
+      }
+
+      // Set token in axios
+      axios.defaults.headers.common["Authorization"] = `Bearer ${tokenValue}`;
+
+      // Try to fetch profile
+      const user = await get().getProfileApi();
+
+      return !!user;
+    } catch (error) {
+      console.error("checkLogin error:", error);
       return false;
     }
-
-    // Set token in axios
-    axios.defaults.headers.common["Authorization"] = `Bearer ${tokenValue}`;
-
-    // Try to fetch profile
-    const user = await get().getProfileApi();
-
-    return !!user; 
-  } catch (error) {
-    console.error("checkLogin error:", error);
-    return false;
-  }
-},
+  },
 
   // 🔹 Logout
   logout: async (navigation) => {
     try {
-      // Clear all auth data from AsyncStorage
+      // 1️⃣ Call backend logout API
+      await axios.get(`${API_URL_LOCAL_ENDPOINT}/auth/logout`);
+
+      // 2️⃣ Clear all auth data from AsyncStorage
       await AsyncStorage.multiRemove(["authToken"]);
 
-      // Remove token from axios headers
+      // 3️⃣ Remove token from axios headers
       delete axios.defaults.headers.common["Authorization"];
 
+      // 4️⃣ Reset navigation stack to Login
       if (navigation) {
         navigation.reset({
           index: 0,
@@ -300,6 +330,7 @@ checkLogin: async () => {
         });
       }
 
+      // 5️⃣ Reset Zustand store
       set({
         loggedIn: false,
         token: null,
@@ -311,8 +342,12 @@ checkLogin: async () => {
 
       return { success: true, message: "Logged out successfully" };
     } catch (error) {
-      console.error("Logout Error:", error);
-      throw error;
+      console.error("Logout Error:", error.response.data);
+      return {
+        success: false,
+        message: "Failed to logout",
+        error: error.message,
+      };
     }
   },
 

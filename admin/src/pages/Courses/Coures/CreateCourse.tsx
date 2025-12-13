@@ -330,7 +330,7 @@ const CreateBatch = () => {
                   </button>
 
                   {subjectsDropdownOpen && !loadingSubjects && (
-                    <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                    <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-99999 max-h-80 overflow-hidden">
                       <div className="p-2 sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                         <div className="relative">
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

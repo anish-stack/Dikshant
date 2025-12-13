@@ -13,6 +13,8 @@ import {
   Modal,
   KeyboardAvoidingView,
   Slider,
+  ScrollView,
+  RefreshControl,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -23,16 +25,16 @@ import * as Haptics from "expo-haptics";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 import { useAuthStore } from "../../stores/auth.store";
+import axios from "axios";
 
 const { width, height } = Dimensions.get("window");
 const isTablet = width >= 768;
 
-// Modern Light Color Palette
 const colors = {
-  primary: "#EF4444", // Indigo
+  primary: "#EF4444",
   primaryLight: "#EEF2FF",
   primaryDark: "#4F46E5",
-  accent: "#EC4899", // Pink
+  accent: "#EC4899",
   background: "#FAFAFA",
   card: "#FFFFFF",
   text: "#1F2937",
@@ -45,7 +47,7 @@ const colors = {
   shadow: "rgba(0, 0, 0, 0.1)",
 };
 
-// Automatic progress tracking every 10 seconds
+// Automatic progress tracking
 const saveProgress = async (userId, videoId, batchId, watched, duration) => {
   if (!userId || !videoId || !batchId) return;
 
@@ -55,24 +57,18 @@ const saveProgress = async (userId, videoId, batchId, watched, duration) => {
     batchId,
     watched: Math.floor(watched),
     duration: Math.floor(duration || 3600),
-    percentage: Math.min(
-      100,
-      Math.round((Math.floor(watched) / (duration || 3600)) * 100)
-    ),
+    percentage: Math.min(100, Math.round((Math.floor(watched) / (duration || 3600)) * 100)),
     lastPosition: Math.floor(watched),
     lastWatchedAt: new Date().toISOString(),
     completedAt: Math.floor(watched) / (duration || 3600) > 0.95 ? new Date().toISOString() : null,
   };
 
   try {
-    const response = await fetch(
-      `${API_URL_LOCAL_ENDPOINT}/courseprogresss`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }
-    );
+    const response = await fetch(`${API_URL_LOCAL_ENDPOINT}/courseprogresss`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     if (response.ok) {
       console.log("✅ Progress saved:", payload.percentage + "%");
     }
@@ -101,21 +97,37 @@ export default function MyEnrollCourse() {
   const route = useRoute();
   const navigation = useNavigation();
   const { courseId, unlocked = false, userId } = route.params || {};
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
+  
+  // Video Player States
   const [currentVideo, setCurrentVideo] = useState(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [showComments, setShowComments] = useState(false);
-  const [showDoubts, setShowDoubts] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
-  const [showSpeed, setShowSpeed] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [volume, setVolume] = useState(100);
-  const [showVolumeControl, setShowVolumeControl] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showSpeed, setShowSpeed] = useState(false);
+  const [showVolumeControl, setShowVolumeControl] = useState(false);
+  
+  // Comments States
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  
+  // Doubts States
+  const [showDoubts, setShowDoubts] = useState(false);
+  const [showMyDoubts, setShowMyDoubts] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [question, setQuestion] = useState("");
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [myDoubts, setMyDoubts] = useState([]);
+  const [isLoadingDoubts, setIsLoadingDoubts] = useState(false);
+  const [refreshingDoubts, setRefreshingDoubts] = useState(false);
+  const [videoTimestamp, setVideoTimestamp] = useState(null);
+  
   const playerRef = useRef(null);
   const progressInterval = useRef(null);
 
@@ -141,6 +153,23 @@ export default function MyEnrollCourse() {
     return match ? match[1] : null;
   };
 
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const formatTimestamp = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   const playVideo = async (video) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCurrentVideo(video);
@@ -148,6 +177,7 @@ export default function MyEnrollCourse() {
     setIsPlaying(true);
     setShowComments(false);
     setShowDoubts(false);
+    setShowMyDoubts(false);
 
     const savedPosition = await fetchProgress(user?.id, video.id);
     if (savedPosition > 0) {
@@ -176,6 +206,118 @@ export default function MyEnrollCourse() {
         likes: 5,
       },
     ]);
+
+    // Fetch doubts for this video
+    fetchMyDoubtsForVideo(video.id);
+  };
+
+  // Fetch user's doubts for current video
+  const fetchMyDoubtsForVideo = async (lessonId = null) => {
+    if (!token) return;
+    
+    setIsLoadingDoubts(true);
+    try {
+      const res = await axios.get(`${API_URL_LOCAL_ENDPOINT}/doubt/my`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          course_id: courseId,
+          lesson_id: lessonId || currentVideo?.id,
+        },
+      });
+
+      console.log("✅ My Doubts:", res.data);
+      const data = res.data || res.data.data
+      setMyDoubts(data || []);
+    } catch (error) {
+      console.error("❌ Fetch My Doubts Error:", error.response.data);
+    } finally {
+      setIsLoadingDoubts(false);
+      setRefreshingDoubts(false);
+    }
+  };
+
+  // Submit a new doubt
+  const handleAskDoubt = async () => {
+    if (!subject.trim() || !question.trim()) {
+      Alert.alert("Error", "Please enter subject and your doubt");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const payload = {
+        subject: subject.trim(),
+        question: question.trim(),
+        courseId: courseId || null,
+        lessonId: currentVideo?.id || null,
+        attachmentUrl: attachmentUrl.trim() || null,
+        videoTimestamp: videoTimestamp || Math.floor(currentTime),
+      };
+
+      const res = await axios.post(
+        `${API_URL_LOCAL_ENDPOINT}/doubt`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log("✅ Doubt Submitted:", res.data);
+      
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Success", "Your doubt has been submitted successfully");
+
+      // Reset form
+      setSubject("");
+      setQuestion("");
+      setAttachmentUrl("");
+      setVideoTimestamp(null);
+      setShowDoubts(false);
+
+      // Refresh doubts list
+      fetchMyDoubtsForVideo(currentVideo?.id);
+    } catch (error) {
+      console.error("❌ Ask Doubt Error:", error);
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to submit doubt"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Like a doubt
+  const handleLikeDoubt = async (doubtId) => {
+    try {
+      await axios.post(
+        `${API_URL_LOCAL_ENDPOINT}/doubt/${doubtId}/like`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Update local state
+      setMyDoubts(prevDoubts =>
+        prevDoubts.map(doubt =>
+          doubt.id === doubtId
+            ? { ...doubt, likes: (doubt.likes || 0) + 1 }
+            : doubt
+        )
+      );
+    } catch (error) {
+      console.error("❌ Like Doubt Error:", error);
+    }
+  };
+
+  // Capture current video timestamp
+  const captureTimestamp = () => {
+    setVideoTimestamp(Math.floor(currentTime));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   // Automatic progress tracking every 10 seconds
@@ -187,17 +329,15 @@ export default function MyEnrollCourse() {
       return;
     }
 
-    // Clear any existing interval
     if (progressInterval.current) {
       clearInterval(progressInterval.current);
     }
 
-    // Set up new interval to save every 10 seconds
     progressInterval.current = setInterval(() => {
       if (currentTime > 0) {
         saveProgress(user?.id, currentVideo.id, courseId, currentTime, videoDuration);
       }
-    }, 10000); // 10 seconds
+    }, 10000);
 
     return () => {
       if (progressInterval.current) {
@@ -223,11 +363,6 @@ export default function MyEnrollCourse() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const handleDoubts = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowDoubts(true);
-  };
-
   const handleBookmark = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert("✅ Bookmarked", `${currentVideo?.title} added to bookmarks`);
@@ -238,10 +373,16 @@ export default function MyEnrollCourse() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  const handleOpenDoubts = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowDoubts(true);
+    setVideoTimestamp(Math.floor(currentTime)); // Auto-capture timestamp
+  };
+
+  const handleViewMyDoubts = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowMyDoubts(true);
+    fetchMyDoubtsForVideo(currentVideo?.id);
   };
 
   if (batchLoading || videosLoading) {
@@ -265,18 +406,16 @@ export default function MyEnrollCourse() {
     );
   }
 
-  const progressPercentage =
-    videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
+  const progressPercentage = videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
   const videoId = currentVideo ? getYouTubeId(currentVideo.url) : null;
 
   return (
     <SafeAreaView style={styles.container}>
       {currentVideo && (
         <>
-          {/* Modern Player Container */}
+          {/* Player Container */}
           <View style={styles.playerContainer}>
             <View style={styles.playerBackground}>
-              {/* Player */}
               <YoutubePlayer
                 ref={playerRef}
                 height={isTablet ? 400 : 240}
@@ -306,7 +445,6 @@ export default function MyEnrollCourse() {
                 }}
               />
 
-          
               {/* Progress Bar */}
               <View style={styles.progressBar}>
                 <View
@@ -323,6 +461,9 @@ export default function MyEnrollCourse() {
                   <Text style={styles.playerTitle} numberOfLines={2}>
                     {currentVideo.title}
                   </Text>
+                  <Text style={styles.playerTime}>
+                    {formatTime(currentTime)} / {formatTime(videoDuration)}
+                  </Text>
                 </View>
 
                 <View style={styles.playerActions}>
@@ -333,9 +474,9 @@ export default function MyEnrollCourse() {
               </View>
             </View>
 
-            {/* Enhanced Action Bar */}
+            {/* Action Bar */}
             <View style={styles.actionBar}>
-              <TouchableOpacity
+              {/* <TouchableOpacity
                 style={[
                   styles.actionBarButton,
                   showComments && styles.actionBarButtonActive,
@@ -347,89 +488,29 @@ export default function MyEnrollCourse() {
               >
                 <Feather name="message-circle" size={22} color={colors.primary} />
                 <Text style={styles.actionBarLabel}>Comments</Text>
-              </TouchableOpacity>
+              </TouchableOpacity> */}
 
-       
               <TouchableOpacity
                 style={styles.actionBarButton}
-                onPress={handleDoubts}
+                onPress={handleOpenDoubts}
               >
                 <Feather name="help-circle" size={22} color={colors.primary} />
                 <Text style={styles.actionBarLabel}>Ask Doubt</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBarButton}
+                onPress={handleViewMyDoubts}
+              >
+                <Feather name="list" size={22} color={colors.primary} />
+                <Text style={styles.actionBarLabel}>My Doubts</Text>
+                {myDoubts.length > 0 && (
+                  <View style={styles.doubtBadge}>
+                    <Text style={styles.doubtBadgeText}>{myDoubts.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
-
-            {/* Speed Selector */}
-            {showSpeed && (
-              <View style={styles.controlPanel}>
-                <Text style={styles.controlPanelTitle}>Playback Speed</Text>
-                <View style={styles.speedGrid}>
-                  {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((speed) => (
-                    <TouchableOpacity
-                      key={speed}
-                      style={[
-                        styles.speedOption,
-                        playbackSpeed === speed && styles.speedOptionActive,
-                      ]}
-                      onPress={() => {
-                        setPlaybackSpeed(speed);
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.speedText2,
-                          playbackSpeed === speed && styles.speedTextActive,
-                        ]}
-                      >
-                        {speed}x
-                      </Text>
-                      {playbackSpeed === speed && (
-                        <Feather name="check" size={16} color="#fff" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {/* Volume Control */}
-            {showVolumeControl && (
-              <View style={styles.controlPanel}>
-                <View style={styles.volumeHeader}>
-                  <Text style={styles.controlPanelTitle}>Volume Control</Text>
-                  <TouchableOpacity 
-                    onPress={toggleMute}
-                    style={styles.muteButton}
-                  >
-                    <Feather 
-                      name={isMuted ? "volume-x" : "volume-2"} 
-                      size={20} 
-                      color={colors.primary} 
-                    />
-                    <Text style={styles.muteText}>
-                      {isMuted ? "Unmute" : "Mute"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.volumeSliderContainer}>
-                  <Feather name="volume-1" size={18} color={colors.textLight} />
-                  <Slider
-                    style={styles.volumeSlider}
-                    minimumValue={0}
-                    maximumValue={100}
-                    value={isMuted ? 0 : volume}
-                    onValueChange={setVolume}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.border}
-                    thumbTintColor={colors.primary}
-                    disabled={isMuted}
-                  />
-                  <Feather name="volume-2" size={18} color={colors.textLight} />
-                  <Text style={styles.volumeText}>{Math.round(volume)}%</Text>
-                </View>
-              </View>
-            )}
 
             {/* Comments Section */}
             {showComments && (
@@ -470,7 +551,6 @@ export default function MyEnrollCourse() {
                   )}
                 />
 
-                {/* Add Comment */}
                 <KeyboardAvoidingView behavior="padding" style={styles.addCommentBox}>
                   <TextInput
                     style={styles.commentInput}
@@ -553,26 +633,6 @@ export default function MyEnrollCourse() {
                   {item.subject && (
                     <Text style={styles.videoSubject}>📖 {item.subject}</Text>
                   )}
-                  <View style={styles.tagsContainer}>
-                    {item.isLive && (
-                      <View style={styles.liveBadge}>
-                        <View style={styles.liveIndicator} />
-                        <Text style={styles.liveText}>LIVE</Text>
-                      </View>
-                    )}
-                    {item.isNotes && (
-                      <View style={styles.tagBadge}>
-                        <Feather name="file-text" size={10} color={colors.primary} />
-                        <Text style={styles.tagText}>Notes</Text>
-                      </View>
-                    )}
-                    {item.isPdf && (
-                      <View style={styles.tagBadge}>
-                        <Feather name="download" size={10} color={colors.success} />
-                        <Text style={styles.tagText}>PDF</Text>
-                      </View>
-                    )}
-                  </View>
                 </View>
 
                 {isCurrentPlaying && (
@@ -586,17 +646,14 @@ export default function MyEnrollCourse() {
         }}
       />
 
-      {/* Doubts Modal */}
+      {/* Ask Doubt Modal */}
       <Modal
         visible={showDoubts}
         transparent
         animationType="slide"
         onRequestClose={() => setShowDoubts(false)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={styles.doubtModal}
-        >
+        <KeyboardAvoidingView behavior="padding" style={styles.doubtModal}>
           <View style={styles.doubtContent}>
             <View style={styles.doubtHeader}>
               <Text style={styles.doubtTitle}>❓ Ask Your Doubt</Text>
@@ -605,30 +662,176 @@ export default function MyEnrollCourse() {
               </TouchableOpacity>
             </View>
 
-            <TextInput
-              style={styles.doubtInput}
-              placeholder="Describe your doubt in detail..."
-              placeholderTextColor={colors.textMuted}
-              multiline
-              numberOfLines={6}
-            />
+            <ScrollView showsVerticalScrollIndicator={false}>
+           
+              {/* Subject Input */}
+              <Text style={styles.inputLabel}>Subject *</Text>
+              <TextInput
+                style={styles.doubtSubjectInput}
+                placeholder="e.g., Quadratic Equations"
+                placeholderTextColor={colors.textMuted}
+                value={subject}
+                onChangeText={setSubject}
+              />
 
-            <TouchableOpacity 
-              style={styles.submitDoubtBtn}
-              onPress={() => {
-                setShowDoubts(false);
-                Alert.alert("✅ Doubt Submitted", "Instructors will respond within 24 hours");
-              }}
-            >
-              <Feather name="send" size={18} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.submitDoubtBtnText}>Submit Doubt</Text>
-            </TouchableOpacity>
+              {/* Question Input */}
+              <Text style={styles.inputLabel}>Your Doubt *</Text>
+              <TextInput
+                style={styles.doubtInput}
+                placeholder="Describe your doubt in detail..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={6}
+                value={question}
+                onChangeText={setQuestion}
+              />
 
-            <Text style={styles.doubtInfo}>
-              ⚡ Your doubt will be answered by instructors within 24 hours
-            </Text>
+     
+              <TouchableOpacity
+                style={[
+                  styles.submitDoubtBtn,
+                  isSubmitting && styles.submitDoubtBtnDisabled
+                ]}
+                onPress={handleAskDoubt}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Feather name="send" size={18} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={styles.submitDoubtBtnText}>Submit Doubt</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.doubtInfo}>
+                ⚡ Your doubt will be answered by instructors within 10 min
+              </Text>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* My Doubts Modal */}
+      <Modal
+        visible={showMyDoubts}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMyDoubts(false)}
+      >
+        <View style={styles.myDoubtsModal}>
+          <View style={styles.myDoubtsContent}>
+            <View style={styles.doubtHeader}>
+              <Text style={styles.doubtTitle}>📝 My Doubts</Text>
+              <TouchableOpacity onPress={() => setShowMyDoubts(false)}>
+                <Feather name="x" size={28} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingDoubts ? (
+              <View style={styles.loadingDoubts}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingDoubtsText}>Loading your doubts...</Text>
+              </View>
+            ) : myDoubts.length === 0 ? (
+              <View style={styles.emptyDoubts}>
+                <Feather name="help-circle" size={64} color={colors.textMuted} />
+                <Text style={styles.emptyDoubtsTitle}>No Doubts Yet</Text>
+                <Text style={styles.emptyDoubtsText}>
+                  Ask your first doubt to get started!
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={myDoubts}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.doubtsList}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshingDoubts}
+                    onRefresh={() => {
+                      setRefreshingDoubts(true);
+                      fetchMyDoubtsForVideo(currentVideo?.id);
+                    }}
+                    colors={[colors.primary]}
+                  />
+                }
+                renderItem={({ item }) => (
+                  <View style={styles.doubtCard}>
+                    {/* Status Badge */}
+                    <View style={styles.doubtCardHeader}>
+                      <View style={[
+                        styles.statusBadge,
+                        item.status === 'answered' && styles.statusBadgeAnswered,
+                        item.status === 'closed' && styles.statusBadgeClosed
+                      ]}>
+                        <Text style={styles.statusBadgeText}>
+                          {item.status === 'open' ? '🕐 Open' :
+                           item.status === 'answered' ? '✅ Answered' : '🔒 Closed'}
+                        </Text>
+                      </View>
+
+                      {item.videoTimestamp && (
+                        <View style={styles.timestampBadge}>
+                          <Feather name="clock" size={12} color={colors.textLight} />
+                          <Text style={styles.timestampBadgeText}>
+                            {formatTimestamp(item.videoTimestamp)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Subject */}
+                    <Text style={styles.doubtCardSubject}>{item.subject}</Text>
+
+                    {/* Question */}
+                    <Text style={styles.doubtCardQuestion} numberOfLines={3}>
+                      {item.question}
+                    </Text>
+
+                    {/* Answer Section */}
+                    {item.answer && (
+                      <View style={styles.answerSection}>
+                        <View style={styles.answerHeader}>
+                          <Feather name="message-square" size={16} color={colors.success} />
+                          <Text style={styles.answerLabel}>Answer:</Text>
+                        </View>
+                        <Text style={styles.answerText}>{item.answer}</Text>
+                        {item.answeredBy && (
+                          <Text style={styles.answeredBy}>
+                            — {item.answeredBy}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Footer Actions */}
+                    <View style={styles.doubtCardFooter}>
+                      <TouchableOpacity
+                        style={styles.likeButton}
+                        onPress={() => handleLikeDoubt(item.id)}
+                      >
+                        <Feather name="thumbs-up" size={16} color={colors.primary} />
+                        <Text style={styles.likeButtonText}>
+                          {item.likes || 0} {item.likes === 1 ? 'Like' : 'Likes'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <Text style={styles.doubtCardTime}>
+                        {new Date(item.createdAt).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              />
+            )}
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -669,7 +872,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-
   playerContainer: {
     backgroundColor: "#000",
     elevation: 8,
@@ -681,70 +883,6 @@ const styles = StyleSheet.create({
   playerBackground: {
     backgroundColor: "#000",
     position: "relative",
-  },
-  controlsOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-    zIndex: 10,
-    justifyContent: "space-between",
-  },
-  topControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    gap: 12,
-  },
-  controlButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  overlayTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    flex: 1,
-  },
-  centerControls: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  playButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(99, 102, 241, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bottomControls: {
-    padding: 16,
-  },
-  timeRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  timeText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  speedText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
   },
   progressBar: {
     height: 4,
@@ -771,6 +909,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     lineHeight: 20,
+    marginBottom: 4,
+  },
+  playerTime: {
+    fontSize: 12,
+    color: colors.textLight,
+    fontWeight: "600",
   },
   playerActions: {
     flexDirection: "row",
@@ -785,7 +929,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   actionBar: {
     flexDirection: "row",
     backgroundColor: colors.card,
@@ -801,6 +944,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     minWidth: 80,
+    position: "relative",
   },
   actionBarButtonActive: {
     backgroundColor: colors.primaryLight,
@@ -811,88 +955,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600",
   },
-
-  controlPanel: {
-    backgroundColor: colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
-  controlPanelTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: 12,
-  },
-  speedGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  speedOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: colors.background,
-    borderWidth: 2,
-    borderColor: colors.border,
-    minWidth: 80,
+  doubtBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: colors.error,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
   },
-  speedOptionActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  speedText2: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: "700",
-  },
-  speedTextActive: {
+  doubtBadgeText: {
     color: "#fff",
-  },
-
-  volumeHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  muteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: colors.primaryLight,
-  },
-  muteText: {
-    fontSize: 13,
-    color: colors.primary,
-    fontWeight: "600",
-  },
-  volumeSliderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  volumeSlider: {
-    flex: 1,
-    height: 40,
-  },
-  volumeText: {
-    fontSize: 14,
-    color: colors.text,
+    fontSize: 10,
     fontWeight: "700",
-    minWidth: 45,
-    textAlign: "right",
   },
-
   commentsPanel: {
     maxHeight: height * 0.4,
     backgroundColor: colors.background,
@@ -1000,7 +1079,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-
   content: {
     padding: 16,
   },
@@ -1062,7 +1140,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 16,
   },
-
   videoCard: {
     backgroundColor: colors.card,
     borderRadius: 16,
@@ -1120,54 +1197,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textLight,
     fontWeight: "600",
-    marginBottom: 8,
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.error,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  liveIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#fff",
-  },
-  liveText: {
-    fontSize: 10,
-    color: "#fff",
-    fontWeight: "700",
-  },
-  tagBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.background,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  tagText: {
-    fontSize: 10,
-    color: colors.textLight,
-    fontWeight: "700",
   },
   playingIndicator: {
     marginLeft: 12,
   },
-
   doubtModal: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1179,6 +1212,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 32,
+    maxHeight: height * 0.85,
     elevation: 8,
   },
   doubtHeader: {
@@ -1191,6 +1225,58 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "800",
     color: colors.text,
+  },
+  timestampContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  timestampInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  timestampText: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: "700",
+  },
+  captureButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  captureButtonText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  doubtSubjectInput: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
+    padding: 12,
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: 8,
   },
   doubtInput: {
     backgroundColor: colors.background,
@@ -1211,12 +1297,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 8,
     marginBottom: 12,
     elevation: 2,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  submitDoubtBtnDisabled: {
+    opacity: 0.6,
   },
   submitDoubtBtnText: {
     color: "#fff",
@@ -1228,5 +1318,163 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: "center",
     lineHeight: 18,
+  },
+  myDoubtsModal: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  myDoubtsContent: {
+    flex: 1,
+    backgroundColor: colors.card,
+    marginTop: 60,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    elevation: 8,
+  },
+  loadingDoubts: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  loadingDoubtsText: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 16,
+  },
+  emptyDoubts: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  emptyDoubtsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: 16,
+  },
+  emptyDoubtsText: {
+    fontSize: 14,
+    color: colors.textLight,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  doubtsList: {
+    padding: 16,
+  },
+  doubtCard: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  doubtCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: colors.warning,
+  },
+  statusBadgeAnswered: {
+    backgroundColor: colors.success,
+  },
+  statusBadgeClosed: {
+    backgroundColor: colors.textMuted,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    color: "#fff",
+    fontWeight: "700",
+  },
+  timestampBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.card,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  timestampBadgeText: {
+    fontSize: 11,
+    color: colors.textLight,
+    fontWeight: "600",
+  },
+  doubtCardSubject: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 8,
+  },
+  doubtCardQuestion: {
+    fontSize: 14,
+    color: colors.textLight,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  answerSection: {
+    backgroundColor: colors.card,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  answerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  answerLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.success,
+  },
+  answerText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+    marginBottom: 6,
+  },
+  answeredBy: {
+    fontSize: 12,
+    color: colors.textLight,
+    fontStyle: "italic",
+  },
+  doubtCardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  likeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 20,
+  },
+  likeButtonText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  doubtCardTime: {
+    fontSize: 12,
+    color: colors.textMuted,
   },
 });

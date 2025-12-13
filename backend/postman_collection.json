@@ -1,0 +1,2511 @@
+{
+  "info": {
+    "name": "Dikshant IAS Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Signup",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Test\",\"mobile\":\"9999999999\"}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/auth/signup",
+          "host": [
+            "http://localhost:5000"
+          ],
+          "path": [
+            "auth",
+            "signup"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Request OTP",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"mobile\":\"9999999999\"}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/auth/request-otp",
+          "host": [
+            "http://localhost:5000"
+          ],
+          "path": [
+            "auth",
+            "request-otp"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Verify OTP",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"user_id\":1,\"otp\":\"123456\"}"
+        },
+        "url": {
+          "raw": "http://localhost:5000/auth/verify-otp",
+          "host": [
+            "http://localhost:5000"
+          ],
+          "path": [
+            "auth",
+            "verify-otp"
+          ]
+        }
+      }
+    },
+    
+    {
+      "name": "Program - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/programs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "programs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Program - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/programs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "programs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Program - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/programs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "programs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Program - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/programs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "programs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Program - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/programs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "programs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subject - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/subjects",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "subjects"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subject - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/subjects",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "subjects"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subject - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/subjects/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "subjects",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subject - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/subjects/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "subjects",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Subject - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/subjects/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "subjects",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Batch - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/batchs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batchs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Batch - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/batchs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batchs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Batch - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/batchs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batchs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Batch - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/batchs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batchs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Batch - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/batchs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "batchs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQQuestion - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqquestions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqquestions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQQuestion - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/mcqquestions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqquestions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQQuestion - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQQuestion - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/mcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQQuestion - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipMCQQuestion - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipmcqquestions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipmcqquestions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipMCQQuestion - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipmcqquestions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipmcqquestions"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipMCQQuestion - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipmcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipmcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipMCQQuestion - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipmcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipmcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipMCQQuestion - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipmcqquestions/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipmcqquestions",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VideoCourse - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/videocourses",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "videocourses"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VideoCourse - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/videocourses",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "videocourses"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VideoCourse - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/videocourses/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "videocourses",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VideoCourse - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/videocourses/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "videocourses",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "VideoCourse - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/videocourses/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "videocourses",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PDFNote - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pdfnotes",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pdfnotes"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PDFNote - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/pdfnotes",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pdfnotes"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PDFNote - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pdfnotes/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pdfnotes",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PDFNote - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/pdfnotes/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pdfnotes",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PDFNote - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pdfnotes/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pdfnotes",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TestSeries - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testseriess",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testseriess"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TestSeries - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/testseriess",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testseriess"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TestSeries - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testseriess/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testseriess",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TestSeries - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/testseriess/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testseriess",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "TestSeries - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testseriess/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testseriess",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Announcement - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/announcements",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "announcements"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Announcement - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/announcements",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "announcements"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Announcement - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/announcements/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "announcements",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Announcement - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/announcements/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "announcements",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Announcement - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/announcements/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "announcements",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Order - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "orders",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coupon - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/coupons",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "coupons"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coupon - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/coupons",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "coupons"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coupon - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/coupons/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "coupons",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coupon - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/coupons/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "coupons",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Coupon - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/coupons/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "coupons",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Blog - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/blogs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "blogs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Blog - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/blogs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "blogs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Blog - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/blogs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "blogs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Blog - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/blogs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "blogs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Blog - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/blogs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "blogs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Banner - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/banners",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "banners"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Banner - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/banners",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "banners"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Banner - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/banners/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "banners",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Banner - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/banners/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "banners",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Banner - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/banners/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "banners",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FAQ - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/faqs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "faqs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FAQ - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/faqs",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "faqs"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FAQ - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/faqs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "faqs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FAQ - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/faqs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "faqs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "FAQ - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/faqs/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "faqs",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Testimonial - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testimonials",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testimonials"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Testimonial - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/testimonials",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testimonials"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Testimonial - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testimonials/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testimonials",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Testimonial - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/testimonials/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testimonials",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Testimonial - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/testimonials/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "testimonials",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Page - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pages",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pages"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Page - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/pages",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pages"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Page - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pages/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pages",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Page - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/pages/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pages",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Page - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/pages/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "pages",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "AppSetting - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/appsettings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "appsettings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "AppSetting - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/appsettings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "appsettings"
+          ]
+        }
+      }
+    },
+    {
+      "name": "AppSetting - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/appsettings/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "appsettings",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "AppSetting - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/appsettings/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "appsettings",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "AppSetting - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/appsettings/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "appsettings",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/downloads",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "downloads"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/downloads",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "downloads"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/downloads/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "downloads",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/downloads/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "downloads",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Download - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/downloads/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "downloads",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQResult - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqresults",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqresults"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQResult - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/mcqresults",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqresults"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQResult - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQResult - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/mcqresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCQResult - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/mcqresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "mcqresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipApplication - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipapplications",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipapplications"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipApplication - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipapplications",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipapplications"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipApplication - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipapplications/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipapplications",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipApplication - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipapplications/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipapplications",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipApplication - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipapplications/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipapplications",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipResult - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipresults",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipresults"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipResult - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipresults",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipresults"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipResult - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipResult - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "ScholarshipResult - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarshipresults/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarshipresults",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scholarship - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarships",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarships"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scholarship - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarships",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarships"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scholarship - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarships/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarships",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scholarship - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/scholarships/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarships",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Scholarship - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/scholarships/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "scholarships",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CourseProgress - List",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/courseprogresss",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "courseprogresss"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CourseProgress - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/courseprogresss",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "courseprogresss"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CourseProgress - Get by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/courseprogresss/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "courseprogresss",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CourseProgress - Update",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/courseprogresss/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "courseprogresss",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "CourseProgress - Delete",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/courseprogresss/1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "courseprogresss",
+            "1"
+          ]
+        }
+      }
+    }
+  
+  ]
+}

@@ -12,6 +12,7 @@ import {
   Share,
   Platform,
   Alert,
+  Linking,
 } from "react-native";
 
 import { Feather } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ import { useAuthStore } from "../../stores/auth.store";
 import useSWR from "swr";
 import { fetcher } from "../../constant/fetcher";
 import { useNavigation } from "@react-navigation/native";
+import { useSettings } from "../../hooks/useSettings";
 
 const { width } = Dimensions.get("window");
 
@@ -35,11 +37,11 @@ const menuOptions = [
     icon: "credit-card",
     screen: "PaymentHistory",
   },
-  {
-    label: "Downloads",
-    icon: "download",
-    screen: "Downloads",
-  },
+  // {
+  //   label: "Downloads",
+  //   icon: "download",
+  //   screen: "Downloads",
+  // },
   {
     label: "Terms & Conditions",
     icon: "file-text",
@@ -116,7 +118,7 @@ const colors = {
 };
 
 export default function Profile() {
-  const { user } = useAuthStore();
+  const { user ,logout } = useAuthStore();
   const [selectedTab, setSelectedTab] = useState("all");
   const navigation = useNavigation();
   const {
@@ -128,6 +130,7 @@ export default function Profile() {
   });
 
   const myCourses = ordersData || [];
+  const { settings, refetch } = useSettings();
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -165,6 +168,12 @@ export default function Profile() {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (e) {}
+  };
+
+  const handleLogout = async () => {
+    console.log("Call")
+   const l =  await logout(navigation);
+   console.log(l)
   };
 
   const redirectCourse = (id) => {
@@ -450,7 +459,26 @@ export default function Profile() {
                   activeOpacity={0.7}
                   onPress={() => {
                     triggerHaptic();
-                    navigation.navigate(item.screen);
+                    refetch();
+                    // Open external URL for Terms & Privacy if URLs exist
+                    if (item.screen === "TermsConditions") {
+                      Linking.openURL(settings.termsUrl).catch((err) =>
+                        console.error("Failed to open Terms URL:", err)
+                      );
+                      return; // Stop execution here
+                    }
+
+                    if (item.screen === "PrivacyPolicy") {
+                      Linking.openURL(settings.privacyPolicyUrl).catch((err) =>
+                        console.error("Failed to open Privacy URL:", err)
+                      );
+                      return; // Stop execution here
+                    }
+
+                    // Navigate only if item.screen is defined and exists in your navigator
+                    if (item.screen) {
+                      navigation.navigate(item.screen);
+                    }
                   }}
                 >
                   <View style={styles.menuLeft}>
@@ -461,7 +489,6 @@ export default function Profile() {
                     />
                     <Text style={styles.menuText}>{item.label}</Text>
                   </View>
-
                   <Feather
                     name="chevron-right"
                     size={16}
@@ -481,7 +508,7 @@ export default function Profile() {
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.logoutButton}
-            onPress={triggerHaptic}
+            onPress={() => handleLogout()}
             activeOpacity={0.8}
           >
             <Feather name="log-out" size={16} color={colors.danger} />

@@ -26,6 +26,10 @@ import AllCourses from "./pages/Courses/Coures/AllCourses";
 import ViewCourse from "./pages/Courses/Coures/ViewCourse";
 import EditBatch from "./pages/Courses/Coures/EditBatch";
 import CreateCourse from "./pages/Courses/Coures/CreateCourse";
+import AllSubject from "./pages/Courses/Subjects/AllSubject";
+import CourseVideos from "./pages/Courses/Coures/Videos";
+import Announcements from "./pages/announcements/announcements";
+import Banner from "./pages/Banner/Banner";
 export default function App() {
   return (
     <>
@@ -65,6 +69,20 @@ export default function App() {
             <Route path="/all-courses/view/:id" element={<ViewCourse />} />
             <Route path="/all-courses/edit/:id" element={<EditBatch />} />
             <Route path="/all-courses/add" element={<CreateCourse />} />
+            <Route
+              path="/all-courses/add-video/:id"
+              element={<CourseVideos />}
+            />
+
+            {/* Subjects */}
+            <Route path="/all-subject" element={<AllSubject />} />
+
+            {/* Announcements */}
+
+            <Route path="/announcements" element={<Announcements />} />
+            {/*Banners */}
+
+            <Route path="/app-baners" element={<Banner />} />
 
 
             {/* Charts */}

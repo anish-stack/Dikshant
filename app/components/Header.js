@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,46 +15,35 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../stores/auth.store";
 import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
-
+import * as Application from "expo-application";
+import { useSettings } from "../hooks/useSettings";
+import { getBadgeCount } from "../utils/permissions";
 const { width, height } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.85;
-const user = {
-  name: 'Rahul Sharma',
-  email: 'rahul.sharma@example.com',
-  phone: '+91 98765 43210',
-  enrollmentId: 'DIK2024-1234',
-  avatar: 'https://i.pravatar.cc/300?img=12',
-  joinedDate: 'January 15, 2024',
-  batchName: 'UPSC 2025 Batch',
-  batchProgress: 68,
-  totalCourses: 5,
-  completedCourses: 3,
-  inProgressCourses: 2,
-  totalLectures: 450,
-  completedLectures: 306,
-  totalHours: 180,
-  completedHours: 122,
-  currentStreak: 12,
-  longestStreak: 28,
-  rank: 45,
-  totalStudents: 320,
-};
 
 export default function Header() {
   const { logout } = useAuthStore();
+  const [count, setCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState("Home");
   const sidebarAnim = useRef(new Animated.Value(SIDEBAR_WIDTH)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation();
-
+  const { settings, refetch } = useSettings();
   const triggerHaptic = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) { }
+    } catch (e) {}
   };
 
+  useEffect(() => {
+    async () => {
+      const countN = await getBadgeCount();
+      setCount(countN);
+    };
+  }, []);
   const openSidebar = () => {
+    refetch();
     triggerHaptic();
     setIsOpen(true);
     Animated.parallel([
@@ -129,7 +118,7 @@ export default function Header() {
           >
             <Ionicons name="notifications-outline" size={22} color="#0f172a" />
             <View style={styles.notificationBadge}>
-              <Text style={styles.badgeText}>3</Text>
+              <Text style={styles.badgeText}>{count}</Text>
             </View>
           </TouchableOpacity>
 
@@ -167,69 +156,6 @@ export default function Header() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.sidebarContent}
         >
-          {/* User Profile Section */}
-          <View style={styles.profileSection}>
-            <TouchableOpacity
-              style={styles.closeBtn}
-              onPress={closeSidebar}
-              activeOpacity={0.7}
-            >
-              <Feather name="x" size={24} color="#64748b" />
-            </TouchableOpacity>
-
-            <View style={styles.profileCard}>
-              <View style={styles.avatarContainer}>
-                <Image
-                  source={{
-                    uri:
-                      user?.avatar ||
-                      "https://ui-avatars.com/api/?name=" +
-                      (user?.name || "User") +
-                      "&background=6366f1&color=fff&size=200",
-                  }}
-                  style={styles.avatar}
-                />
-                <View style={styles.onlineIndicator} />
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.userName}>{user?.name || "Guest User"}</Text>
-                <Text style={styles.userEmail}>
-                  {user?.email || "guest@example.com"}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.editProfileBtn}
-                onPress={() => {
-                  triggerHaptic();
-                  handleMenuPress({ screen: "Profile" });
-                }}
-              >
-                <Feather name="edit-2" size={16} color="#6366f1" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Quick Stats */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-              <Feather name="book-open" size={20} color="#6366f1" />
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Courses</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Feather name="award" size={20} color="#10b981" />
-              <Text style={styles.statValue}>8</Text>
-              <Text style={styles.statLabel}>Completed</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Feather name="target" size={20} color="#f59e0b" />
-              <Text style={styles.statValue}>85%</Text>
-              <Text style={styles.statLabel}>Progress</Text>
-            </View>
-          </View>
-
           {/* Navigation Section */}
           <View style={styles.navigationSection}>
             <Text style={styles.sectionTitle}>Navigation</Text>
@@ -277,8 +203,6 @@ export default function Header() {
             ))}
           </View>
 
-    
-
           {/* Settings Section */}
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>Settings</Text>
@@ -298,24 +222,6 @@ export default function Header() {
             ))}
           </View>
 
-      {/* Resources Section */}
-          <View style={styles.resourcesSection}>
-            <Text style={styles.sectionTitle}>Resources</Text>
-            {menuItems.resources.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItem}
-                activeOpacity={0.7}
-                onPress={() => handleMenuPress(item)}
-              >
-                <View style={styles.menuIconWrapper}>
-                  <Feather name={item.icon} size={20} color="#64748b" />
-                </View>
-                <Text style={styles.menuText}>{item.label}</Text>
-                <Feather name="chevron-right" size={18} color="#cbd5e1" />
-              </TouchableOpacity>
-            ))}
-          </View>
           {/* Logout Button */}
           <TouchableOpacity
             style={styles.logoutButton}
@@ -328,8 +234,13 @@ export default function Header() {
 
           {/* Footer */}
           <View style={styles.sidebarFooter}>
-            <Text style={styles.versionText}>App Version 1.2.0</Text>
-            <Text style={styles.copyrightText}>© 2025 Your App. All rights reserved.</Text>
+            <Text style={styles.versionText}>
+              App Version {Application.nativeApplicationVersion}
+            </Text>
+            <Text style={styles.copyrightText}>
+              © {new Date().getFullYear()} {settings?.appName || "Dikshant ias"}
+              . All rights reserved.
+            </Text>
           </View>
         </ScrollView>
       </Animated.View>
@@ -341,9 +252,9 @@ export default function Header() {
 const menuItems = {
   navigation: [
     { icon: "home", label: "Home", screen: "Home" },
-    { icon: "book-open", label: "My Courses", screen: "Courses" },
-    { icon: "play-circle", label: "Recorded Courses", screen: "RecordedCourses" },
-    { icon: "file-text", label: "Test Series", screen: "TestSeries", badge: "New" },
+    { icon: "book-open", label: "My Courses", screen: "Profile" },
+    { icon: "play-circle", label: "Recorded Courses", screen: "Courses" },
+    { icon: "file-text", label: "Test Series", badge: "soon" },
     { icon: "user", label: "Profile", screen: "Profile" },
   ],
 
@@ -351,11 +262,6 @@ const menuItems = {
     { icon: "settings", label: "Settings", screen: "Settings" },
     { icon: "help-circle", label: "Help & Support", screen: "Support" },
     { icon: "info", label: "About", screen: "About" },
-  ],
-  resources: [
-    { icon: "download", label: "Downloads", screen: "Downloads" },
-    { icon: "bookmark", label: "Saved", screen: "Saved" },
-    { icon: "clock", label: "Watch History", screen: "History" },
   ],
 };
 

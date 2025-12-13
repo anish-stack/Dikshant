@@ -356,7 +356,7 @@ const EditBatch = () => {
                 </button>
 
                 {subjectsDropdownOpen && (
-                  <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                  <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-lg shadow-lg z-99999 max-h-64 overflow-y-auto">
                     <div className="p-2 sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
                       <Input
                         placeholder="Search subjects..."

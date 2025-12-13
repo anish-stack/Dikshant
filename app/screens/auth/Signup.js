@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Button from "../../components/Button";
 import { useAuthStore } from "../../stores/auth.store";
+import { getDeviceInfo, getFCMToken } from "../../utils/permissions";
+import * as Application from "expo-application";
 
 export default function Signup({ navigation }) {
   const { signup, verifyOtp, resendOtp } = useAuthStore();
@@ -67,9 +69,11 @@ export default function Signup({ navigation }) {
     } else if (formData.password.length > 50) {
       newErrors.password = "Password must not exceed 50 characters";
     } else if (!/(?=.*[a-z])/.test(formData.password)) {
-      newErrors.password = "Password must contain at least one lowercase letter";
+      newErrors.password =
+        "Password must contain at least one lowercase letter";
     } else if (!/(?=.*[A-Z])/.test(formData.password)) {
-      newErrors.password = "Password must contain at least one uppercase letter";
+      newErrors.password =
+        "Password must contain at least one uppercase letter";
     } else if (!/(?=.*\d)/.test(formData.password)) {
       newErrors.password = "Password must contain at least one number";
     }
@@ -83,15 +87,21 @@ export default function Signup({ navigation }) {
 
     setLoading(true);
     setErrors({});
+    const deviceInfo = await getDeviceInfo();
+    const tokenFcm = await getFCMToken();
 
     try {
       const res = await signup({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        phone: formData.phone,
+        mobile: formData.phone,
         password: formData.password,
+        device_id: deviceInfo?.device_id,
+        fcm_token: tokenFcm,
+        platform: deviceInfo?.platform,
+        appVersion: Application.nativeApplicationVersion,
       });
-      
+
       if (res.success) {
         setStep(2);
       }
@@ -171,7 +181,7 @@ export default function Signup({ navigation }) {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -278,7 +288,9 @@ export default function Signup({ navigation }) {
                     errors.phone ? styles.textInputError : null,
                   ]}
                   value={formData.phone}
-                  onChangeText={(text) => updateField("phone", text.replace(/[^0-9]/g, ""))}
+                  onChangeText={(text) =>
+                    updateField("phone", text.replace(/[^0-9]/g, ""))
+                  }
                   placeholder="Enter 10-digit phone number"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"

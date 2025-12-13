@@ -17,6 +17,7 @@ import {
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
+import { ImageDown, Speaker } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -31,11 +32,7 @@ const navItems: NavItem[] = [
     name: "Dashboard",
    path: "/",
   },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
+
   {
     icon: <UserCircleIcon />,
     name: "Student Profiles",
@@ -51,17 +48,25 @@ const navItems: NavItem[] = [
     ],
     
   },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
+    {
+    icon: <Speaker />,
+    name: "Announcements",
+    path: "/announcements",
   },
+     {
+    icon: <ImageDown />,
+    name: "App Banners",
+    path: "/app-baners",
+  },
+
   {
     name: "Pages",
     icon: <PageIcon />,
     subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
+      { name: "About Us Page", path: "/about-us", pro: false },
+      { name: "Privacy Policy", path: "/privacy-policy", pro: false },
+      { name: "Terms & Condition", path: "/term-and-condition", pro: false },
+
     ],
   },
 ];
@@ -290,7 +295,7 @@ const AppSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-99999 border-r border-gray-200 
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"
@@ -312,14 +317,14 @@ const AppSidebar: React.FC = () => {
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <img
-                className="dark:hidden"
+                className="dark:hidden  w-10"
                 src="/images/logo/logo.png"
                 alt="Logo"
                 width={150}
                 height={40}
               />
               <img
-                className="hidden dark:block"
+                className="hidden dark:block  w-10"
               src="./images/logo/logo.png"
                 alt="Logo"
                 width={150}

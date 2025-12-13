@@ -1,148 +1,24 @@
-version: '3.9'
+version: "3.9"
 
 services:
-  # 🌐 API Gateway (DEV MODE)
-  api-gateway:
-    build: ./api-gateway
-    container_name: api-gateway
+  mysql:
+    image: mysql:8.0
+    container_name: dikshant_mysql
     restart: always
-    ports:
-      - "4000:4000"
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-    volumes:
-      - ./api-gateway:/usr/src/app          # 🔥 Code auto reflect hoga
-      - ./shared:/usr/src/app/shared        # Shared folder bhi live linked
-      - /usr/src/app/node_modules           # Prevent node_modules overwrite
-    command: npm run dev                    # Nodemon se auto restart (dev mode)
-
-  # 🔐 Auth Service
-  auth-service:
-    build: ./services/auth-service
-    container_name: auth-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 📚 Course Service
-  course-service:
-    build: ./services/course-service
-    container_name: course-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 🎥 Liveclass Service
-  liveclass-service:
-    build: ./services/liveclass-service
-    container_name: liveclass-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 🔔 Notification Service
-  notification-service:
-    build: ./services/notification-service
-    container_name: notification-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 💳 Payment Service
-  payment-service:
-    build: ./services/payment-service
-    container_name: payment-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 🧪 Test Service
-  test-service:
-    build: ./services/test-service
-    container_name: test-service
-    restart: always
-    env_file:
-      - ./.env
-    depends_on:
-      - rabbitmq
-      - redis
-      - mongo
-    networks:
-      - backend
-
-  # 💾 MongoDB
-  mongo:
-    image: mongo:6.0
-    container_name: mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - backend
-
-  # 🐇 RabbitMQ
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    networks:
-      - backend
-
-  # 🔥 Redis
-  redis:
-    image: redis:7
-    container_name: redis
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dikshant_db
     ports:
-      - "6379:6379"
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:6
+    container_name: dikshant_redis
     restart: always
-    networks:
-      - backend
+    ports:
+      - "6380:6379"
 
 volumes:
-  mongo_data:
-
-networks:
-  backend:
-    driver: bridge
+  mysql_data:

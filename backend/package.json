@@ -1,44 +1,29 @@
 {
   "name": "dikshant-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:course\" \"npm run dev:test\" \"npm run dev:notification\" \"npm run dev:payment\" \"npm run dev:user\" \"npm run dev:scholarship\" \"npm run dev:content\"",
-    "dev:gateway": "cd api-gateway && npm run dev",
-    "dev:auth": "cd services/auth-service && npm run dev",
-    "dev:course": "cd services/course-service && npm run dev",
-    "dev:test": "cd services/test-service && npm run dev",
-    "dev:notification": "cd services/notification-service && npm run dev",
-    "dev:payment": "cd services/payment-service && npm run dev",
-    "dev:user": "cd services/user-service && npm run dev",
-    "dev:scholarship": "cd services/scholarship-service && npm run dev",
-    "dev:content": "cd services/content-service && npm run dev",
-    "install:all": "npm install && cd api-gateway && npm install && cd ../services/auth-service && npm install && cd ../course-service && npm install && cd ../test-service && npm install && cd ../notification-service && npm install && cd ../payment-service && npm install && cd ../user-service && npm install && cd ../scholarship-service && npm install && cd ../content-service && npm install"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "amqplib": "^0.10.9",
-    "aws-sdk": "^2.1692.0",
-    "axios": "^1.13.2",
+    "@aws-sdk/client-s3": "^3.934.0",
+    "bcrypt": "5.1.0",
     "bcryptjs": "^3.0.3",
-    "bullmq": "^5.63.1",
-    "cloudinary": "^2.8.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "ioredis": "^5.8.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.3",
-    "multer": "^2.0.2",
-    "sharp": "^0.34.5",
-    "validator": "^13.15.23"
+    "body-parser": "1.20.2",
+    "dotenv": "^16.0.3",
+    "express": "4.18.2",
+    "ioredis": "5.3.2",
+    "jsonwebtoken": "9.0.0",
+    "multer": "1.4.5-lts.1",
+    "mysql2": "^3.3.1",
+    "pdfkit": "^0.17.2",
+    "razorpay": "^2.9.6",
+    "sequelize": "^6.32.1",
+    "sequelize-cli": "^6.6.3",
+    "uuid": "9.0.0"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.1.11"
+    "nodemon": "3.0.1"
   }
 }
