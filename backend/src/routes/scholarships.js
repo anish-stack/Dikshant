@@ -1,6 +1,6 @@
 'use strict';
 const router = require("express").Router();
-const ctrl = require("../controllers/ScholarshipController");
+const ctrl = require("../controllers/scholarshipController");
 const auth = require("../middleware/auth");
 const role = require("../middleware/role");
 
