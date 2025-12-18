@@ -30,6 +30,8 @@ import AllSubject from "./pages/Courses/Subjects/AllSubject";
 import CourseVideos from "./pages/Courses/Coures/Videos";
 import Announcements from "./pages/announcements/announcements";
 import Banner from "./pages/Banner/Banner";
+import FAQPage from "./pages/faq/faq";
+import DoubtsAdmin from "./pages/doubts/doubts";
 export default function App() {
   return (
     <>
@@ -76,6 +78,8 @@ export default function App() {
 
             {/* Subjects */}
             <Route path="/all-subject" element={<AllSubject />} />
+            <Route path="/all-faqs" element={<FAQPage />} />
+            <Route path="/all-doubts" element={<DoubtsAdmin />} />
 
             {/* Announcements */}
 

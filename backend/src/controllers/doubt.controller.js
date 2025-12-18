@@ -146,7 +146,7 @@ exports.getAllDoubts = async (req, res) => {
 
     return res.json(doubts);
   } catch (error) {
-    console.error("❌ Admin Fetch Doubts Error:", error);
+    console.error("Admin Fetch Doubts Error:", error);
     return res.status(500).json({
       message: "Failed to fetch doubts",
       error,
@@ -160,7 +160,7 @@ exports.getAllDoubts = async (req, res) => {
  */
 exports.answerDoubt = async (req, res) => {
   try {
-    const adminName = req.user.name || "Admin";
+    const adminName = req?.user?.name || "Admin";
     const { answer } = req.body;
 
     if (!answer) {

@@ -441,6 +441,53 @@ exports.login = async (req, res) => {
   }
 };
 
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required.",
+      });
+    }
+
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found.",
+      });
+    }
+
+    if (user.role !== "admin") {
+      return res.status(403).json({
+        error: "Access denied. Admin access required.",
+      });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        error: "Incorrect email or password. Please try again.",
+      });
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user);
+    user.refresh_token = refreshToken;
+    await user.save();
+
+    return res.json({
+      status: "success",
+      message: "Admin logged in successfully!",
+      token: accessToken,
+      refresh_token: refreshToken,
+      user: getUserResponse(user),
+    });
+  } catch (error) {
+    console.log("Internal server error", error)
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
 // ==================== REFRESH TOKEN ====================
 
 exports.refreshToken = async (req, res) => {

@@ -19,10 +19,10 @@ router.get("/my", auth, doubtController.getMyDoubts);
 router.post("/:id/like", auth, doubtController.likeDoubt);
 
 // 📄 Get all doubts (filter: status, courseId)
-router.get("/admin/all", auth,  doubtController.getAllDoubts);
+router.get("/admin/all",  doubtController.getAllDoubts);
 // ✍️ Answer a doubt
-router.post("/admin/:id/answer", auth,  doubtController.answerDoubt);
+router.post("/admin/:id/answer",  doubtController.answerDoubt);
 // 🔒 Close a doubt
-router.patch("/admin/:id/close", auth,  doubtController.closeDoubt);
+router.patch("/admin/:id/close",  doubtController.closeDoubt);
 
 module.exports = router;

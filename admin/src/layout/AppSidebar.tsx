@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-   path: "/",
+    path: "/",
   },
 
   {
@@ -44,21 +44,29 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "All Courses", path: "/all-courses", pro: false },
       { name: "Programs", path: "/all-programs", pro: false },
-      { name: "Subjects", path: "/all-subject", pro: false }
+      { name: "Subjects", path: "/all-subject", pro: false },
     ],
-    
   },
-    {
+  {
     icon: <Speaker />,
     name: "Announcements",
     path: "/announcements",
   },
-     {
+  {
     icon: <ImageDown />,
     name: "App Banners",
     path: "/app-baners",
   },
-
+  {
+    icon: <ImageDown />,
+    name: "FAQs",
+    path: "/all-faqs",
+  },
+  {
+    icon: <ImageDown />,
+    name: "Doubts",
+    path: "/all-doubts",
+  },
   {
     name: "Pages",
     icon: <PageIcon />,
@@ -66,7 +74,6 @@ const navItems: NavItem[] = [
       { name: "About Us Page", path: "/about-us", pro: false },
       { name: "Privacy Policy", path: "/privacy-policy", pro: false },
       { name: "Terms & Condition", path: "/term-and-condition", pro: false },
-
     ],
   },
 ];
@@ -325,7 +332,7 @@ const AppSidebar: React.FC = () => {
               />
               <img
                 className="hidden dark:block  w-10"
-              src="./images/logo/logo.png"
+                src="./images/logo/logo.png"
                 alt="Logo"
                 width={150}
                 height={40}

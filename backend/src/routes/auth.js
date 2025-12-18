@@ -6,6 +6,7 @@ router.post('/signup', ctrl.signup);
 router.post('/request-otp', ctrl.requestOtp);
 router.post('/verify-otp', ctrl.verifyOtp);
 router.post('/login', ctrl.login);
+router.post('/admin-login', ctrl.adminLogin);
 router.put('/profile', auth, ctrl.updateProfile);
 router.get('/profile-details',auth,ctrl.getProfile)
 router.get('/refresh-token',ctrl.refreshToken)
