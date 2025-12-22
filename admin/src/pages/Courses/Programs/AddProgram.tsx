@@ -9,7 +9,7 @@ import Form from "../../../components/form/Form";
 import Label from "../../../components/form/Label";
 import { API_URL } from "../../../constant/constant";
 import { Loader2, Upload, Image as ImageIcon, ArrowLeft } from "lucide-react";
-const COURSE_TYPES = ["Offline", "Online", "Recorded", "Live"] as const;
+// const COURSE_TYPES = ["Offline", "Online", "Recorded", "Live"] as const;
 
 // type CourseType = (typeof COURSE_TYPES)[number];
 

@@ -123,7 +123,7 @@ const CreateBatch = () => {
     const fetchPrograms = async () => {
       try {
         const res = await axios.get(PROGRAMS_API);
-        console.log("res",res)
+        // console.log("res",res)
         setPrograms(res.data?.data);
       } catch (err) {
         console.error("Failed to fetch programs:", err);
@@ -219,7 +219,7 @@ const CreateBatch = () => {
         data.append("emiSchedule", JSON.stringify(emiSchedule));
       }
 
-      data.append("image", imageFile);
+      data.append("imageUrl", imageFile);
 
       await axios.post(BATCH_API, data, {
         headers: { "Content-Type": "multipart/form-data" },
