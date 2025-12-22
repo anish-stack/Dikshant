@@ -45,7 +45,8 @@ class BatchController {
 
       const item = await Batch.create(payload);
 
-      await this.clearBatchCache();
+      // await this.clearBatchCache();
+      await BatchController.clearBatchCache();
 
       return res.status(201).json(item);
     } catch (err) {
@@ -223,7 +224,8 @@ class BatchController {
         slug: req.body.name ? generateSlug(req.body.name) : item.slug,
       });
 
-      await this.clearBatchCache(batchId);
+      // await this.clearBatchCache(batchId);
+      await BatchController.clearBatchCache(batchId);
 
       return res.json(item);
     } catch (err) {
@@ -253,7 +255,8 @@ class BatchController {
 
       await item.destroy();
 
-      await this.clearBatchCache(batchId);
+      // await this.clearBatchCache(batchId);
+      await BatchController.clearBatchCache(batchId);
 
       return res.json({ message: "Batch deleted successfully" });
     } catch (err) {

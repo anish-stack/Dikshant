@@ -172,6 +172,7 @@ const AllBatches = () => {
         prev.map((b) => (b.id === batch.id ? { ...b, status: newStatus as any } : b))
       );
     } catch (err: any) {
+      console.log("error", err);
       toast.error(err.response?.data?.message || "Failed to update status", {
         id: loadingToast,
       });
