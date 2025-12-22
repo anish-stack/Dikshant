@@ -35,7 +35,7 @@ interface Program {
   slug: string;
   imageUrl: string;
   description: string;
-  typeOfCourse: "Online" | "Offline" | "Recorded" | "Live";
+  // typeOfCourse: "Online" | "Offline" | "Recorded" | "Live";
   position: number;
   isActive: boolean;
   createdAt: string;
@@ -384,7 +384,7 @@ const AllPrograms: React.FC = () => {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="px-6 py-4">
+                      {/* <TableCell className="px-6 py-4">
                         <Badge
                           color={
                             program.typeOfCourse === "Online"
@@ -394,7 +394,7 @@ const AllPrograms: React.FC = () => {
                         >
                           {program.typeOfCourse}
                         </Badge>
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell className="px-6 py-4">
                         <Badge color={program.isActive ? "success" : "error"}>
                           {program.isActive ? "Active" : "Inactive"}
@@ -477,9 +477,9 @@ const AllPrograms: React.FC = () => {
                     <p className="text-sm text-gray-600">
                       {program.description}
                     </p>
-                    <div className="flex gap-2 flex-wrap">
+                    {/* <div className="flex gap-2 flex-wrap">
                       <Badge color="info">{program.typeOfCourse}</Badge>
-                    </div>
+                    </div> */}
                     <div className="flex gap-2 pt-2">
                       <Button size="sm" >
                         <Link to={`/admin/programs/view/${program.slug}`}>

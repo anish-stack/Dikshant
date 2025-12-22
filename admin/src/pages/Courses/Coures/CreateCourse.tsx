@@ -22,12 +22,19 @@ import {
 
 const BATCH_API = "https://www.dikapi.olyox.in/api/batchs";
 const SUBJECTS_API = "https://www.dikapi.olyox.in/api/subjects";
+const PROGRAMS_API = "https://www.dikapi.olyox.in/api/programs";
 
 interface Subject {
   id: number;
   name: string;
   slug: string;
   description?: string;
+}
+
+interface Program {
+  id: number;
+  name: string;
+  slug: string;
 }
 
 const CreateBatch = () => {
@@ -40,10 +47,13 @@ const CreateBatch = () => {
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<number[]>([]);
   const [subjectSearch, setSubjectSearch] = useState("");
   const [subjectsDropdownOpen, setSubjectsDropdownOpen] = useState(false);
+  const [programs, setPrograms] = useState<Program[]>([]);
 
   const [isEmi, setIsEmi] = useState(false);
   const [emiMonths, setEmiMonths] = useState(2);
-  const [emiSchedule, setEmiSchedule] = useState<Array<{ month: number; amount: number }>>([]);
+  const [emiSchedule, setEmiSchedule] = useState<
+    Array<{ month: number; amount: number }>
+  >([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -65,7 +75,10 @@ const CreateBatch = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState("");
 
-  const finalPrice = formData.batchDiscountPrice > 0 ? formData.batchDiscountPrice : formData.batchPrice;
+  const finalPrice =
+    formData.batchDiscountPrice > 0
+      ? formData.batchDiscountPrice
+      : formData.batchPrice;
 
   // Auto-calculate EMI schedule
   useEffect(() => {
@@ -94,7 +107,8 @@ const CreateBatch = () => {
         const res = await axios.get<Subject[]>(SUBJECTS_API);
         setAllSubjects(res.data);
       } catch (err: any) {
-        const errorMsg = err.response?.data?.message || "Failed to load subjects";
+        const errorMsg =
+          err.response?.data?.message || "Failed to load subjects";
         setSubjectsError(errorMsg);
         toast.error(errorMsg);
       } finally {
@@ -103,6 +117,20 @@ const CreateBatch = () => {
     };
 
     fetchSubjects();
+  }, []);
+
+  useEffect(() => {
+    const fetchPrograms = async () => {
+      try {
+        const res = await axios.get(PROGRAMS_API);
+        console.log("res",res)
+        setPrograms(res.data?.data);
+      } catch (err) {
+        console.error("Failed to fetch programs:", err);
+      }
+    };
+
+    fetchPrograms();
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,13 +199,16 @@ const CreateBatch = () => {
       data.append("shortDescription", formData.shortDescription.trim());
       data.append("longDescription", formData.longDescription.trim());
       data.append("batchPrice", formData.batchPrice.toString());
-      
+
       if (formData.batchDiscountPrice > 0) {
-        data.append("batchDiscountPrice", formData.batchDiscountPrice.toString());
+        data.append(
+          "batchDiscountPrice",
+          formData.batchDiscountPrice.toString()
+        );
       }
-      
+
       data.append("gst", formData.gst.toString());
-      
+
       if (formData.offerValidityDays > 0) {
         data.append("offerValidityDays", formData.offerValidityDays.toString());
       }
@@ -230,20 +261,18 @@ const CreateBatch = () => {
             <div className="space-y-4 mb-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">
-                    Batch Name
-                  </Label>
+                  <Label className="text-sm">Batch Name</Label>
                   <Input
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
                     className="text-sm"
                     placeholder="e.g., UPSC 2025 Batch"
                   />
                 </div>
                 <div>
-                  <Label className="text-sm">
-                    Display Order
-                  </Label>
+                  <Label className="text-sm">Display Order</Label>
                   <Input
                     type="number"
                     value={formData.displayOrder}
@@ -255,24 +284,26 @@ const CreateBatch = () => {
                     }
                     className="text-sm"
                     min="1"
-                    
                   />
                 </div>
               </div>
 
               <div>
-                <Label className="text-sm">
-                  Program ID
-                </Label>
-                <Input
-                  type="number"
+                <Label className="text-sm">Program</Label>
+                <select
                   value={formData.programId}
-                  onChange={(e) => setFormData({ ...formData, programId: e.target.value })}
-                  className="text-sm"
-                  placeholder="Enter program ID"
-                  min="1"
-                  
-                />
+                  onChange={(e) =>
+                    setFormData({ ...formData, programId: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                >
+                  <option value="">Select Program</option>
+                  {programs && programs.map((program) => (
+                    <option key={program.id} value={program.id}>
+                      {program.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -292,7 +323,9 @@ const CreateBatch = () => {
                     <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1">
                       Failed to load subjects
                     </p>
-                    <p className="text-xs text-red-700 dark:text-red-300">{subjectsError}</p>
+                    <p className="text-xs text-red-700 dark:text-red-300">
+                      {subjectsError}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -306,7 +339,9 @@ const CreateBatch = () => {
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setSubjectsDropdownOpen(!subjectsDropdownOpen)}
+                    onClick={() =>
+                      setSubjectsDropdownOpen(!subjectsDropdownOpen)
+                    }
                     disabled={loadingSubjects}
                     className="w-full px-3 py-2 text-sm text-left border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 flex justify-between items-center hover:border-gray-400 dark:hover:border-gray-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -316,7 +351,9 @@ const CreateBatch = () => {
                         : selectedSubjectIds.length === 0
                         ? "Select subjects..."
                         : selectedSubjectIds
-                            .map((id) => allSubjects.find((s) => s.id === id)?.name)
+                            .map(
+                              (id) => allSubjects.find((s) => s.id === id)?.name
+                            )
                             .filter(Boolean)
                             .join(", ")}
                     </span>
@@ -348,7 +385,9 @@ const CreateBatch = () => {
                           </div>
                         ) : (
                           filteredSubjects.map((subject) => {
-                            const isSelected = selectedSubjectIds.includes(subject.id);
+                            const isSelected = selectedSubjectIds.includes(
+                              subject.id
+                            );
                             return (
                               <label
                                 key={subject.id}
@@ -361,7 +400,9 @@ const CreateBatch = () => {
                                       : "border-gray-300 dark:border-gray-600"
                                   }`}
                                 >
-                                  {isSelected && <Check className="w-3 h-3 text-white" />}
+                                  {isSelected && (
+                                    <Check className="w-3 h-3 text-white" />
+                                  )}
                                 </div>
                                 <div
                                   className="flex-1 min-w-0"
@@ -374,7 +415,9 @@ const CreateBatch = () => {
                                     );
                                   }}
                                 >
-                                  <div className="font-medium text-sm">{subject.name}</div>
+                                  <div className="font-medium text-sm">
+                                    {subject.name}
+                                  </div>
                                   {subject.description && (
                                     <div className="text-xs text-gray-500 line-clamp-1">
                                       {subject.description}
@@ -408,9 +451,7 @@ const CreateBatch = () => {
             <div className="space-y-4 mb-6">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">
-                    Start Date
-                  </Label>
+                  <Label className="text-sm">Start Date</Label>
                   <Input
                     type="date"
                     value={formData.startDate}
@@ -418,50 +459,48 @@ const CreateBatch = () => {
                       setFormData({ ...formData, startDate: e.target.value })
                     }
                     className="text-sm"
-                    
                   />
                 </div>
                 <div>
-                  <Label  className="text-sm">
-                    End Date
-                  </Label>
+                  <Label className="text-sm">End Date</Label>
                   <Input
                     type="date"
                     value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endDate: e.target.value })
+                    }
                     className="text-sm"
-                    
                   />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm">
-                    Registration Start
-                  </Label>
+                  <Label className="text-sm">Registration Start</Label>
                   <Input
                     type="date"
                     value={formData.registrationStartDate}
                     onChange={(e) =>
-                      setFormData({ ...formData, registrationStartDate: e.target.value })
+                      setFormData({
+                        ...formData,
+                        registrationStartDate: e.target.value,
+                      })
                     }
                     className="text-sm"
-                    
                   />
                 </div>
                 <div>
-                  <Label className="text-sm">
-                    Registration End
-                  </Label>
+                  <Label className="text-sm">Registration End</Label>
                   <Input
                     type="date"
                     value={formData.registrationEndDate}
                     onChange={(e) =>
-                      setFormData({ ...formData, registrationEndDate: e.target.value })
+                      setFormData({
+                        ...formData,
+                        registrationEndDate: e.target.value,
+                      })
                     }
                     className="text-sm"
-                    
                   />
                 </div>
               </div>
@@ -469,9 +508,7 @@ const CreateBatch = () => {
 
             {/* Status */}
             <div className="mb-6">
-              <Label  className="text-sm">
-                Status
-              </Label>
+              <Label className="text-sm">Status</Label>
               <select
                 value={formData.status}
                 onChange={(e) =>
@@ -488,18 +525,15 @@ const CreateBatch = () => {
             {/* Descriptions */}
             <div className="space-y-4 mb-6">
               <div>
-                <Label className="text-sm">
-                  Short Description
-                </Label>
+                <Label className="text-sm">Short Description</Label>
                 <TextArea
                   value={formData.shortDescription}
                   onChange={(value) =>
-    setFormData({ ...formData, shortDescription: value })
-  }
+                    setFormData({ ...formData, shortDescription: value })
+                  }
                   rows={2}
                   className="text-sm"
                   placeholder="Brief description of the batch"
-                  
                 />
               </div>
               <div>
@@ -507,7 +541,7 @@ const CreateBatch = () => {
                 <TextArea
                   value={formData.longDescription}
                   onChange={(value) =>
-                     setFormData({ ...formData, longDescription: value })
+                    setFormData({ ...formData, longDescription: value })
                   }
                   rows={3}
                   className="text-sm"
@@ -520,9 +554,7 @@ const CreateBatch = () => {
             <div className="space-y-4 mb-6">
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <Label className="text-sm">
-                    Price (₹)
-                  </Label>
+                  <Label className="text-sm">Price (₹)</Label>
                   <Input
                     type="number"
                     value={formData.batchPrice}
@@ -534,7 +566,6 @@ const CreateBatch = () => {
                     }
                     className="text-sm"
                     min="0"
-                    
                   />
                 </div>
                 <div>
@@ -558,7 +589,10 @@ const CreateBatch = () => {
                     type="number"
                     value={formData.gst}
                     onChange={(e) =>
-                      setFormData({ ...formData, gst: parseFloat(e.target.value) || 18 })
+                      setFormData({
+                        ...formData,
+                        gst: parseFloat(e.target.value) || 18,
+                      })
                     }
                     className="text-sm"
                     min="0"
@@ -614,8 +648,7 @@ const CreateBatch = () => {
                         onChange={(e) => setEmiMonths(parseInt(e.target.value))}
                         className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
                       >
-                        
-                        {[2,3,4,5,6,7,8,9, 12, 18, 24].map((m) => (
+                        {[2, 3, 4, 5, 6, 7, 8, 9, 12, 18, 24].map((m) => (
                           <option key={m} value={m}>
                             {m} months
                           </option>
@@ -627,7 +660,9 @@ const CreateBatch = () => {
                       <div className="px-3 py-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-indigo-600">
                         ₹
                         {emiSchedule.length > 0
-                          ? Math.round(finalPrice / emiMonths).toLocaleString("en-IN")
+                          ? Math.round(finalPrice / emiMonths).toLocaleString(
+                              "en-IN"
+                            )
                           : 0}
                       </div>
                     </div>
@@ -635,7 +670,9 @@ const CreateBatch = () => {
 
                   {emiSchedule.length > 0 && (
                     <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
-                      <h4 className="text-sm font-semibold mb-3">EMI Schedule</h4>
+                      <h4 className="text-sm font-semibold mb-3">
+                        EMI Schedule
+                      </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                         {emiSchedule.map((item, i) => (
                           <div
@@ -665,9 +702,7 @@ const CreateBatch = () => {
 
             {/* Image Upload */}
             <div className="mb-6">
-              <Label className="text-sm">
-                Batch Image
-              </Label>
+              <Label className="text-sm">Batch Image</Label>
               <div className="mt-2">
                 {imagePreview ? (
                   <div className="relative inline-block w-full max-w-md">
@@ -693,7 +728,9 @@ const CreateBatch = () => {
                     <span className="text-sm text-gray-600 dark:text-gray-400">
                       Click to upload image
                     </span>
-                    <span className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB</span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      PNG, JPG up to 5MB
+                    </span>
                   </label>
                 )}
                 <input

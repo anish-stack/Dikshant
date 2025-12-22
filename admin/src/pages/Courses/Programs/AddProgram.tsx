@@ -11,13 +11,13 @@ import { API_URL } from "../../../constant/constant";
 import { Loader2, Upload, Image as ImageIcon, ArrowLeft } from "lucide-react";
 const COURSE_TYPES = ["Offline", "Online", "Recorded", "Live"] as const;
 
-type CourseType = (typeof COURSE_TYPES)[number];
+// type CourseType = (typeof COURSE_TYPES)[number];
 
 interface ProgramFormData {
   name: string;
   slug: string;
   description: string;
-  typeOfCourse: CourseType;
+  // typeOfCourse: CourseType;
   position: string;
 }
 
@@ -29,7 +29,7 @@ const AddProgram = () => {
     name: "",
     slug: "",
     description: "",
-    typeOfCourse: "Online", // ✅ backend default
+    // typeOfCourse: "Online", // ✅ backend default
     position: "",
   });
 
@@ -93,7 +93,7 @@ const AddProgram = () => {
       data.append("name", formData.name);
       data.append("slug", formData.slug);
       data.append("description", formData.description);
-      data.append("typeOfCourse", formData.typeOfCourse);
+      // data.append("typeOfCourse", formData.typeOfCourse);
       data.append("imageUrl", imageFile);
 
       await axios.post(`${API_URL}/programs`, data, {
@@ -167,7 +167,7 @@ const AddProgram = () => {
                 </p>
               </div>
             </div>
-            <div>
+            {/* <div>
               <Label>Type Of Course</Label>
 
               <select
@@ -187,7 +187,7 @@ const AddProgram = () => {
                   </option>
                 ))}
               </select>
-            </div>
+            </div> */}
 
             <div>
               <Label>Position</Label>

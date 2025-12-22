@@ -23,7 +23,7 @@ class ProgramController {
         name: req.body.name,
         slug: generateSlug(req.body.name),
         description: req.body.description,
-        typeOfCourse: req.body.typeOfCourse,
+        // typeOfCourse: req.body.typeOfCourse,
         position: req.body.position,
         imageUrl: imageUrl,
       });
@@ -65,9 +65,9 @@ class ProgramController {
   }
 
   // Filter by Type
-  if (type) {
-    where.typeOfCourse = type;
-  }
+  // if (type) {
+  //   where.typeOfCourse = type;
+  // }
 
   // ---- Redis Cache Key (unique per query) ----
   const cacheKey = `programs:${page}:${limit}:${search}:${type}`;
