@@ -69,12 +69,12 @@ class BatchController {
       limit = parseInt(limit);
       const offset = (page - 1) * limit;
 
-      const redisKey = `batches:page:${page}:limit:${limit}:search:${search}`;
+      // const redisKey = `batches:page:${page}:limit:${limit}:search:${search}`;
 
-      const cache = await redis.get(redisKey);
-      if (cache) {
-        return res.json(JSON.parse(cache));
-      }
+      // const cache = await redis.get(redisKey);
+      // if (cache) {
+      //   return res.json(JSON.parse(cache));
+      // }
 
       const where = {};
 
@@ -130,7 +130,7 @@ class BatchController {
         items: batchItems,
       };
 
-      await redis.set(redisKey, JSON.stringify(response), "EX", 60);
+      // await redis.set(redisKey, JSON.stringify(response), "EX", 60);
 
       return res.json(response);
     } catch (err) {
@@ -148,12 +148,12 @@ class BatchController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `batch:id:${id}`;
+      // const cacheKey = `batch:id:${id}`;
 
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
+      // const cached = await redis.get(cacheKey);
+      // if (cached) {
+      //   return res.json(JSON.parse(cached));
+      // }
 
       const item = await Batch.findByPk(id, {
         include: [
@@ -186,7 +186,7 @@ class BatchController {
         subjects: subjectsList,
       };
 
-      await redis.set(cacheKey, JSON.stringify(response), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(response), "EX", 300);
 
       return res.json(response);
     } catch (err) {

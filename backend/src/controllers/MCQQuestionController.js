@@ -37,13 +37,13 @@ class MCQQuestionController {
   // ALL MCQs
   static async findAll(req, res) {
     try {
-      const cached = await redis.get("mcq_list");
+      // const cached = await redis.get("mcq_list");
 
-      if (cached) return res.json(JSON.parse(cached));
+      // if (cached) return res.json(JSON.parse(cached));
 
       const items = await MCQQuestion.findAll();
 
-      await redis.set("mcq_list", JSON.stringify(items), "EX", 60);
+      // await redis.set("mcq_list", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -58,16 +58,16 @@ class MCQQuestionController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `mcq:${id}`;
+      // const cacheKey = `mcq:${id}`;
 
-      const cached = await redis.get(cacheKey);
-      if (cached) return res.json(JSON.parse(cached));
+      // const cached = await redis.get(cacheKey);
+      // if (cached) return res.json(JSON.parse(cached));
 
       const item = await MCQQuestion.findByPk(id);
 
       if (!item) return res.status(404).json({ message: "MCQ not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 
@@ -134,13 +134,13 @@ class MCQQuestionController {
   static async findBySubject(req, res) {
     try {
       const subjectId = req.params.subjectId;
-      const cacheKey = `mcq_subject:${subjectId}`;
+      // const cacheKey = `mcq_subject:${subjectId}`;
 
       // 🔥 Redis check
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        return res.json(JSON.parse(cached));
-      }
+      // const cached = await redis.get(cacheKey);
+      // if (cached) {
+      //   return res.json(JSON.parse(cached));
+      // }
 
       // DB Query
       const items = await MCQQuestion.findAll({
@@ -156,7 +156,7 @@ class MCQQuestionController {
       }
 
       // Save to Redis (5 minutes cache)
-      await redis.set(cacheKey, JSON.stringify(items), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 

@@ -64,12 +64,12 @@ class CouponController {
   // GET ALL COUPONS
   static async findAll(req, res) {
     try {
-      const cached = await redis.get("coupons");
-      if (cached) return res.json(JSON.parse(cached));
+      // const cached = await redis.get("coupons");
+      // if (cached) return res.json(JSON.parse(cached));
 
       const items = await Coupon.findAll();
 
-      await redis.set("coupons", JSON.stringify(items), "EX", 120);
+      // await redis.set("coupons", JSON.stringify(items), "EX", 120);
 
       return res.json(items);
 

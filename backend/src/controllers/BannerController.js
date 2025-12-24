@@ -55,14 +55,14 @@ class BannerController {
 
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("banners");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("banners");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Banner.findAll({
         order: [["position", "ASC"], ["createdAt", "DESC"]]
       });
 
-      await redis.set("banners", JSON.stringify(items), "EX", 300);
+      // await redis.set("banners", JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 
@@ -78,13 +78,13 @@ class BannerController {
     try {
       const id = req.params.id;
 
-      const cache = await redis.get(`banner:${id}`);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(`banner:${id}`);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await Banner.findByPk(id);
       if (!item) return res.status(404).json({ message: "Banner not found" });
 
-      await redis.set(`banner:${id}`, JSON.stringify(item), "EX", 300);
+      // await redis.set(`banner:${id}`, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

@@ -85,7 +85,8 @@ const AccordionItem = ({
 export default function CourseDetail() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { courseId } = route.params || {};
+  const { batchId } = route.params || {};
+  console.log("batchId",batchId)
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -98,7 +99,7 @@ export default function CourseDetail() {
     data: batchData,
     error: batchError,
     isLoading: batchLoading,
-  } = useSWR(courseId ? `/batchs/${courseId}` : null, fetcher, {
+  } = useSWR(batchId ? `/batchs/${batchId}` : null, fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
@@ -108,7 +109,7 @@ export default function CourseDetail() {
     data: videosResponse,
     error: videosError,
     isLoading: videosLoading,
-  } = useSWR(courseId ? `/videocourses/batch/${courseId}` : null, fetcher, {
+  } = useSWR(batchId ? `/videocourses/batch/${batchId}` : null, fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
@@ -233,6 +234,8 @@ export default function CourseDetail() {
       </SafeAreaView>
     );
   }
+
+  console.log("batchData",batchData)
 
   if (batchError || !batchData) {
     return (

@@ -42,12 +42,12 @@ class PDFNoteController {
   // GET ALL
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("pdfnotes");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("pdfnotes");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await PDFNote.findAll();
 
-      await redis.set("pdfnotes", JSON.stringify(items), "EX", 60);
+      // await redis.set("pdfnotes", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -62,13 +62,13 @@ class PDFNoteController {
   // GET ONE
   static async findOne(req, res) {
     try {
-      const cache = await redis.get(`pdfnote:${req.params.id}`);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(`pdfnote:${req.params.id}`);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await PDFNote.findByPk(req.params.id);
       if (!item) return res.status(404).json({ message: "PDF note not found" });
 
-      await redis.set(`pdfnote:${req.params.id}`, JSON.stringify(item), "EX", 300);
+      // await redis.set(`pdfnote:${req.params.id}`, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

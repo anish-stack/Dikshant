@@ -30,14 +30,14 @@ class TestimonialController {
   // GET ALL
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("testimonials");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("testimonials");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Testimonial.findAll({
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set("testimonials", JSON.stringify(items), "EX", 300);
+      // await redis.set("testimonials", JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 
@@ -53,16 +53,16 @@ class TestimonialController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `testimonial:${id}`;
+      // const cacheKey = `testimonial:${id}`;
 
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await Testimonial.findByPk(id);
 
       if (!item) return res.status(404).json({ message: "Not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

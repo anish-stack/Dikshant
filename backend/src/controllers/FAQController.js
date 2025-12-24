@@ -29,14 +29,14 @@ class FAQController {
   // GET ALL FAQS
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("faqs");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("faqs");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await FAQ.findAll({
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set("faqs", JSON.stringify(items), "EX", 300);
+      // await redis.set("faqs", JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 

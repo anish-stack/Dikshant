@@ -41,14 +41,14 @@ class BlogController {
   // GET ALL
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("blogs");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("blogs");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const blogs = await Blog.findAll({
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set("blogs", JSON.stringify(blogs), "EX", 120);
+      // await redis.set("blogs", JSON.stringify(blogs), "EX", 120);
 
       return res.json(blogs);
 
@@ -63,16 +63,16 @@ class BlogController {
   static async findOne(req, res) {
     try {
       const slug = req.params.slug;
-      const cacheKey = `blog:${slug}`;
+      // const cacheKey = `blog:${slug}`;
 
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const blog = await Blog.findOne({ where: { slug } });
 
       if (!blog) return res.status(404).json({ message: "Blog not found" });
 
-      await redis.set(cacheKey, JSON.stringify(blog), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(blog), "EX", 300);
 
       return res.json(blog);
 

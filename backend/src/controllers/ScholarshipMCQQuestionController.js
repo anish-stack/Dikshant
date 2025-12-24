@@ -32,13 +32,13 @@ class ScholarshipMCQQuestionController {
   // ALL MCQs
   static async findAll(req, res) {
     try {
-      const cached = await redis.get("scholarship_mcq_list");
+      // const cached = await redis.get("scholarship_mcq_list");
 
-      if (cached) return res.json(JSON.parse(cached));
+      // if (cached) return res.json(JSON.parse(cached));
 
       const items = await ScholarshipMCQQuestion.findAll();
 
-      await redis.set("scholarship_mcq_list", JSON.stringify(items), "EX", 60);
+      // await redis.set("scholarship_mcq_list", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -53,16 +53,16 @@ class ScholarshipMCQQuestionController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `smcq:${id}`;
+      // const cacheKey = `smcq:${id}`;
 
-      const cached = await redis.get(cacheKey);
-      if (cached) return res.json(JSON.parse(cached));
+      // const cached = await redis.get(cacheKey);
+      // if (cached) return res.json(JSON.parse(cached));
 
       const item = await ScholarshipMCQQuestion.findByPk(id);
 
       if (!item) return res.status(404).json({ message: "MCQ not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

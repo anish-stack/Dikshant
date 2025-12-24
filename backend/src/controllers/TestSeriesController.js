@@ -48,12 +48,12 @@ class TestSeriesController {
   static async findAll(req, res) {
     try {
    
-      const cache = await redis.get("testseries");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("testseries");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await TestSeries.findAll();
 
-      await redis.set("testseries", JSON.stringify(items), "EX", 60);
+      // await redis.set("testseries", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -67,13 +67,13 @@ class TestSeriesController {
   // GET ONE
   static async findOne(req, res) {
     try {
-      const cache = await redis.get(`testseries:${req.params.id}`);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(`testseries:${req.params.id}`);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await TestSeries.findByPk(req.params.id);
       if (!item) return res.status(404).json({ message: "Not found" });
 
-      await redis.set(`testseries:${req.params.id}`, JSON.stringify(item), "EX", 300);
+      // await redis.set(`testseries:${req.params.id}`, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

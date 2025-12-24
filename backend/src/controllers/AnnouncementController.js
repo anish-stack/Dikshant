@@ -31,15 +31,15 @@ class AnnouncementController {
   // GET ALL
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("announcements");
+      // const cache = await redis.get("announcements");
 
-      if (cache) return res.json(JSON.parse(cache));
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Announcement.findAll({
         order: [["publishDate", "DESC"]]
       });
 
-      await redis.set("announcements", JSON.stringify(items), "EX", 60);
+      // await redis.set("announcements", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -54,16 +54,16 @@ class AnnouncementController {
   // GET ONE
   static async findOne(req, res) {
     try {
-      const cacheKey = `announcement:${req.params.id}`;
-      const cache = await redis.get(cacheKey);
+      // const cacheKey = `announcement:${req.params.id}`;
+      // const cache = await redis.get(cacheKey);
 
-      if (cache) return res.json(JSON.parse(cache));
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await Announcement.findByPk(req.params.id);
 
       if (!item) return res.status(404).json({ message: "Announcement not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

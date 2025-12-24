@@ -55,9 +55,9 @@ static async getBatchProgress(req, res) {
   try {
     const { userId, batchId } = req.params;
 
-    const cacheKey = `progress:user:${userId}:batch:${batchId}`;
-    const cache = await redis.get(cacheKey);
-    if (cache) return res.json(JSON.parse(cache));
+    // const cacheKey = `progress:user:${userId}:batch:${batchId}`;
+    // const cache = await redis.get(cacheKey);
+    // if (cache) return res.json(JSON.parse(cache));
 
     const progressList = await CourseProgress.findAll({
       where: { userId, batchId },
@@ -71,7 +71,7 @@ static async getBatchProgress(req, res) {
       order: [["id", "ASC"]], // optional but recommended
     });
 
-    await redis.set(cacheKey, JSON.stringify(progressList), "EX", 300);
+    // await redis.set(cacheKey, JSON.stringify(progressList), "EX", 300);
 
     return res.json(progressList);
 

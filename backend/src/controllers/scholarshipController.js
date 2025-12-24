@@ -31,14 +31,14 @@ class ScholarshipController {
   // GET ALL
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("scholarships");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("scholarships");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Scholarship.findAll({
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set("scholarships", JSON.stringify(items), "EX", 300);
+      // await redis.set("scholarships", JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 
@@ -54,15 +54,15 @@ class ScholarshipController {
     try {
       const id = req.params.id;
 
-      const cacheKey = `scholarship:${id}`;
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cacheKey = `scholarship:${id}`;
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await Scholarship.findByPk(id);
 
       if (!item) return res.status(404).json({ message: "Scholarship not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

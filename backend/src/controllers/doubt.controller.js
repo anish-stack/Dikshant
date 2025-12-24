@@ -59,10 +59,10 @@ exports.getMyDoubts = async (req, res) => {
     const userId = req.user.id; 
     const { course_id, lesson_id, status, category } = req.query;
 
-    const cacheKey = `doubts:user:${userId}:course:${course_id || "all"}:lesson:${lesson_id || "all"}:status:${status || "all"}:category:${category || "all"}`;
+    // const cacheKey = `doubts:user:${userId}:course:${course_id || "all"}:lesson:${lesson_id || "all"}:status:${status || "all"}:category:${category || "all"}`;
 
-    const cachedData = await redis.get(cacheKey);
-    if (cachedData) return res.json(JSON.parse(cachedData));
+    // const cachedData = await redis.get(cacheKey);
+    // if (cachedData) return res.json(JSON.parse(cachedData));
 
     const where = { userId };
 
@@ -76,7 +76,7 @@ exports.getMyDoubts = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    await redis.set(cacheKey, JSON.stringify(doubts || []), "EX", 300);
+    // await redis.set(cacheKey, JSON.stringify(doubts || []), "EX", 300);
 
     return res.json({
       success: true,

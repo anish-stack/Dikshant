@@ -70,13 +70,13 @@ class ProgramController {
   // }
 
   // ---- Redis Cache Key (unique per query) ----
-  const cacheKey = `programs:${page}:${limit}:${search}:${type}`;
+  // const cacheKey = `programs:${page}:${limit}:${search}:${type}`;
 
   // Check cache
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    return res.json(JSON.parse(cached));
-  }
+  // const cached = await redis.get(cacheKey);
+  // if (cached) {
+  //   return res.json(JSON.parse(cached));
+  // }
 
   // Fetch from DB
   const { rows, count } = await Program.findAndCountAll({
@@ -95,7 +95,7 @@ class ProgramController {
   };
 
   // Save into Redis for 60 sec
-  await redis.set(cacheKey, JSON.stringify(response), "EX", 60);
+  // await redis.set(cacheKey, JSON.stringify(response), "EX", 60);
 
   return res.json(response);
 
@@ -119,12 +119,12 @@ class ProgramController {
       const programId = req.params.id;
 
       // ✔ Check Redis first
-      const cacheKey = `program:${programId}`;
-      const cacheData = await redis.get(cacheKey);
+      // const cacheKey = `program:${programId}`;
+      // const cacheData = await redis.get(cacheKey);
 
-      if (cacheData) {
-        return res.json(JSON.parse(cacheData));
-      }
+      // if (cacheData) {
+      //   return res.json(JSON.parse(cacheData));
+      // }
 
       const program = await Program.findByPk(programId);
 
@@ -133,7 +133,7 @@ class ProgramController {
       }
 
       // ✔ Save in Redis
-      await redis.set(cacheKey, JSON.stringify(program), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(program), "EX", 300);
 
       return res.json(program);
     } catch (error) {

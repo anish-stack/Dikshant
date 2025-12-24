@@ -38,17 +38,17 @@ class SubjectController {
   // ======================
   static async findAll(req, res) {
     try {
-      const cacheData = await redis.get("subjects");
+      // const cacheData = await redis.get("subjects");
 
     
-      if (cacheData) {
-        return res.json(JSON.parse(cacheData));
-      }
+      // if (cacheData) {
+      //   return res.json(JSON.parse(cacheData));
+      // }
 
       const items = await Subject.findAll();
 
       // Store in Redis for 60 sec
-      await redis.set("subjects", JSON.stringify(items), "EX", 60);
+      // await redis.set("subjects", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -66,14 +66,14 @@ class SubjectController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `subject:${id}`;
+      // const cacheKey = `subject:${id}`;
 
-      const cacheData = await redis.get(cacheKey);
+      // const cacheData = await redis.get(cacheKey);
 
     
-      if (cacheData) {
-        return res.json(JSON.parse(cacheData));
-      }
+      // if (cacheData) {
+      //   return res.json(JSON.parse(cacheData));
+      // }
 
       const item = await Subject.findByPk(id);
 
@@ -82,7 +82,7 @@ class SubjectController {
       }
 
       // Cache for 5 minutes
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 

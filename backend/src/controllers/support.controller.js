@@ -47,18 +47,18 @@ exports.create = async (req, res) => {
  */
 exports.findAll = async (req, res) => {
   try {
-    const cacheKey = "support:all";
-    const cached = await redis.get(cacheKey);
+    // const cacheKey = "support:all";
+    // const cached = await redis.get(cacheKey);
 
-    if (cached) {
-      return res.json(JSON.parse(cached));
-    }
+    // if (cached) {
+    //   return res.json(JSON.parse(cached));
+    // }
 
     const tickets = await Support.findAll({
       order: [["created_at", "DESC"]],
     });
 
-    await redis.set(cacheKey, JSON.stringify(tickets), "EX", 300);
+    // await redis.set(cacheKey, JSON.stringify(tickets), "EX", 300);
 
     return res.json(tickets);
   } catch (error) {

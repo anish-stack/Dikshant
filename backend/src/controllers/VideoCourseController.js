@@ -69,16 +69,16 @@ class VideoCourseController {
   ====================== */
   static async findAll(req, res) {
     try {
-      const cacheKey = "videocourses";
+      // const cacheKey = "videocourses";
 
-      const cache = await redis.get(cacheKey);
-      if (cache) {
-        return res.json(JSON.parse(cache));
-      }
+      // const cache = await redis.get(cacheKey);
+      // if (cache) {
+      //   return res.json(JSON.parse(cache));
+      // }
 
       const items = await VideoCourse.findAll();
 
-      await redis.set(cacheKey, JSON.stringify(items), "EX", 60);
+      // await redis.set(cacheKey, JSON.stringify(items), "EX", 60);
 
       return res.json(items);
     } catch (error) {
@@ -92,17 +92,17 @@ class VideoCourseController {
   static async findOne(req, res) {
     try {
       const { id } = req.params;
-      const cacheKey = `videocourse:${id}`;
+      // const cacheKey = `videocourse:${id}`;
 
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const item = await VideoCourse.findByPk(id);
       if (!item) {
         return res.status(404).json({ message: "Not found" });
       }
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
       return res.json(item);
     } catch (error) {
       return res.status(500).json({ message: "Fetch failed", error });
@@ -115,21 +115,21 @@ class VideoCourseController {
   static async FindByBathId(req, res) {
     try {
       const { id } = req.params;
-      const cacheKey = `videocourses:batch:${id}`;
+      // const cacheKey = `videocourses:batch:${id}`;
 
-      const cache = await redis.get(cacheKey);
-      if (cache) {
-        return res.json({
-          success: true,
-          data: JSON.parse(cache),
-        });
-      }
+      // const cache = await redis.get(cacheKey);
+      // if (cache) {
+      //   return res.json({
+      //     success: true,
+      //     data: JSON.parse(cache),
+      //   });
+      // }
 
       const items = await VideoCourse.findAll({
         where: { batchId: id },
       });
 
-      await redis.set(cacheKey, JSON.stringify(items), "EX", 120);
+      // await redis.set(cacheKey, JSON.stringify(items), "EX", 120);
 
       return res.json({
         success: true,

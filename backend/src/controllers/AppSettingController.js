@@ -37,12 +37,12 @@ class AppSettingController {
   // GET ALL SETTINGS
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("appsettings");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("appsettings");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await AppSetting.findAll();
 
-      await redis.set("appsettings", JSON.stringify(items), "EX", 300);
+      // await redis.set("appsettings", JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 
@@ -59,14 +59,14 @@ class AppSettingController {
     try {
       const { key } = req.params;
 
-      const cache = await redis.get(`appsettings:${key}`);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(`appsettings:${key}`);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const setting = await AppSetting.findOne({ where: { key } });
 
       if (!setting) return res.status(404).json({ message: "Setting not found" });
 
-      await redis.set(`appsettings:${key}`, JSON.stringify(setting), "EX", 300);
+      // await redis.set(`appsettings:${key}`, JSON.stringify(setting), "EX", 300);
 
       return res.json(setting);
 

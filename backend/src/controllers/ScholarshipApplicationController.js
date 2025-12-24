@@ -47,16 +47,16 @@ class ScholarshipApplicationController {
     try {
       const scholarshipId = req.params.scholarshipId;
 
-      const cacheKey = `scholarshipapps:sch:${scholarshipId}`;
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cacheKey = `scholarshipapps:sch:${scholarshipId}`;
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const apps = await ScholarshipApplication.findAll({
         where: { scholarshipId },
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set(cacheKey, JSON.stringify(apps), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(apps), "EX", 300);
 
       return res.json(apps);
 
@@ -71,16 +71,16 @@ class ScholarshipApplicationController {
     try {
       const userId = req.params.userId;
 
-      const cacheKey = `scholarshipapps:user:${userId}`;
-      const cache = await redis.get(cacheKey);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cacheKey = `scholarshipapps:user:${userId}`;
+      // const cache = await redis.get(cacheKey);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const apps = await ScholarshipApplication.findAll({
         where: { userId },
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set(cacheKey, JSON.stringify(apps), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(apps), "EX", 300);
 
       return res.json(apps);
 

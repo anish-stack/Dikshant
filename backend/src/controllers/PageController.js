@@ -32,14 +32,14 @@ class PageController {
   // GET ALL PAGES
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("pages");
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get("pages");
+      // if (cache) return res.json(JSON.parse(cache));
 
       const pages = await Page.findAll({
         order: [["createdAt", "DESC"]]
       });
 
-      await redis.set("pages", JSON.stringify(pages), "EX", 300);
+      // await redis.set("pages", JSON.stringify(pages), "EX", 300);
 
       return res.json(pages);
 
@@ -56,16 +56,16 @@ class PageController {
     try {
       const { slug } = req.params;
 
-      const cacheKey = `page:${slug}`;
-      const cache = await redis.get(cacheKey);
+      // const cacheKey = `page:${slug}`;
+      // const cache = await redis.get(cacheKey);
 
-      if (cache) return res.json(JSON.parse(cache));
+      // if (cache) return res.json(JSON.parse(cache));
 
       const page = await Page.findOne({ where: { slug } });
 
       if (!page) return res.status(404).json({ message: "Page not found" });
 
-      await redis.set(cacheKey, JSON.stringify(page), "EX", 300);
+      // await redis.set(cacheKey, JSON.stringify(page), "EX", 300);
 
       return res.json(page);
 

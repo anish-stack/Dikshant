@@ -65,21 +65,21 @@ module.exports = {
    */
   async findAll(req, res) {
     try {
-      const cache = await redis.get(CACHE_KEY_ALL);
-      if (cache) {
-        return res.json(JSON.parse(cache));
-      }
+      // const cache = await redis.get(CACHE_KEY_ALL);
+      // if (cache) {
+      //   return res.json(JSON.parse(cache));
+      // }
 
       const items = await AppRating.findAll({
         order: [["created_at", "DESC"]],
       });
 
-      await redis.set(
-        CACHE_KEY_ALL,
-        JSON.stringify(items),
-        "EX",
-        CACHE_TTL
-      );
+      // await redis.set(
+      //   CACHE_KEY_ALL,
+      //   JSON.stringify(items),
+      //   "EX",
+      //   CACHE_TTL
+      // );
 
       return res.json(items);
     } catch (error) {

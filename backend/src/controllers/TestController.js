@@ -76,13 +76,13 @@ class TestController {
   // GET ALL TESTS
   static async findAll(req, res) {
     try {
-      const cache = await redis.get("tests");
+      // const cache = await redis.get("tests");
 
-      if (cache) return res.json(JSON.parse(cache));
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Test.findAll();
 
-      await redis.set("tests", JSON.stringify(items), "EX", 60);
+      // await redis.set("tests", JSON.stringify(items), "EX", 60);
 
       return res.json(items);
 
@@ -98,16 +98,16 @@ class TestController {
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      const cacheKey = `test:${id}`;
+      // const cacheKey = `test:${id}`;
 
-      const cached = await redis.get(cacheKey);
-      if (cached) return res.json(JSON.parse(cached));
+      // const cached = await redis.get(cacheKey);
+      // if (cached) return res.json(JSON.parse(cached));
 
       const item = await Test.findByPk(id);
 
       if (!item) return res.status(404).json({ message: "Test not found" });
 
-      await redis.set(cacheKey, JSON.stringify(item), "EX", 180); // 3 minutes
+      // await redis.set(cacheKey, JSON.stringify(item), "EX", 180); // 3 minutes
 
       return res.json(item);
 

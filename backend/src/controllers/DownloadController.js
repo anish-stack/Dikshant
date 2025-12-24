@@ -38,15 +38,15 @@ class DownloadController {
     try {
       const userId = req.params.userId;
 
-      const cache = await redis.get(`downloads:${userId}`);
-      if (cache) return res.json(JSON.parse(cache));
+      // const cache = await redis.get(`downloads:${userId}`);
+      // if (cache) return res.json(JSON.parse(cache));
 
       const items = await Download.findAll({
         where: { userId },
         order: [["downloadedAt", "DESC"]]
       });
 
-      await redis.set(`downloads:${userId}`, JSON.stringify(items), "EX", 300);
+      // await redis.set(`downloads:${userId}`, JSON.stringify(items), "EX", 300);
 
       return res.json(items);
 
