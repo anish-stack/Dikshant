@@ -140,6 +140,52 @@ class CommentController {
       return res.status(500).json({ success: false, message: "Server error" });
     }
   }
+
+ static async getAdminComments(req, res) {
+  try {
+    const { videoId } = req.params;
+    const limit = parseInt(req.query.limit) || 500;
+
+    if (!videoId) {
+      return res.status(400).json({ success: false, message: "videoId is required" });
+    }
+
+    // 1️⃣ Fetch comments
+    const comments = await Comment.findAll({
+      where: { videoId, isDeleted: false },
+      order: [["createdAt", "DESC"]],
+      limit,
+    });
+
+    const plainComments = comments.map((c) => c.get({ plain: true }));
+
+    // 2️⃣ Build nested structure
+    const commentMap = {};
+    plainComments.forEach((c) => {
+      c.replies = [];
+      commentMap[c.id] = c;
+    });
+
+    const nestedComments = [];
+    plainComments.forEach((c) => {
+      if (c.parentId) {
+        // attach reply to parent
+        if (commentMap[c.parentId]) commentMap[c.parentId].replies.push(c);
+      } else {
+        nestedComments.push(c);
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: nestedComments,
+    });
+  } catch (error) {
+    console.error("getAdminComments error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+}
+
 }
 
 module.exports = CommentController;

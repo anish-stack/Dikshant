@@ -31,6 +31,7 @@ module.exports = (sequelize, DataTypes) => {
   type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    LiveEndAt:{ type: DataTypes.DATEONLY, allowNull:true},
     DateOfLive: {
       type: DataTypes.DATEONLY,    
       allowNull: true           

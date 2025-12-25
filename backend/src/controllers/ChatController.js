@@ -1,4 +1,4 @@
-const { ChatMessage } = require("../models");
+const { ChatMessage,User } = require("../models");
 
 class ChatController {
   // ============================
@@ -170,6 +170,154 @@ class ChatController {
       return res.status(500).json({ success: false, message: "Internal server error" });
     }
   }
+
+
+  // ============================
+  // GET UNIQUE JOINED STUDENTS COUNT
+  // ============================
+
+  static async getUsersChatStatus(req, res) {
+    try {
+      const { videoId } = req.params;
+
+      if (!videoId) {
+        return res.status(400).json({
+          success: false,
+          message: "videoId required",
+        });
+      }
+
+      const events = await ChatMessage.findAll({
+        where: {
+          videoId,
+          messageType: ["join", "leave"],
+        },
+        order: [["createdAt", "ASC"]],
+        raw: true,
+      });
+
+      const usersMap = {};
+
+      for (const event of events) {
+        const uid = event.userId;
+
+        if (!usersMap[uid]) {
+          usersMap[uid] = {
+            userId: uid,
+            userName: event.userName,
+            joinCount: 0,
+            leaveCount: 0,
+            latestStatus: null,
+            lastActionAt: null,
+          };
+        }
+
+        if (event.messageType === "join") {
+          usersMap[uid].joinCount += 1;
+          usersMap[uid].latestStatus = "joined";
+        }
+
+        if (event.messageType === "leave") {
+          usersMap[uid].leaveCount += 1;
+          usersMap[uid].latestStatus = "left";
+        }
+
+        usersMap[uid].lastActionAt = event.createdAt;
+      }
+
+      const result = Object.values(usersMap);
+
+      return res.json({
+        success: true,
+        videoId,
+        totalUsers: result.length,
+        users: result,
+      });
+    } catch (error) {
+      console.error("getUsersChatStatus error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch users chat status",
+      });
+    }
+  }
+
+  static async getAllChatsaMessageFromVideo(req, res) {
+    try {
+
+      const { videoId } = req.params;
+
+      if (!videoId) {
+        return res.status(400).json({
+          success: false,
+          message: "videoId required",
+        });
+      }
+
+      const events = await ChatMessage.findAll({
+        where: {
+          videoId,
+          messageType: ["message"],
+        },
+        order: [["createdAt", "ASC"]],
+        raw: true,
+      });
+
+    } catch (error) {
+
+    }
+  }
+static async getAllChatsMessageFromVideo(req, res) {
+  try {
+    const { videoId } = req.params;
+
+    if (!videoId) {
+      return res.status(400).json({
+        success: false,
+        message: "videoId required",
+      });
+    }
+
+    const messages = await ChatMessage.findAll({
+      where: {
+        videoId,
+        messageType: "message",
+      },
+      order: [["createdAt", "ASC"]],
+      raw: true,
+    });
+
+    // Collect unique userIds
+    const userIds = [...new Set(messages.map((m) => m.userId))];
+
+    // Fetch users
+    const users = await User.findAll({
+      where: { id: userIds },
+      attributes: ["id", "name"],
+      raw: true,
+    });
+
+    const userMap = {};
+    users.forEach((u) => (userMap[u.id] = u.name));
+
+    const formatted = messages.map((msg) => ({
+      ...msg,
+      userName: userMap[msg.userId] || msg.userName || "Unknown",
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: formatted,
+    });
+  } catch (error) {
+    console.error("getAllChatsMessageFromVideo error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
 }
 
 module.exports = ChatController;

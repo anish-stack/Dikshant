@@ -2,6 +2,9 @@ const ChatController = require("../controllers/ChatController");
 const router = require("express").Router();
 
 router.get("/admin-message", ChatController.adminMessage)
+router.get("/joined-student/:videoId",ChatController.getUsersChatStatus)
+router.get("/chat-message/:videoId",ChatController.getAllChatsMessageFromVideo)
+
 router.get("/history/:videoId", async (req, res) => {
     const { videoId } = req.params
     const limit = parseInt(req.query.limit) || 500

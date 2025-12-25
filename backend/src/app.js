@@ -10,9 +10,11 @@ const app = express();
 
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST"],
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
-}))
+}));
+
 app.use(bodyParser.json({limit: '10mb'}));
 app.use(bodyParser.urlencoded({ extended: true }));
 

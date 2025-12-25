@@ -27,7 +27,7 @@ import {
 const cn = (...classes: (string | undefined | null | false)[]) =>
   classes.filter(Boolean).join(" ");
 
-const API_URL = "http://localhost:5001/api/batchs";
+const API_URL = "https://www.dikapi.olyox.in/api/batchs";
 
 interface Subject {
   id: number;
@@ -641,11 +641,13 @@ const AllBatches = () => {
                     <Button size="sm"  className="text-xs">
                       <Link to={`/all-courses/view/${batch.id}`}>View</Link>
                     </Button>
+                    
                      <Button size="sm" className="text-xs" variant="outline">
                           <Link to={`/all-courses/add-video/${batch.id}`} className="text-xs truncate">
                             Add Videos
                           </Link>
                         </Button>
+                        
                     <Button size="sm" variant="outline"  className="text-xs">
                       <Link to={`/all-courses/edit/${batch.id}`}>Edit</Link>
                     </Button>

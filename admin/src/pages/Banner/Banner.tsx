@@ -6,7 +6,7 @@ import { Plus, Edit, Trash2, ToggleLeft, ToggleRight, Upload, X, AlertCircle } f
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
-const API_URL = "http://localhost:5001/api/banners";
+const API_URL = "https://www.dikapi.olyox.in/api/banners";
 
 interface Banner {
   id: number;

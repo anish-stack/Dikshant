@@ -33,6 +33,9 @@ import FAQPage from "./pages/faq/faq";
 import DoubtsAdmin from "./pages/doubts/doubts";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./ProtectedRoute";
+import StudnetsJoined from "./pages/Courses/Coures/StudnetsJoined";
+import StudentChats from "./pages/Courses/Coures/StudentChats";
+import ViewComments from "./pages/Courses/Coures/ViewComments";
 
 export default function App(){
   return (
@@ -90,6 +93,13 @@ export default function App(){
 
               {/* Banners */}
               <Route path="/app-baners" element={<Banner />} />
+
+              <Route path="/view-studnets-joined/:id" element={<StudnetsJoined />} />
+              <Route path="/view-chat/:id" element={<StudentChats />} />
+              <Route path="/view-comments-joined/:id" element={<ViewComments />} />
+
+
+
 
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />

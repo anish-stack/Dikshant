@@ -5,7 +5,7 @@ import { Plus, Edit, Trash2, Calendar, Search, X, AlertCircle } from "lucide-rea
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
-const API_URL = "http://localhost:5001/api/announcements";
+const API_URL = "https://www.dikapi.olyox.in/api/announcements";
 
 interface Announcement {
   id: number;
