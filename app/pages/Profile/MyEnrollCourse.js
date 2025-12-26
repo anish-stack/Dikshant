@@ -72,6 +72,7 @@ export default function CourseScreen() {
     return <LockedScreen />;
   }
 
+  console.log("currentVideo.isLiveEnded",currentVideo?.isLiveEnded)
   return (
     <SocketProvider userId={user?.id}>
       <VideoProgressProvider userId={user?.id} courseId={courseId}>
@@ -98,7 +99,7 @@ export default function CourseScreen() {
 
             {/* Video Player */}
             {currentVideo && (
-              currentVideo.isLive === true && currentVideo.isEnded === false ? (
+              currentVideo.isLive === true && currentVideo.isLiveEnded === false ? (
                 <LiveVideoPlayer
                   video={currentVideo}
                   userId={user?.id}

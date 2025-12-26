@@ -8,11 +8,10 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get("window");
 
-// Card width: screen width minus horizontal padding (16 on each side) and gaps
-// 3 cards + 2 gaps (12px each) → total gap width = 24px
 const CARD_WIDTH = (width - 32 - 24) / 3;
 
 const categories = [
@@ -55,7 +54,7 @@ const categories = [
     subtitle: "Notes & PDFs",
     icon: "book-open",
     screen: "ComingSoon",
-    gradient: ["#43e97b", "#38f9d7"],
+    gradient: ["#ff9a9e", "#fad0c4"],
     students: "Coming Soon",
     comingSoon: true,
   },
@@ -75,7 +74,7 @@ const categories = [
     subtitle: "Get instant help",
     icon: "help-circle",
     screen: "ComingSoon",
-    gradient: ["#a8edea", "#fed6e3"],
+    gradient: ["#fbc2eb", "#a6c1ee"],
     students: "Coming Soon",
     comingSoon: true,
   },
@@ -101,17 +100,24 @@ const QuickActionItem = ({ item }) => {
       activeOpacity={0.7}
       disabled={item.comingSoon}
     >
-      <View style={styles.quickActionIcon}>
-        <Feather name={item.icon} size={16} color="#ef4444" />
-      </View>
-      <Text style={styles.quickActionText} numberOfLines={1}>
-        {item.title}
-      </Text>
-      {item.comingSoon && (
-        <View style={styles.comingSoonBadge}>
-          <Text style={styles.comingSoonText}>Soon</Text>
+      <LinearGradient
+        colors={item.gradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientBackground}
+      >
+        <View style={styles.quickActionIcon}>
+          <Feather name={item.icon} size={16} color="#ffffff" />
         </View>
-      )}
+        <Text style={styles.quickActionText} numberOfLines={1}>
+          {item.title}
+        </Text>
+        {item.comingSoon && (
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Soon</Text>
+          </View>
+        )}
+      </LinearGradient>
     </TouchableOpacity>
   );
 };
@@ -162,20 +168,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   quickActionItem: {
-    alignItems: "center",
-    backgroundColor: "#fef2f2",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
     borderRadius: 12,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: "#e2e8f0",
+  },
+  gradientBackground: {
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     position: "relative",
   },
   quickActionIcon: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: "#fee2e2",
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 6,
@@ -183,20 +191,20 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#475569",
+    color: "#ffffff",
     textAlign: "center",
   },
   comingSoonBadge: {
     position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   comingSoonText: {
-    color: "#ef4444",
+    color: "#ffffff",
     fontSize: 8,
     fontWeight: "700",
     textTransform: "uppercase",
