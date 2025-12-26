@@ -1,8 +1,7 @@
 import React from "react";
 import { View, StyleSheet, TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { Image } from "expo-image"; // ✅ use expo-image
-import ScholarshipImage from "../assets/images/scholarship-heros.jpeg";
+import { Image } from "expo-image"; 
 
 const Scholarship = () => {
   const navigation = useNavigation();
@@ -15,7 +14,7 @@ const Scholarship = () => {
     >
       <View style={styles.imageWrapper}>
         <Image
-          source={ScholarshipImage}
+          source={{uri:"https://res.cloudinary.com/dglihfwse/image/upload/v1766726612/scholarship-heros_ydcbde.jpg"}}
           style={styles.bannerImage}
           contentFit="cover" // fills the space
           cachePolicy="memory-disk" // ✅ enables caching
