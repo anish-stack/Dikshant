@@ -23,7 +23,7 @@ import YoutubePlayer from "react-native-youtube-iframe";
 
 const { width } = Dimensions.get("window");
 
-// Updated color scheme (unchanged)
+// Updated color scheme
 const colors = {
   primary: "#DC2626",
   secondary: "#1F2937",
@@ -84,6 +84,42 @@ const AccordionItem = ({
 
 const BOTTOM_GESTURE_THRESHOLD = 16;
 
+// Helper function to safely format currency
+const formatCurrency = (amount) => {
+  if (amount == null || isNaN(amount)) return "0";
+  return Number(amount).toLocaleString("en-IN");
+};
+
+// Helper function to safely format date
+const formatDate = (dateString) => {
+  if (!dateString) return "Date not available";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "Invalid date";
+  }
+};
+
+// Helper function to extract YouTube video ID
+const getYouTubeVideoId = (url) => {
+  if (!url || typeof url !== "string") return null;
+  const regex =
+    /(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+};
+
+// Helper function to get YouTube thumbnail
+const getYouTubeThumbnail = (url) => {
+  const videoId = getYouTubeVideoId(url);
+  return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
+};
+
 export default function CourseDetail() {
   const route = useRoute();
   const navigation = useNavigation();
@@ -91,8 +127,8 @@ export default function CourseDetail() {
   const insets = useSafeAreaInsets();
 
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
-
   const TAB_BAR_HEIGHT = isGestureNavigation ? 72 : 56;
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -119,46 +155,62 @@ export default function CourseDetail() {
     revalidateOnReconnect: false,
   });
 
-  const videos = useMemo(() => videosResponse?.data || [], [videosResponse]);
+  const videos = useMemo(() => {
+    try {
+      return Array.isArray(videosResponse?.data) ? videosResponse.data : [];
+    } catch {
+      return [];
+    }
+  }, [videosResponse]);
 
   const { demoVideos, lockedVideos } = useMemo(() => {
-    const demo = videos.filter((v) => v.isDemo && v.status === "active");
-    const locked = videos.filter((v) => !v.isDemo && v.status === "active");
-    return { demoVideos: demo, lockedVideos: locked };
+    try {
+      const demo = videos.filter((v) => v?.isDemo && v?.status === "active");
+      const locked = videos.filter((v) => !v?.isDemo && v?.status === "active");
+      return { demoVideos: demo, lockedVideos: locked };
+    } catch {
+      return { demoVideos: [], lockedVideos: [] };
+    }
   }, [videos]);
 
-  // === NEW LOGIC FOR FINAL PRICE & DISCOUNT ===
+  // Safe price calculations with null checks
   const hasDiscount = useMemo(() => {
     return (
       batchData?.batchDiscountPrice != null &&
-      batchData?.batchDiscountPrice < batchData?.batchPrice
+      batchData?.batchPrice != null &&
+      batchData.batchDiscountPrice < batchData.batchPrice
     );
   }, [batchData]);
 
   const finalPrice = useMemo(() => {
-    return hasDiscount ? batchData.batchDiscountPrice : batchData.batchPrice;
+    return hasDiscount
+      ? batchData?.batchDiscountPrice
+      : batchData?.batchPrice ?? 0;
   }, [hasDiscount, batchData]);
 
   const discountPercent = useMemo(() => {
-    if (!hasDiscount) return 0;
-    return Math.round(
-      ((batchData.batchPrice - batchData.batchDiscountPrice) /
+    if (!hasDiscount || !batchData?.batchPrice) return 0;
+    const discount = Math.round(
+      ((batchData.batchPrice - (batchData?.batchDiscountPrice ?? 0)) /
         batchData.batchPrice) *
-      100
+        100
     );
+    return Math.max(0, Math.min(100, discount)); // Ensure 0-100%
   }, [hasDiscount, batchData]);
 
   const savings = useMemo(() => {
-    return hasDiscount
-      ? batchData.batchPrice - batchData.batchDiscountPrice
-      : 0;
+    if (!hasDiscount || !batchData?.batchPrice) return 0;
+    const save =
+      (batchData.batchPrice ?? 0) - (batchData?.batchDiscountPrice ?? 0);
+    return Math.max(0, save);
   }, [hasDiscount, batchData]);
-  // ==========================================
 
   const triggerHaptic = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) { }
+    } catch (e) {
+      // Haptics might not be available
+    }
   };
 
   const handleBack = () => {
@@ -167,12 +219,12 @@ export default function CourseDetail() {
   };
 
   const handleEnrollPress = () => {
-    if (batchData?.isEmi) {
+    if (batchData?.isEmi && batchData?.emiSchedule?.length > 0) {
       setShowPaymentModal(true);
       triggerHaptic();
     } else {
       navigation.navigate("enroll-course", {
-        batchId: batchData.id,
+        batchId: batchData?.id,
         userId: 456,
       });
     }
@@ -186,13 +238,14 @@ export default function CourseDetail() {
   const handleConfirmPayment = () => {
     triggerHaptic();
     setShowPaymentModal(false);
+    const amount =
+      selectedPayment === "full"
+        ? finalPrice
+        : batchData?.emiSchedule?.[0]?.amount ?? 0;
     console.log("Payment confirmed:", {
       type: selectedPayment,
       batchId: batchData?.id,
-      amount:
-        selectedPayment === "full"
-          ? finalPrice
-          : batchData?.emiSchedule?.[0]?.amount,
+      amount,
     });
   };
 
@@ -216,29 +269,7 @@ export default function CourseDetail() {
     }
   }, []);
 
-  const getYouTubeVideoId = (url) => {
-    if (!url) return null;
-    const regex =
-      /(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-  };
-
-  const getYouTubeThumbnail = (url) => {
-    const videoId = getYouTubeVideoId(url);
-    return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
-
+  // Loading state
   if (batchLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -248,6 +279,7 @@ export default function CourseDetail() {
     );
   }
 
+  // Error state
   if (batchError || !batchData) {
     return (
       <SafeAreaView style={styles.errorContainer}>
@@ -280,46 +312,49 @@ export default function CourseDetail() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Hero Image */}
-        <View style={styles.hero}>
-          <Image
-            source={{ uri: batchData.imageUrl }}
-            style={styles.heroImage}
-            resizeMode="contain"
-          />
+        {batchData?.imageUrl && (
+          <View style={styles.hero}>
+            <Image
+              source={{ uri: batchData.imageUrl }}
+              style={styles.heroImage}
+              resizeMode="contain"
+            />
 
-          {/* Only show discount tag if there is a real discount */}
-          {discountPercent > 0 && (
-            <View style={styles.discountTag}>
-              <Text style={styles.discountTagText}>{discountPercent}% OFF</Text>
-            </View>
-          )}
-        </View>
+            {discountPercent > 0 && (
+              <View style={styles.discountTag}>
+                <Text style={styles.discountTagText}>{discountPercent}% OFF</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Course Info Card */}
         <View style={styles.infoCard}>
-          <Text style={styles.courseTitle}>{batchData.name}</Text>
+          <Text style={styles.courseTitle}>{batchData?.name || "Course Title"}</Text>
 
-          {batchData.program?.name && (
+          {batchData?.program?.name && (
             <View style={styles.programBadge}>
               <Feather name="layers" size={12} color={colors.primary} />
               <Text style={styles.programName}>{batchData.program.name}</Text>
             </View>
           )}
 
-          {batchData.shortDescription && (
+          {batchData?.shortDescription && (
             <Text style={styles.courseSubtitle}>{batchData.shortDescription}</Text>
           )}
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Feather name="calendar" size={14} color={colors.primary} />
-              <Text style={styles.statText}>{formatDate(batchData.startDate)}</Text>
+              <Text style={styles.statText}>
+                {formatDate(batchData?.startDate)}
+              </Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Feather name="book-open" size={14} color={colors.primary} />
               <Text style={styles.statText}>
-                {batchData.subjects?.length || 0} Subjects
+                {batchData?.subjects?.length ?? 0} Subjects
               </Text>
             </View>
             <View style={styles.statDivider} />
@@ -331,17 +366,19 @@ export default function CourseDetail() {
         </View>
 
         {/* Long Description */}
-        {batchData.longDescription && (
+        {batchData?.longDescription && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About This Course</Text>
             <View style={styles.descriptionCard}>
-              <Text style={styles.descriptionText}>{batchData.longDescription}</Text>
+              <Text style={styles.descriptionText}>
+                {batchData.longDescription}
+              </Text>
             </View>
           </View>
         )}
 
         {/* Subjects Section */}
-        {batchData.subjects && batchData.subjects.length > 0 && (
+        {Array.isArray(batchData?.subjects) && batchData.subjects.length > 0 && (
           <View style={styles.section}>
             <AccordionItem
               title={`Course Subjects (${batchData.subjects.length})`}
@@ -350,13 +387,13 @@ export default function CourseDetail() {
             >
               <View style={styles.subjectsGrid}>
                 {batchData.subjects.map((subject) => (
-                  <View key={subject.id} style={styles.subjectCard}>
+                  <View key={subject?.id || Math.random()} style={styles.subjectCard}>
                     <View style={styles.subjectIcon}>
                       <Feather name="book" size={18} color={colors.primary} />
                     </View>
                     <View style={styles.subjectInfo}>
-                      <Text style={styles.subjectName}>{subject.name}</Text>
-                      {subject.description && (
+                      <Text style={styles.subjectName}>{subject?.name || "Subject"}</Text>
+                      {subject?.description && (
                         <Text style={styles.subjectDesc} numberOfLines={3}>
                           {subject.description}
                         </Text>
@@ -379,11 +416,11 @@ export default function CourseDetail() {
             >
               {demoVideos.map((video) => {
                 const thumbnailUrl =
-                  video.imageUrl || getYouTubeThumbnail(video.url);
+                  video?.imageUrl || getYouTubeThumbnail(video?.url);
 
                 return (
                   <TouchableOpacity
-                    key={video.id}
+                    key={video?.id || Math.random()}
                     style={styles.videoItem}
                     onPress={() => handleVideoPress(video)}
                     activeOpacity={0.8}
@@ -394,6 +431,7 @@ export default function CourseDetail() {
                           source={{ uri: thumbnailUrl }}
                           style={styles.thumbImage}
                           resizeMode="cover"
+                          onError={() => console.log("Image failed to load")}
                         />
                       ) : (
                         <View style={styles.thumbPlaceholder}>
@@ -407,13 +445,13 @@ export default function CourseDetail() {
 
                     <View style={styles.videoDetails}>
                       <Text style={styles.videoTitle} numberOfLines={2}>
-                        {video.title}
+                        {video?.title || "Video"}
                       </Text>
                       <View style={styles.videoMeta}>
                         <View style={styles.freeTag}>
                           <Text style={styles.freeTagText}>FREE DEMO</Text>
                         </View>
-                        {video.duration && (
+                        {video?.duration && (
                           <Text style={styles.durationText}>{video.duration}</Text>
                         )}
                       </View>
@@ -444,41 +482,36 @@ export default function CourseDetail() {
           <View style={styles.priceCard}>
             <View style={styles.priceRow}>
               <View>
-                {/* Original price (always show if exists) */}
-                {batchData.batchPrice && (
+                {batchData?.batchPrice && (
                   <Text style={styles.originalPrice}>
-                    ₹{batchData.batchPrice.toLocaleString("en-IN")}
+                    ₹{formatCurrency(batchData.batchPrice)}
                   </Text>
                 )}
 
-                {/* Final price – use batchDiscountPrice only if there's a real discount */}
                 <View style={styles.finalPriceRow}>
                   <Text style={styles.finalPrice}>
-                    ₹{Number(finalPrice).toLocaleString("en-IN")}
+                    ₹{formatCurrency(finalPrice)}
                   </Text>
                 </View>
               </View>
 
-              {/* Savings badge only when there's discount */}
               {discountPercent > 0 && (
                 <View style={styles.saveBadge}>
                   <Text style={styles.saveText}>
-                    Save ₹{savings.toLocaleString("en-IN")}
+                    Save ₹{formatCurrency(savings)}
                   </Text>
                 </View>
               )}
             </View>
 
-            {/* Total with GST (now using finalPrice) */}
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total Amount (incl. GST)</Text>
               <Text style={styles.totalValue}>
-                ₹{Number(finalPrice).toLocaleString("en-IN")}
+                ₹{formatCurrency(finalPrice)}
               </Text>
             </View>
 
-            {/* Offer Validity */}
-            {batchData.offerValidityDays > 0 && (
+            {batchData?.offerValidityDays > 0 && (
               <View style={styles.validityBanner}>
                 <Feather name="clock" size={12} color={colors.danger} />
                 <Text style={styles.validityText}>
@@ -487,31 +520,34 @@ export default function CourseDetail() {
               </View>
             )}
 
-            {/* EMI Options */}
-            {batchData.isEmi && batchData.emiSchedule && batchData.emiSchedule.length > 0 && (
-              <View style={styles.emiCard}>
-                <View style={styles.emiHeader}>
-                  <Feather name="credit-card" size={18} color={colors.primary} />
-                  <Text style={styles.emiTitle}>Easy EMI Available</Text>
-                </View>
+            {batchData?.isEmi &&
+              Array.isArray(batchData?.emiSchedule) &&
+              batchData.emiSchedule.length > 0 && (
+                <View style={styles.emiCard}>
+                  <View style={styles.emiHeader}>
+                    <Feather name="credit-card" size={18} color={colors.primary} />
+                    <Text style={styles.emiTitle}>Easy EMI Available</Text>
+                  </View>
 
-                {batchData.emiSchedule.map((emi, idx) => (
-                  <View key={idx} style={styles.emiRow}>
-                    <Text style={styles.emiLabel}>Month {emi.month} Payment</Text>
-                    <Text style={styles.emiValue}>
-                      ₹{emi.amount.toLocaleString("en-IN")}
+                  {batchData.emiSchedule.map((emi, idx) => (
+                    <View key={idx} style={styles.emiRow}>
+                      <Text style={styles.emiLabel}>
+                        Month {emi?.month ?? idx + 1} Payment
+                      </Text>
+                      <Text style={styles.emiValue}>
+                        ₹{formatCurrency(emi?.amount)}
+                      </Text>
+                    </View>
+                  ))}
+
+                  <View style={styles.emiTotal}>
+                    <Text style={styles.emiTotalLabel}>Total EMI Amount</Text>
+                    <Text style={styles.emiTotalValue}>
+                      ₹{formatCurrency(batchData.emiTotal)}
                     </Text>
                   </View>
-                ))}
-
-                <View style={styles.emiTotal}>
-                  <Text style={styles.emiTotalLabel}>Total EMI Amount</Text>
-                  <Text style={styles.emiTotalValue}>
-                    ₹{batchData.emiTotal.toLocaleString("en-IN")}
-                  </Text>
                 </View>
-              </View>
-            )}
+              )}
           </View>
         </View>
 
@@ -523,21 +559,27 @@ export default function CourseDetail() {
               <Feather name="calendar" size={16} color={colors.primary} />
               <View style={styles.dateInfo}>
                 <Text style={styles.dateLabel}>Course Starts</Text>
-                <Text style={styles.dateValue}>{formatDate(batchData.startDate)}</Text>
+                <Text style={styles.dateValue}>
+                  {formatDate(batchData?.startDate)}
+                </Text>
               </View>
             </View>
             <View style={styles.dateRow}>
               <Feather name="calendar" size={16} color={colors.danger} />
               <View style={styles.dateInfo}>
                 <Text style={styles.dateLabel}>Course Ends</Text>
-                <Text style={styles.dateValue}>{formatDate(batchData.endDate)}</Text>
+                <Text style={styles.dateValue}>
+                  {formatDate(batchData?.endDate)}
+                </Text>
               </View>
             </View>
             <View style={styles.dateRow}>
               <Feather name="clock" size={16} color={colors.success} />
               <View style={styles.dateInfo}>
                 <Text style={styles.dateLabel}>Registration Closes</Text>
-                <Text style={styles.dateValue}>{formatDate(batchData.registrationEndDate)}</Text>
+                <Text style={styles.dateValue}>
+                  {formatDate(batchData?.registrationEndDate)}
+                </Text>
               </View>
             </View>
           </View>
@@ -559,7 +601,7 @@ export default function CourseDetail() {
         <View style={styles.enrollPriceInfo}>
           <Text style={styles.enrollPriceLabel}>Total Price</Text>
           <Text style={styles.enrollPriceValue}>
-            ₹{Number(finalPrice ?? 0).toLocaleString("en-IN")}
+            ₹{formatCurrency(finalPrice ?? 0)}
           </Text>
         </View>
 
@@ -573,7 +615,7 @@ export default function CourseDetail() {
         </TouchableOpacity>
       </View>
 
-      {/* Video Modal (unchanged) */}
+      {/* Video Modal */}
       <Modal
         visible={showVideoModal}
         transparent={true}
@@ -585,7 +627,7 @@ export default function CourseDetail() {
             <View style={styles.videoModalHeader}>
               <View style={styles.videoModalTitleContainer}>
                 <Text style={styles.videoModalTitle} numberOfLines={1}>
-                  {currentVideo?.title}
+                  {currentVideo?.title || "Video"}
                 </Text>
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={handleCloseVideo}>
@@ -617,7 +659,7 @@ export default function CourseDetail() {
       </Modal>
 
       {/* Payment Modal */}
-      {batchData.isEmi && (
+      {batchData?.isEmi && (
         <Modal
           visible={showPaymentModal}
           transparent={true}
@@ -635,7 +677,9 @@ export default function CourseDetail() {
               <View style={styles.modalHandle} />
 
               <Text style={styles.modalTitle}>Choose Payment Option</Text>
-              <Text style={styles.modalSubtitle}>Select your preferred payment method</Text>
+              <Text style={styles.modalSubtitle}>
+                Select your preferred payment method
+              </Text>
 
               {/* Full Payment */}
               <TouchableOpacity
@@ -651,9 +695,11 @@ export default function CourseDetail() {
                 </View>
                 <View style={styles.paymentOptionDetails}>
                   <Text style={styles.paymentOptionTitle}>Full Payment</Text>
-                  <Text style={styles.paymentOptionDesc}>Pay once, get instant access</Text>
+                  <Text style={styles.paymentOptionDesc}>
+                    Pay once, get instant access
+                  </Text>
                   <Text style={styles.paymentOptionPrice}>
-                    ₹{Number(finalPrice).toLocaleString("en-IN")}
+                    ₹{formatCurrency(finalPrice)}
                   </Text>
                 </View>
                 <View
@@ -667,38 +713,39 @@ export default function CourseDetail() {
               </TouchableOpacity>
 
               {/* EMI Option */}
-              {batchData.emiSchedule?.length > 0 && (
-                <TouchableOpacity
-                  style={[
-                    styles.paymentOption,
-                    selectedPayment === "emi" && styles.paymentOptionActive,
-                  ]}
-                  onPress={() => handlePaymentSelect("emi")}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.paymentOptionIcon}>
-                    <Feather name="credit-card" size={22} color={colors.primary} />
-                  </View>
-                  <View style={styles.paymentOptionDetails}>
-                    <Text style={styles.paymentOptionTitle}>Easy EMI</Text>
-                    <Text style={styles.paymentOptionDesc}>
-                      Pay in {batchData.emiSchedule.length} monthly installments
-                    </Text>
-                    <Text style={styles.paymentOptionPrice}>
-                      ₹{batchData.emiSchedule[0].amount.toLocaleString("en-IN")}
-                      <Text style={styles.paymentOptionSub}> /month</Text>
-                    </Text>
-                  </View>
-                  <View
+              {Array.isArray(batchData?.emiSchedule) &&
+                batchData.emiSchedule.length > 0 && (
+                  <TouchableOpacity
                     style={[
-                      styles.radioCircle,
-                      selectedPayment === "emi" && styles.radioCircleActive,
+                      styles.paymentOption,
+                      selectedPayment === "emi" && styles.paymentOptionActive,
                     ]}
+                    onPress={() => handlePaymentSelect("emi")}
+                    activeOpacity={0.8}
                   >
-                    {selectedPayment === "emi" && <View style={styles.radioDot} />}
-                  </View>
-                </TouchableOpacity>
-              )}
+                    <View style={styles.paymentOptionIcon}>
+                      <Feather name="credit-card" size={22} color={colors.primary} />
+                    </View>
+                    <View style={styles.paymentOptionDetails}>
+                      <Text style={styles.paymentOptionTitle}>Easy EMI</Text>
+                      <Text style={styles.paymentOptionDesc}>
+                        Pay in {batchData.emiSchedule.length} monthly installments
+                      </Text>
+                      <Text style={styles.paymentOptionPrice}>
+                        ₹{formatCurrency(batchData.emiSchedule[0]?.amount)}
+                        <Text style={styles.paymentOptionSub}> /month</Text>
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        selectedPayment === "emi" && styles.radioCircleActive,
+                      ]}
+                    >
+                      {selectedPayment === "emi" && <View style={styles.radioDot} />}
+                    </View>
+                  </TouchableOpacity>
+                )}
 
               <TouchableOpacity
                 style={[
