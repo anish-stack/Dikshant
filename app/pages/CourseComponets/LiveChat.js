@@ -82,7 +82,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
 
   const addMessage = (msg) => {
     const normalized = {
-      id: msg.id || `temp-${Date.now()}`,
+      id: msg.id || msg._id,
       userId: msg.userId?.toString(),
       userName: msg.userName || "Unknown",
       message: msg.message || "",
@@ -91,10 +91,18 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     };
 
     setMessages((prev) => {
-      if (prev.some((m) => m.id === normalized.id)) return prev;
+      const exists = prev.some(
+        (m) =>
+          m.message === normalized.message &&
+          m.userId === normalized.userId &&
+          Math.abs(new Date(m.timestamp) - new Date(normalized.timestamp)) < 2000
+      );
+
+      if (exists) return prev;
       return [...prev, normalized];
     });
   };
+
 
   const fetchChatHistory = async () => {
     try {
@@ -138,14 +146,14 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
         setTimeout(() => setIsTyping(false), 3000);
       }
     };
-    socket.on("admin-message",(data)=>{
+    socket.on("admin-message", (data) => {
       console.log(data)
     })
 
     const handleLiveCount = (data) => {
       const count = data.total || 0;
       setLiveCount(count);
-fetchChatHistory()
+      fetchChatHistory()
       // ← YEH LINE ADD KI — PARENT KO BHI UPDATE KAR DO
       if (onLiveCountChange) {
         onLiveCountChange(count);
@@ -188,18 +196,18 @@ fetchChatHistory()
     scrollToBottom();
   };
 
-useEffect(() => {
-  // First immediate call
-  fetchChatHistory();
+  // useEffect(() => {
+  //   // First immediate call
+  //   fetchChatHistory();
 
-  // Interval
-  const interval = setInterval(() => {
-    fetchChatHistory();
-  }, 5000);
+  //   // Interval
+  //   const interval = setInterval(() => {
+  //     fetchChatHistory();
+  //   }, 5000);
 
-  // Cleanup (VERY IMPORTANT)
-  return () => clearInterval(interval);
-}, []);
+  //   // Cleanup (VERY IMPORTANT)
+  //   return () => clearInterval(interval);
+  // }, []);
 
 
   const handleTyping = () => {
@@ -235,8 +243,13 @@ useEffect(() => {
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop} />
+      <TouchableWithoutFeedback onPress={onClose} accessible={false}>
+        <View
+          style={styles.backdrop}
+          pointerEvents="box-only"
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={onClose}
+        />
       </TouchableWithoutFeedback>
 
       <Animated.View
@@ -276,7 +289,7 @@ useEffect(() => {
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => scrollToBottom(false)}
             onLayout={() => scrollToBottom(false)}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps="always"
           />
 
           {/* Typing Indicator */}
@@ -310,6 +323,8 @@ useEffect(() => {
               ]}
               onPress={sendMessage}
               disabled={!newMessage.trim()}
+              activeOpacity={0.7}
+              keyboardShouldPersistTaps="always"
             >
               <Feather name="send" size={20} color="#fff" />
             </TouchableOpacity>

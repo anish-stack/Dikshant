@@ -49,6 +49,13 @@ interface ApiResponse {
   data: Program[];
 }
 
+interface ProgramQueryParams {
+  page: number;
+  limit: number;
+  search?: string;
+  type?: string;
+}
+
 const LIMIT_OPTIONS = [10, 25, 50, 100];
 const COURSE_TYPES = [
   { value: "", label: "All Courses", icon: <Globe className="w-4 h-4" /> },
@@ -106,7 +113,7 @@ const AllPrograms: React.FC = () => {
     const fetchPrograms = async () => {
       setLoading(true);
       try {
-        const params: any = {
+        const params: ProgramQueryParams = {
           page,
           limit,
           ...(debouncedSearch && { search: debouncedSearch }),
@@ -133,27 +140,28 @@ const AllPrograms: React.FC = () => {
 
   // Delete program
   const handleDelete = async () => {
-  const program = deleteModal.program;
-  if (!program) return; // ✅ TS is now happy
+    const program = deleteModal.program;
+    if (!program) return; // ✅ TS is now happy
 
-  setDeleting(true);
-  try {
-    await axios.delete(`${API_URL}/programs/${program.id}`);
+    setDeleting(true);
+    try {
+      await axios.delete(`${API_URL}/programs/${program.id}`);
 
-    setPrograms((prev) => prev.filter((p) => p.id !== program.id));
+      setPrograms((prev) => prev.filter((p) => p.id !== program.id));
 
-    setDeleteModal({ open: false });
-  } catch (err: any) {
-    const message =
-      err.response?.data?.message ||
-      err.message ||
-      "Failed to delete program. Please try again.";
-    alert(message);
-  } finally {
-    setDeleting(false);
-  }
-};
+      setDeleteModal({ open: false });
+    } catch (err: unknown) {
+      let message = "Failed to delete program. Please try again.";
 
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+      }
+
+      alert(message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const currentFilter =
     COURSE_TYPES.find((t) => t.value === selectedType) || COURSE_TYPES[0];
@@ -481,12 +489,12 @@ const AllPrograms: React.FC = () => {
                       <Badge color="info">{program.typeOfCourse}</Badge>
                     </div> */}
                     <div className="flex gap-2 pt-2">
-                      <Button size="sm" >
+                      <Button size="sm">
                         <Link to={`/admin/programs/view/${program.slug}`}>
                           View
                         </Link>
                       </Button>
-                      <Button size="sm" variant="outline" >
+                      <Button size="sm" variant="outline">
                         <Link to={`/all-programs/${program.id}`}>Edit</Link>
                       </Button>
                       <Button
@@ -501,8 +509,7 @@ const AllPrograms: React.FC = () => {
               ))}
         </div>
 
-        <Link to={`/programs-add`}
->
+        <Link to={`/programs-add`}>
           <Button
             size="sm"
             className="bg-red-400 mb-5 absolute right-8 rounded-4xl bottom-5"

@@ -49,16 +49,16 @@ const AllSubject = () => {
   const fetchSubjects = async () => {
     setLoading(true);
     try {
-const res = await axios.get<Subject[]>(API_URL);
+      const res = await axios.get<Subject[]>(API_URL);
 
-const sortedData = res.data.sort(
-  (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-);
+      const sortedData = res.data.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
 
-setSubjects(sortedData);
-setFilteredSubjects(sortedData);
-
-    } catch (error) {
+      setSubjects(sortedData);
+      setFilteredSubjects(sortedData);
+    } catch {
       toast.error("Failed to load subjects");
     } finally {
       setLoading(false);
@@ -111,9 +111,14 @@ setFilteredSubjects(sortedData);
       setCreateModal(false);
       setFormData({ name: "", description: "" });
       fetchSubjects();
-    } catch (error: any) {
-        console.log(error)
-      toast.error(error.response?.data?.message || "Failed to create");
+    } catch (error: unknown) {
+      let message = "Failed to create";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -134,8 +139,14 @@ setFilteredSubjects(sortedData);
       setEditModal(null);
       setFormData({ name: "", description: "" });
       fetchSubjects();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update");
+    } catch (error: unknown) {
+      let message = "Failed to update";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -148,8 +159,14 @@ setFilteredSubjects(sortedData);
       toast.success("Subject deleted!");
       setDeleteModal(null);
       fetchSubjects();
-    } catch (error) {
-      toast.error("Failed to delete");
+    } catch (error: unknown) {
+      let message = "Failed to delete";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message);
     }
   };
 
@@ -361,13 +378,12 @@ setFilteredSubjects(sortedData);
             <form onSubmit={handleCreate}>
               <div className="space-y-5">
                 <div>
-                  <Label >Name</Label>
+                  <Label>Name</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    
                   />
                 </div>
                 <div className="relative">
@@ -423,13 +439,12 @@ setFilteredSubjects(sortedData);
             <form onSubmit={handleUpdate}>
               <div className="space-y-5">
                 <div>
-                  <Label >Name</Label>
+                  <Label>Name</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    
                   />
                 </div>
                 <div className="relative">
@@ -480,9 +495,7 @@ setFilteredSubjects(sortedData);
               <strong>{deleteModal.name}</strong>"? This cannot be undone.
             </p>
             <div className="flex gap-4 justify-center">
-              <Button onClick={handleDelete}>
-                Yes, Delete
-              </Button>
+              <Button onClick={handleDelete}>Yes, Delete</Button>
               <Button variant="outline" onClick={() => setDeleteModal(null)}>
                 Cancel
               </Button>

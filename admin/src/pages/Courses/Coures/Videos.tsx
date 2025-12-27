@@ -13,7 +13,6 @@ import {
   ImageIcon,
   Calendar,
   Clock,
-  Video,
   MessageSquare,
   Search,
   ChevronLeft,
@@ -44,6 +43,7 @@ interface VideoItem {
   isLive?: boolean;
   DateOfLive?: string;
   TimeOfLIve?: string;
+  isLiveEnded?: boolean;
 }
 
 interface FormData {
@@ -98,28 +98,30 @@ export default function CourseVideos() {
   });
 
   const navigate = useNavigate();
-  // Fetch videos
-  useEffect(() => {
-    fetchVideos();
-  }, []);
 
-  const fetchVideos = async () => {
+  const fetchVideos = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(false);
+
       const [videoRes, subjectRes] = await Promise.all([
         axios.get(`${API_URL}/batch/${batchId}`),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
+
       setVideos(videoRes.data.data || []);
       setSubjects(subjectRes.data.subjects || []);
-    } catch (err) {
+    } catch (error) {
+      console.error(error);
       setError(true);
-      console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [batchId]);
+
+  useEffect(() => {
+    fetchVideos();
+  }, [fetchVideos]);
 
   // Search and pagination
   const filtered = videos.filter((v) =>
@@ -224,7 +226,12 @@ export default function CourseVideos() {
     data.append("title", form.title);
     data.append("videoSource", form.videoSource);
     data.append("url", form.url);
-    data.append("batchId", batchId);
+    if (!batchId) {
+      alert("Invalid batch ID");
+      return;
+    }
+
+    data.append("batchId", String(batchId));
     data.append("subjectId", form.subjectId);
     data.append("isDownloadable", String(form.isDownloadable));
     data.append("isDemo", String(form.isDemo));
@@ -669,7 +676,10 @@ export default function CourseVideos() {
                 <select
                   value={form.videoSource}
                   onChange={(e) =>
-                    setForm({ ...form, videoSource: e.target.value as any })
+                    setForm({
+                      ...form,
+                      videoSource: e.target.value as "youtube" | "s3" | "vimeo",
+                    })
                   }
                   className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
                 >

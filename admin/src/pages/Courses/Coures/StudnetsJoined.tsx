@@ -1,19 +1,27 @@
-import React, { useEffect, useState, useMemo } from "react";
+import  { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useParams } from "react-router";
 
+interface JoinedStudent {
+  userId: string | number;
+  userName: string;
+  joinCount: number;
+  leaveCount: number;
+  latestStatus: "joined" | "left";
+}
+
 const StudentsJoined = () => {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<JoinedStudent[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { id } = useParams(); // ✅ get id from URL
 
   const VIDEO_ID = id;
   const API_URL = `https://www.dikapi.olyox.in/api/chat/joined-student/${VIDEO_ID}`;
 
-  const fetchJoinedStudents = async () => {
+  const fetchJoinedStudents = useCallback(async () => {
     try {
       const res = await axios.get(API_URL);
 
@@ -22,19 +30,20 @@ const StudentsJoined = () => {
         setTotalUsers(res.data.totalUsers || 0);
         setError(null);
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error(err);
       setError("Failed to load joined students");
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
 
   // 🔁 Poll every 5 seconds
   useEffect(() => {
     fetchJoinedStudents();
     const interval = setInterval(fetchJoinedStudents, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchJoinedStudents]);
 
   // 🔍 SEARCH FILTER
   const filteredData = useMemo(() => {

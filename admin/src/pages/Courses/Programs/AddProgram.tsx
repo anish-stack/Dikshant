@@ -102,10 +102,14 @@ const AddProgram = () => {
 
       toast.success("Program created successfully!", { id: loadingToast });
       navigate("/all-programs");
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to create program", {
-        id: loadingToast,
-      });
+    } catch (error: unknown) {
+      let message = "Failed to create program";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message, { id: loadingToast });
     } finally {
       setSubmitting(false);
     }

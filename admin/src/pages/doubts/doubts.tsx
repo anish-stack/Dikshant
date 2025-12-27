@@ -38,6 +38,13 @@ interface Doubt {
   createdAt: string;
 }
 
+interface ModalProps {
+  title?: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}
+
+
 /* =========================
    COMPONENT
 ========================= */
@@ -349,7 +356,7 @@ export default DoubtsAdmin;
 /* =========================
    MODAL
 ========================= */
-const Modal = ({ title, children, onClose }: any) => (
+const Modal = ({ title, children, onClose }: ModalProps) => (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999 p-4">
     <div className="bg-white rounded-2xl p-6 max-w-lg w-full relative">
       {title && (

@@ -1,21 +1,21 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import PageMeta from "../../../components/common/PageMeta";
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import { Skeleton } from "../../../components/ui/Skeleton/Skeleton";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  IndianRupee, 
-  Tag, 
-  BookOpen, 
-  Users, 
-  AlertCircle, 
+import {
+  ArrowLeft,
+  Calendar,
+  Clock,
+  IndianRupee,
+  Tag,
+  BookOpen,
+  Users,
+  AlertCircle,
   Calculator,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
 
 const API_URL = "https://www.dikapi.olyox.in/api/batchs";
@@ -66,7 +66,7 @@ const ViewBatch = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchBatch = async () => {
+  const fetchBatch = useCallback(async () => {
     if (!id) {
       setError("Invalid batch ID");
       setLoading(false);
@@ -79,19 +79,24 @@ const ViewBatch = () => {
     try {
       const res = await axios.get<Batch>(`${API_URL}/${id}`);
       setBatch(res.data);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to load batch details";
+    } catch (err: unknown) {
+      let errorMsg = "Failed to load batch details";
+
+      if (axios.isAxiosError(err)) {
+        errorMsg = err.response?.data?.message || errorMsg;
+      }
+
       setError(errorMsg);
       toast.error(errorMsg);
       console.error("Error fetching batch:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
-    fetchBatch();
-  }, [id]);
+  fetchBatch();
+}, [fetchBatch]);
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString("en-IN", {
@@ -159,7 +164,8 @@ const ViewBatch = () => {
                   {error || "Batch Not Found"}
                 </h2>
                 <p className="text-sm text-red-700 dark:text-red-300">
-                  {error || "The batch you're looking for doesn't exist or has been removed."}
+                  {error ||
+                    "The batch you're looking for doesn't exist or has been removed."}
                 </p>
               </div>
               <div className="flex gap-3 mt-4">
@@ -183,13 +189,20 @@ const ViewBatch = () => {
     );
   }
 
-  const finalPrice = batch.batchDiscountPrice > 0 ? batch.batchDiscountPrice : batch.batchPrice;
+  const finalPrice =
+    batch.batchDiscountPrice > 0 ? batch.batchDiscountPrice : batch.batchPrice;
   const gstAmount = Math.round((finalPrice * batch.gst) / 100);
-  const savings = batch.batchDiscountPrice > 0 ? batch.batchPrice - batch.batchDiscountPrice : 0;
+  const savings =
+    batch.batchDiscountPrice > 0
+      ? batch.batchPrice - batch.batchDiscountPrice
+      : 0;
 
   return (
     <>
-      <PageMeta title={`${batch.name} - Batch Details`} description={batch.shortDescription} />
+      <PageMeta
+        title={`${batch.name} - Batch Details`}
+        description={batch.shortDescription}
+      />
       <PageBreadcrumb pageTitle={batch.name} />
 
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -220,7 +233,8 @@ const ViewBatch = () => {
                 alt={batch.name}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = "https://via.placeholder.com/1200x400/6366f1/ffffff?text=Batch+Image";
+                  e.currentTarget.src =
+                    "https://via.placeholder.com/1200x400/6366f1/ffffff?text=Batch+Image";
                 }}
               />
             ) : (
@@ -291,7 +305,9 @@ const ViewBatch = () => {
                     </span>
                   ))}
                   {batch.subjects.length === 0 && (
-                    <span className="text-xs text-gray-500">No subjects assigned</span>
+                    <span className="text-xs text-gray-500">
+                      No subjects assigned
+                    </span>
                   )}
                 </div>
               </div>
@@ -306,13 +322,17 @@ const ViewBatch = () => {
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-xs">
-                    <span className="text-gray-700 dark:text-gray-300">Start Date</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      Start Date
+                    </span>
                     <span className="font-semibold text-emerald-700 dark:text-emerald-400">
                       {formatDate(batch.startDate)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg text-xs">
-                    <span className="text-gray-700 dark:text-gray-300">End Date</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      End Date
+                    </span>
                     <span className="font-semibold text-rose-700 dark:text-rose-400">
                       {formatDate(batch.endDate)}
                     </span>
@@ -327,13 +347,17 @@ const ViewBatch = () => {
                 </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg text-xs">
-                    <span className="text-gray-700 dark:text-gray-300">Opens</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      Opens
+                    </span>
                     <span className="font-semibold text-orange-700 dark:text-orange-400">
                       {formatDate(batch.registrationStartDate)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg text-xs">
-                    <span className="text-gray-700 dark:text-gray-300">Closes</span>
+                    <span className="text-gray-700 dark:text-gray-300">
+                      Closes
+                    </span>
                     <span className="font-semibold text-red-700 dark:text-red-400">
                       {formatDate(batch.registrationEndDate)}
                     </span>
@@ -350,13 +374,17 @@ const ViewBatch = () => {
               </h3>
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Original Price</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    Original Price
+                  </p>
                   <p className="text-lg font-bold text-gray-700 dark:text-gray-300 line-through">
                     ₹{formatPrice(batch.batchPrice)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Final Price</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                    Final Price
+                  </p>
                   <p className="text-2xl font-extrabold text-green-600 dark:text-green-400">
                     ₹{formatPrice(finalPrice)}
                   </p>
@@ -397,7 +425,8 @@ const ViewBatch = () => {
                       <p className="text-2xl font-extrabold mt-1">
                         ₹
                         {Math.round(
-                          (batch.emiTotal || finalPrice) / batch.emiSchedule.length
+                          (batch.emiTotal || finalPrice) /
+                            batch.emiSchedule.length
                         ).toLocaleString("en-IN")}{" "}
                         / month
                       </p>
@@ -457,12 +486,20 @@ const ViewBatch = () => {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Created</p>
-                <p className="text-sm font-semibold">{formatDate(batch.createdAt)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Created
+                </p>
+                <p className="text-sm font-semibold">
+                  {formatDate(batch.createdAt)}
+                </p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Updated</p>
-                <p className="text-sm font-semibold">{formatDate(batch.updatedAt)}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  Updated
+                </p>
+                <p className="text-sm font-semibold">
+                  {formatDate(batch.updatedAt)}
+                </p>
               </div>
             </div>
           </div>

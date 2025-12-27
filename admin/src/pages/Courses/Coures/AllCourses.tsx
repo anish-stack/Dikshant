@@ -1,10 +1,16 @@
-import  { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import PageMeta from "../../../components/common/PageMeta";
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
-import { Table, TableHeader, TableBody, TableRow, TableCell } from "../../../components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "../../../components/ui/table";
 import Input from "../../../components/form/input/InputField";
 import Button from "../../../components/ui/button/Button";
 import { Skeleton } from "../../../components/ui/Skeleton/Skeleton";
@@ -21,7 +27,7 @@ import {
   ToggleRight,
   AlertCircle,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
 } from "lucide-react";
 
 const cn = (...classes: (string | undefined | null | false)[]) =>
@@ -94,21 +100,24 @@ const AllBatches = () => {
 
   const [statusDropdown, setStatusDropdown] = useState(false);
   const [limitDropdown, setLimitDropdown] = useState(false);
-  const [deleteModal, setDeleteModal] = useState<{ open: boolean; batch?: Batch }>({
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean;
+    batch?: Batch;
+  }>({
     open: false,
   });
   const [deleting, setDeleting] = useState(false);
 
-  const fetchBatches = async () => {
+  const fetchBatches = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const params: any = {
+      const params = {
         page,
         limit,
-        ...(searchTerm && { search: searchTerm }),
-        ...(statusFilter && { status: statusFilter }),
+        ...(searchTerm ? { search: searchTerm } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
       };
 
       const res = await axios.get<ApiResponse>(API_URL, { params });
@@ -116,19 +125,20 @@ const AllBatches = () => {
       setTotalPages(res.data.pages);
       setTotal(res.data.total);
       setPage(res.data.page);
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to load batches";
-      setError(errorMsg);
-      toast.error(errorMsg);
-      setBatches([]);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const msg = err.response?.data?.message || "Failed to load batches";
+        setError(msg);
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, searchTerm, statusFilter]);
 
   useEffect(() => {
     fetchBatches();
-  }, [page, limit, searchTerm, statusFilter]);
+  }, [fetchBatches]);
 
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-IN", {
@@ -137,7 +147,8 @@ const AllBatches = () => {
       year: "numeric",
     });
 
-  const formatPrice = (price: number) => new Intl.NumberFormat("en-IN").format(price);
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("en-IN").format(price);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -169,13 +180,16 @@ const AllBatches = () => {
       );
       toast.success(`Batch is now ${newStatus}!`, { id: loadingToast });
       setBatches((prev) =>
-        prev.map((b) => (b.id === batch.id ? { ...b, status: newStatus as any } : b))
+        prev.map((b) => (b.id === batch.id ? { ...b, status: newStatus } : b))
       );
-    } catch (err: any) {
-      console.log("error", err);
-      toast.error(err.response?.data?.message || "Failed to update status", {
-        id: loadingToast,
-      });
+    } catch (err: unknown) {
+      let message = "Failed to update status";
+
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+      }
+
+      toast.error(message, { id: loadingToast });
     }
   };
 
@@ -192,10 +206,14 @@ const AllBatches = () => {
       setBatches((prev) => prev.filter((b) => b.id !== deleteModal.batch?.id));
       setTotal((prev) => prev - 1);
       setDeleteModal({ open: false });
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to delete batch", {
-        id: loadingToast,
-      });
+    } catch (err: unknown) {
+      let message = "Failed to delete batch";
+
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+      }
+
+      toast.error(message, { id: loadingToast });
     } finally {
       setDeleting(false);
     }
@@ -215,7 +233,9 @@ const AllBatches = () => {
                 <h2 className="text-lg font-bold text-red-800 dark:text-red-200 mb-2">
                   Error Loading Batches
                 </h2>
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  {error}
+                </p>
               </div>
               <div className="flex gap-3 mt-4">
                 <Button
@@ -242,7 +262,10 @@ const AllBatches = () => {
 
   return (
     <>
-      <PageMeta title="All Batches | Admin" description="Manage all course batches" />
+      <PageMeta
+        title="All Batches | Admin"
+        description="Manage all course batches"
+      />
       <PageBreadcrumb pageTitle="All Batches" />
 
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 sm:p-6">
@@ -252,7 +275,9 @@ const AllBatches = () => {
             <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-indigo-600" />
               All Batches
-              {!loading && <span className="text-sm text-gray-500">({total})</span>}
+              {!loading && (
+                <span className="text-sm text-gray-500">({total})</span>
+              )}
             </h1>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
               Manage and monitor all course batches
@@ -293,7 +318,8 @@ const AllBatches = () => {
             >
               <Filter className="w-4 h-4" />
               <span className="flex-1 text-left">
-                {STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label || "All Status"}
+                {STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label ||
+                  "All Status"}
               </span>
               <ChevronDown className="w-4 h-4" />
             </Button>
@@ -448,11 +474,14 @@ const AllBatches = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <img
-                          src={batch.imageUrl || "https://via.placeholder.com/48"}
+                          src={
+                            batch.imageUrl || "https://via.placeholder.com/48"
+                          }
                           alt={batch.name}
                           className="w-12 h-12 rounded object-cover border border-gray-200 dark:border-gray-700"
                           onError={(e) => {
-                            e.currentTarget.src = "https://via.placeholder.com/48/e0e0e0/999999?text=Batch";
+                            e.currentTarget.src =
+                              "https://via.placeholder.com/48/e0e0e0/999999?text=Batch";
                           }}
                         />
                         <div className="min-w-0">
@@ -514,17 +543,26 @@ const AllBatches = () => {
                     <TableCell>
                       <div className="flex justify-center items-center gap-1">
                         <Button size="sm" variant="outline">
-                          <Link to={`/all-courses/add-video/${batch.id}`} className="text-xs truncate">
+                          <Link
+                            to={`/all-courses/add-video/${batch.id}`}
+                            className="text-xs truncate"
+                          >
                             Add Videos
                           </Link>
                         </Button>
-                           <Button size="sm" variant="outline">
-                          <Link to={`/all-courses/view/${batch.id}`} className="text-xs">
+                        <Button size="sm" variant="outline">
+                          <Link
+                            to={`/all-courses/view/${batch.id}`}
+                            className="text-xs"
+                          >
                             View
                           </Link>
                         </Button>
                         <Button size="sm" variant="outline">
-                          <Link to={`/all-courses/edit/${batch.id}`} className="text-xs">
+                          <Link
+                            to={`/all-courses/edit/${batch.id}`}
+                            className="text-xs"
+                          >
                             Edit
                           </Link>
                         </Button>
@@ -566,7 +604,10 @@ const AllBatches = () => {
         <div className="lg:hidden space-y-3">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 space-y-3">
+              <div
+                key={i}
+                className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 space-y-3"
+              >
                 <Skeleton className="h-32 w-full rounded" />
                 <Skeleton className="h-5 w-3/4" />
                 <Skeleton className="h-16 w-full" />
@@ -596,7 +637,8 @@ const AllBatches = () => {
                   alt={batch.name}
                   className="w-full h-32 object-cover"
                   onError={(e) => {
-                    e.currentTarget.src = "https://via.placeholder.com/400x200/e0e0e0/999999?text=Batch+Image";
+                    e.currentTarget.src =
+                      "https://via.placeholder.com/400x200/e0e0e0/999999?text=Batch+Image";
                   }}
                 />
                 <div className="p-4 space-y-3">
@@ -619,7 +661,10 @@ const AllBatches = () => {
                   <div className="flex items-center gap-2 text-xs">
                     <IndianRupee className="w-3 h-3" />
                     <span className="font-semibold">
-                      ₹{formatPrice(batch.batchDiscountPrice || batch.batchPrice)}
+                      ₹
+                      {formatPrice(
+                        batch.batchDiscountPrice || batch.batchPrice
+                      )}
                       {batch.batchDiscountPrice > 0 && (
                         <span className="line-through text-gray-500 ml-2">
                           ₹{formatPrice(batch.batchPrice)}
@@ -638,17 +683,20 @@ const AllBatches = () => {
                     </span>
                   </div>
                   <div className="pt-3 flex gap-2 flex-wrap border-t border-gray-200 dark:border-gray-800">
-                    <Button size="sm"  className="text-xs">
+                    <Button size="sm" className="text-xs">
                       <Link to={`/all-courses/view/${batch.id}`}>View</Link>
                     </Button>
-                    
-                     <Button size="sm" className="text-xs" variant="outline">
-                          <Link to={`/all-courses/add-video/${batch.id}`} className="text-xs truncate">
-                            Add Videos
-                          </Link>
-                        </Button>
-                        
-                    <Button size="sm" variant="outline"  className="text-xs">
+
+                    <Button size="sm" className="text-xs" variant="outline">
+                      <Link
+                        to={`/all-courses/add-video/${batch.id}`}
+                        className="text-xs truncate"
+                      >
+                        Add Videos
+                      </Link>
+                    </Button>
+
+                    <Button size="sm" variant="outline" className="text-xs">
                       <Link to={`/all-courses/edit/${batch.id}`}>Edit</Link>
                     </Button>
                     <Button
@@ -720,8 +768,8 @@ const AllBatches = () => {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Are you sure you want to delete "
-                  <strong>{deleteModal.batch?.name}</strong>"? This action cannot be
-                  undone.
+                  <strong>{deleteModal.batch?.name}</strong>"? This action
+                  cannot be undone.
                 </p>
               </div>
             </div>
