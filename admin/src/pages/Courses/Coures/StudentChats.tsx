@@ -1,10 +1,18 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
+interface ChatMessage {
+  id: number | string;
+  message: string;
+  userName: string;
+  createdAt: string;
+  isFromTeacher: boolean;
+}
+
 const StudentChats = () => {
   const { id } = useParams<{ id: string }>();
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
   const VIDEO_ID = id;
@@ -18,7 +26,7 @@ const StudentChats = () => {
   const [searchText, setSearchText] = useState("");
   const [timeFilter, setTimeFilter] = useState<"all" | "today" | "week">("all");
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     try {
       const res = await axios.get(API_URL);
       if (res.data?.success) {
@@ -29,13 +37,13 @@ const StudentChats = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
 
   useEffect(() => {
     fetchMessages();
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchMessages]);
 
   // Auto-scroll
   useEffect(() => {
@@ -82,13 +90,16 @@ const StudentChats = () => {
       const now = new Date();
       filtered = filtered.filter((msg) => {
         const msgDate = new Date(msg.createdAt);
-        const diffDays = Math.floor((now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24));
+        const diffDays = Math.floor(
+          (now.getTime() - msgDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
         return timeFilter === "today" ? diffDays === 0 : diffDays <= 7;
       });
     }
 
     return filtered.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
   }, [messages, searchText, timeFilter]);
 
@@ -131,7 +142,11 @@ const StudentChats = () => {
                   : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
               }`}
             >
-              {filter === "all" ? "All" : filter === "today" ? "Today" : "This Week"}
+              {filter === "all"
+                ? "All"
+                : filter === "today"
+                ? "Today"
+                : "This Week"}
             </button>
           ))}
         </div>
@@ -152,25 +167,28 @@ const StudentChats = () => {
             </p>
           </div>
         ) : (
-          filteredMessages.map((msg: any) => {
-            const isTeacher = msg.isFromTeacher;
-            const isOwn = false; // Add logic if needed
+          filteredMessages.map((msg: ChatMessage) => {
+            const isTeacher = Boolean(msg.isFromTeacher);
+            const isOwn = false;
 
             return (
               <div
                 key={msg.id}
-                className={`flex ${isTeacher || isOwn ? "justify-end" : "justify-start"}`}
+                className={`flex ${
+                  isTeacher || isOwn ? "justify-end" : "justify-start"
+                }`}
               >
                 <div
                   className={`
-                    max-w-[70%] rounded-xl px-4 py-2.5
-                    ${isTeacher
-                      ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
-                      : isOwn
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                    }
-                  `}
+          max-w-[70%] rounded-xl px-4 py-2.5
+          ${
+            isTeacher
+              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+              : isOwn
+              ? "bg-blue-600 text-white"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          }
+        `}
                 >
                   {/* Name */}
                   {!isTeacher && !isOwn && (
@@ -187,11 +205,9 @@ const StudentChats = () => {
                     </div>
                   )}
 
-                  {/* Message */}
                   <p className="text-sm leading-relaxed">{msg.message}</p>
 
-                  {/* Time */}
-                  <p className={`text-xs mt-1.5 text-right ${isTeacher || isOwn ? "opacity-70" : "text-gray-500 dark:text-gray-400"}`}>
+                  <p className="text-xs mt-1.5 text-right opacity-70">
                     {formatTime(msg.createdAt)}
                   </p>
                 </div>

@@ -37,6 +37,26 @@ interface Program {
   slug: string;
 }
 
+type BatchStatus = "active" | "inactive" | "upcoming";
+
+interface CreateBatchFormData {
+  name: string;
+  displayOrder: number;
+  programId: string;
+  startDate: string;
+  endDate: string;
+  registrationStartDate: string;
+  registrationEndDate: string;
+  status: BatchStatus;
+  shortDescription: string;
+  longDescription: string;
+  batchPrice: number;
+  batchDiscountPrice: number;
+  gst: number;
+  offerValidityDays: number;
+  category: string;
+}
+
 const CreateBatch = () => {
   const navigate = useNavigate();
 
@@ -55,7 +75,7 @@ const CreateBatch = () => {
     Array<{ month: number; amount: number }>
   >([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CreateBatchFormData>({
     name: "",
     displayOrder: 1,
     programId: "",
@@ -63,7 +83,7 @@ const CreateBatch = () => {
     endDate: "",
     registrationStartDate: "",
     registrationEndDate: "",
-    status: "active" as const,
+    status: "active", // ✅ now fully typed
     shortDescription: "",
     longDescription: "",
     batchPrice: 0,
@@ -107,11 +127,15 @@ const CreateBatch = () => {
       try {
         const res = await axios.get<Subject[]>(SUBJECTS_API);
         setAllSubjects(res.data);
-      } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || "Failed to load subjects";
-        setSubjectsError(errorMsg);
-        toast.error(errorMsg);
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          const errorMsg =
+            err.response?.data?.message || "Failed to load subjects";
+          setSubjectsError(errorMsg);
+          toast.error(errorMsg);
+        } else {
+          toast.error("Failed to load subjects");
+        }
       } finally {
         setLoadingSubjects(false);
       }
@@ -184,10 +208,9 @@ const CreateBatch = () => {
     }
 
     if (!formData.category) {
-  toast.error("Please select a batch category");
-  return;
-}
-
+      toast.error("Please select a batch category");
+      return;
+    }
 
     setSubmitting(true);
     const loadingToast = toast.loading("Creating batch...");
@@ -207,7 +230,6 @@ const CreateBatch = () => {
       data.append("shortDescription", formData.shortDescription.trim());
       data.append("longDescription", formData.longDescription.trim());
       data.append("batchPrice", formData.batchPrice.toString());
-
 
       if (formData.batchDiscountPrice > 0) {
         data.append(
@@ -236,9 +258,14 @@ const CreateBatch = () => {
 
       toast.success("Batch created successfully!", { id: loadingToast });
       navigate("/all-courses");
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to create batch";
-      toast.error(errorMsg, { id: loadingToast });
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const errorMsg =
+          err.response?.data?.message || "Failed to create batch";
+        toast.error(errorMsg, { id: loadingToast });
+      } else {
+        toast.error("Failed to create batch", { id: loadingToast });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -532,20 +559,20 @@ const CreateBatch = () => {
             </div>
 
             {/* Status */}
-            <div className="mb-6">
-              <Label className="text-sm">Status</Label>
-              <select
-                value={formData.status}
-                onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value as any })
-                }
-                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="upcoming">Upcoming</option>
-              </select>
-            </div>
+            <select
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  status: e.target.value as BatchStatus,
+                })
+              }
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="upcoming">Upcoming</option>
+            </select>
 
             {/* Descriptions */}
             <div className="space-y-4 mb-6">

@@ -16,12 +16,20 @@ interface SignInFormData {
   password: string;
 }
 
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "user" | "superadmin";
+}
+
 interface LoginResponse {
   token: string;
   refresh_token: string;
-  user: any; // 👈 if you have User type, replace `any`
+  user: User;
   error?: string;
 }
+
 
 export default function SignInForm() {
   const navigate = useNavigate();

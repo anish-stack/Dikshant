@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -10,7 +10,6 @@ import Form from "../../../components/form/Form";
 import Label from "../../../components/form/Label";
 import { API_URL } from "../../../constant/constant";
 import { Loader2, Upload, Image as ImageIcon } from "lucide-react";
-
 
 const ViewEdit = () => {
   const [searchParams] = useSearchParams();
@@ -29,7 +28,7 @@ const ViewEdit = () => {
     name: "",
     slug: "",
     description: "",
-    position:"",
+    position: "",
     imageUrl: "",
   });
 
@@ -37,7 +36,7 @@ const ViewEdit = () => {
   const [imagePreview, setImagePreview] = useState<string>("");
 
   // Fetch program details
-  const fetchProgram = async () => {
+  const fetchProgram = useCallback(async () => {
     if (!id) {
       toast.error("No program ID provided");
       navigate(-1);
@@ -48,28 +47,33 @@ const ViewEdit = () => {
     try {
       const res = await axios.get(`${API_URL}/programs/${id}`);
       const data = res.data;
-        console.log("data",data)
+
       setFields({
         name: data.name || "",
         slug: data.slug || "",
         description: data.description || "",
-        position:data?.position || "",
+        position: data?.position || "",
         imageUrl: data.imageUrl || "",
       });
+
       setImagePreview(data.imageUrl || "");
-      // toast.success("Program loaded successfully");
-    } catch (error: any) {
-      console.error("Fetch error:", error);
-      toast.error(error.response?.data?.message || "Failed to load program");
+    } catch (error: unknown) {
+      let message = "Failed to load program";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message);
       navigate(-1);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
   useEffect(() => {
     fetchProgram();
-  }, [id]);
+  }, [fetchProgram]);
 
   // Handle image selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,10 +111,11 @@ const ViewEdit = () => {
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setFields(prev => ({
+    setFields((prev) => ({
       ...prev,
       name: value,
-      slug: prev.slug === generateSlug(prev.name) ? generateSlug(value) : prev.slug
+      slug:
+        prev.slug === generateSlug(prev.name) ? generateSlug(value) : prev.slug,
     }));
   };
 
@@ -138,7 +143,6 @@ const ViewEdit = () => {
       formData.append("description", fields.description || "");
       formData.append("position", fields.position || "");
 
-
       if (imageFile) {
         formData.append("imageUrl", imageFile);
       }
@@ -149,10 +153,14 @@ const ViewEdit = () => {
 
       toast.success("Program updated successfully!", { id: loadingToast });
       navigate("/all-programs");
-    } catch (error: any) {
-      console.error("Update error:", error);
-      const msg = error.response?.data?.message || "Failed to update program";
-      toast.error(msg, { id: loadingToast });
+    } catch (error: unknown) {
+      let message = "Failed to update program";
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message, { id: loadingToast });
     } finally {
       setSubmitting(false);
     }
@@ -173,7 +181,9 @@ const ViewEdit = () => {
         description="View or edit program details"
       />
       <PageBreadcrumb
-        pageTitle={`${isEditMode ? "Edit" : "View"} Program - ${fields.name || "Loading..."}`}
+        pageTitle={`${isEditMode ? "Edit" : "View"} Program - ${
+          fields.name || "Loading..."
+        }`}
       />
 
       <div className="max-w-7xl mx-auto">
@@ -193,25 +203,25 @@ const ViewEdit = () => {
             <div className="grid md:grid-cols-2 gap-6">
               {/* Name */}
               <div>
-                <Label >Program Name</Label>
+                <Label>Program Name</Label>
                 <Input
                   value={fields.name}
                   onChange={handleNameChange}
                   placeholder="Enter program name"
                   disabled={isViewMode}
-                  
                 />
               </div>
 
               {/* Slug */}
               <div>
-                <Label >Slug (URL)</Label>
+                <Label>Slug (URL)</Label>
                 <Input
                   value={fields.slug}
-                  onChange={(e) => setFields({ ...fields, slug: e.target.value })}
+                  onChange={(e) =>
+                    setFields({ ...fields, slug: e.target.value })
+                  }
                   placeholder="program-slug"
                   disabled={isViewMode}
-                  
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Auto-generated from name. Edit if needed.
@@ -219,26 +229,25 @@ const ViewEdit = () => {
               </div>
             </div>
             <div>
-                <Label>Position</Label>
-                <Input
-                  value={fields.position}
-                  onChange={(e) =>
-                    setFields({ ...fields, position: e.target.value })
-                  }
-                    disabled={isViewMode}
-                  placeholder="Place What u Show eg 1,2,3,4 ....."
-            
-                />
-               
-              </div>
-
+              <Label>Position</Label>
+              <Input
+                value={fields.position}
+                onChange={(e) =>
+                  setFields({ ...fields, position: e.target.value })
+                }
+                disabled={isViewMode}
+                placeholder="Place What u Show eg 1,2,3,4 ....."
+              />
+            </div>
 
             {/* Description */}
             <div className="mt-6">
               <Label>Description</Label>
               <TextArea
                 value={fields.description}
-                onChange={(value) => setFields({ ...fields, description: value })}
+                onChange={(value) =>
+                  setFields({ ...fields, description: value })
+                }
                 placeholder="Describe the program..."
                 rows={6}
                 disabled={isViewMode}
@@ -278,9 +287,13 @@ const ViewEdit = () => {
                     <div className="flex flex-col items-center gap-3 text-gray-500">
                       <ImageIcon className="w-12 h-12" />
                       <p className="text-sm">
-                        {isViewMode ? "No image uploaded" : "Click to upload image"}
+                        {isViewMode
+                          ? "No image uploaded"
+                          : "Click to upload image"}
                       </p>
-                      {!isViewMode && <p className="text-xs">PNG, JPG up to 5MB</p>}
+                      {!isViewMode && (
+                        <p className="text-xs">PNG, JPG up to 5MB</p>
+                      )}
                     </div>
                   </label>
                 )}

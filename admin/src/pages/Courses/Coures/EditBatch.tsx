@@ -141,40 +141,39 @@ const EditBatch = () => {
         ]);
 
         const data = batchRes.data;
-        console.log("data",data)
+        console.log("data", data);
         setBatch(data);
         setAllSubjects(subjectsRes.data);
         setImagePreview(data.imageUrl || "");
 
         let currentIds: number[] = [];
 
-if (typeof data.subjectId === "string") {
-  try {
-    // 1️⃣ first parse -> "[10,11]"
-    const firstParse = JSON.parse(data.subjectId);
+        if (typeof data.subjectId === "string") {
+          try {
+            // 1️⃣ first parse -> "[10,11]"
+            const firstParse = JSON.parse(data.subjectId);
 
-    // 2️⃣ second parse -> [10,11]
-    const secondParse =
-      typeof firstParse === "string"
-        ? JSON.parse(firstParse)
-        : firstParse;
+            // 2️⃣ second parse -> [10,11]
+            const secondParse =
+              typeof firstParse === "string"
+                ? JSON.parse(firstParse)
+                : firstParse;
 
-    if (Array.isArray(secondParse)) {
-      currentIds = secondParse.map((id) => Number(id));
-    }
-  } catch (e) {
-    console.error("Subject parse error:", e);
-  }
-}
+            if (Array.isArray(secondParse)) {
+              currentIds = secondParse.map((id) => Number(id));
+            }
+          } catch (e) {
+            console.error("Subject parse error:", e);
+          }
+        }
 
-// fallback (if backend ever fixes it)
-if (currentIds.length === 0 && Array.isArray(data.subjects)) {
-  currentIds = data.subjects.map((s) => s.id);
-}
+        // fallback (if backend ever fixes it)
+        if (currentIds.length === 0 && Array.isArray(data.subjects)) {
+          currentIds = data.subjects.map((s) => s.id);
+        }
 
-console.log("FINAL SUBJECT IDS:", currentIds);
-setSelectedSubjectIds(currentIds);
-
+        console.log("FINAL SUBJECT IDS:", currentIds);
+        setSelectedSubjectIds(currentIds);
 
         setFormData({
           name: data.name,
@@ -201,9 +200,13 @@ setSelectedSubjectIds(currentIds);
         if (data.isEmi && data.emiSchedule && data.emiSchedule.length > 0) {
           setEmiMonths(data.emiSchedule.length);
         }
-      } catch (err: any) {
-        const errorMsg =
-          err.response?.data?.message || "Failed to load batch data";
+      } catch (err: unknown) {
+        let errorMsg = "Failed to load batch data";
+
+        if (axios.isAxiosError(err)) {
+          errorMsg = err.response?.data?.message || errorMsg;
+        }
+
         setError(errorMsg);
         toast.error(errorMsg);
       } finally {
@@ -213,8 +216,6 @@ setSelectedSubjectIds(currentIds);
 
     fetchData();
   }, [id]);
-
-
 
   useEffect(() => {
     const fetchPrograms = async () => {
@@ -231,11 +232,10 @@ setSelectedSubjectIds(currentIds);
   }, []);
 
   useEffect(() => {
-  if (allSubjects.length > 0 && selectedSubjectIds.length > 0) {
-    setSelectedSubjectIds([...selectedSubjectIds]);
-  }
-}, [allSubjects]);
-
+    if (allSubjects.length > 0 && selectedSubjectIds.length > 0) {
+      setSelectedSubjectIds([...selectedSubjectIds]);
+    }
+  }, [allSubjects]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -311,8 +311,13 @@ setSelectedSubjectIds(currentIds);
 
       toast.success("Batch updated successfully!", { id: loadingToast });
       navigate("/all-courses");
-    } catch (err: any) {
-      const errorMsg = err.response?.data?.message || "Failed to update batch";
+    } catch (err: unknown) {
+      let errorMsg = "Failed to update batch";
+
+      if (axios.isAxiosError(err)) {
+        errorMsg = err.response?.data?.message || errorMsg;
+      }
+
       toast.error(errorMsg, { id: loadingToast });
     } finally {
       setSubmitting(false);
@@ -588,7 +593,10 @@ setSelectedSubjectIds(currentIds);
               <select
                 value={formData.status}
                 onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value as any })
+                  setFormData({
+                    ...formData,
+                    status: e.target.value as BatchStatus,
+                  })
                 }
                 className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
               >

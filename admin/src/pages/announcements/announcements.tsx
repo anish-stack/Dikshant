@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { Plus, Edit, Trash2, Calendar, Search, X, AlertCircle } from "lucide-react";
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Calendar,
+  Search,
+  X,
+  AlertCircle,
+} from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
@@ -37,9 +45,12 @@ const Announcements = () => {
     setLoading(true);
     try {
       const res = await axios.get<Announcement[]>(API_URL);
-      const sorted = res.data.sort((a, b) => new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime());
+      const sorted = res.data.sort(
+        (a, b) =>
+          new Date(b.publishDate).getTime() - new Date(a.publishDate).getTime()
+      );
       setAnnouncements(sorted);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load announcements");
     } finally {
       setLoading(false);
@@ -51,20 +62,28 @@ const Announcements = () => {
   }, []);
 
   // Search & Pagination
-  const filtered = announcements.filter(a =>
-    a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.message.toLowerCase().includes(searchTerm.toLowerCase())
+  const filtered = announcements.filter(
+    (a) =>
+      a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.message.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginated = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
   const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    new Date(date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
 
   const openAdd = () => {
     setEditMode(false);
@@ -86,7 +105,8 @@ const Announcements = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.message || !form.publishDate) return toast.error("All fields required");
+    if (!form.title || !form.message || !form.publishDate)
+      return toast.error("All fields required");
 
     setSubmitting(true);
     try {
@@ -100,8 +120,14 @@ const Announcements = () => {
       setFormModal(false);
       setForm({ title: "", message: "", publishDate: "" });
       fetchAnnouncements();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || `Failed to ${editMode ? "update" : "create"}`);
+    } catch (error: unknown) {
+      let message = `Failed to ${editMode ? "update" : "create"}`;
+
+      if (axios.isAxiosError(error)) {
+        message = error.response?.data?.message || message;
+      }
+
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -128,8 +154,12 @@ const Announcements = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Announcements</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Total: {announcements.length}</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Announcements
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Total: {announcements.length}
+            </p>
           </div>
           <button
             onClick={openAdd}
@@ -147,7 +177,7 @@ const Announcements = () => {
               type="text"
               placeholder="Search title or message..."
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -158,35 +188,60 @@ const Announcements = () => {
           <table className="w-full min-w-max text-sm">
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Title</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Message</th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">
+                  Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">
+                  Title
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">
+                  Message
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i}>
-                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64 animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="flex justify-center gap-2"><div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" /></div></td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 animate-pulse" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64 animate-pulse" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center gap-2">
+                        <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : paginated.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="text-center py-12 text-gray-500">
-                    {searchTerm ? "No announcements match your search" : "No announcements found"}
+                    {searchTerm
+                      ? "No announcements match your search"
+                      : "No announcements found"}
                   </td>
                 </tr>
               ) : (
                 paginated.map((ann) => (
-                  <tr key={ann.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                  <tr
+                    key={ann.id}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{formatDate(ann.publishDate)}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                          {formatDate(ann.publishDate)}
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -201,15 +256,15 @@ const Announcements = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center gap-2">
-                        <button 
-                          onClick={() => openEdit(ann)} 
+                        <button
+                          onClick={() => openEdit(ann)}
                           className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded hover:bg-blue-200 transition"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </button>
-                        <button 
-                          onClick={() => setDeleteModal(ann)} 
+                        <button
+                          onClick={() => setDeleteModal(ann)}
                           className="p-2 bg-red-100 dark:bg-red-900/50 rounded hover:bg-red-200 transition"
                           title="Delete"
                         >
@@ -228,7 +283,7 @@ const Announcements = () => {
         {totalPages > 1 && (
           <div className="mt-6 flex justify-center items-center gap-3">
             <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
@@ -238,7 +293,7 @@ const Announcements = () => {
               Page {currentPage} of {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
@@ -253,8 +308,13 @@ const Announcements = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full my-8">
             <div className="flex justify-between items-center p-4 border-b dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
-              <h2 className="text-xl font-bold">{editMode ? "Edit Announcement" : "Create Announcement"}</h2>
-              <button onClick={() => setFormModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+              <h2 className="text-xl font-bold">
+                {editMode ? "Edit Announcement" : "Create Announcement"}
+              </h2>
+              <button
+                onClick={() => setFormModal(false)}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -264,38 +324,55 @@ const Announcements = () => {
                 <input
                   type="text"
                   value={form.title}
-                  onChange={e => setForm({ ...form, title: e.target.value })}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
                   className="w-full px-3 py-2 text-sm rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Message</label>
+                <label className="block text-sm font-medium mb-1">
+                  Message
+                </label>
                 <textarea
                   value={form.message}
-                  onChange={e => setForm({ ...form, message: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, message: e.target.value })
+                  }
                   rows={5}
                   className="w-full px-3 py-2 text-sm rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500 resize-none"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Publish Date</label>
+                <label className="block text-sm font-medium mb-1">
+                  Publish Date
+                </label>
                 <input
                   type="date"
                   value={form.publishDate}
-                  onChange={e => setForm({ ...form, publishDate: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, publishDate: e.target.value })
+                  }
                   className="w-full px-3 py-2 text-sm rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-indigo-500"
                   required
                 />
               </div>
               <div className="flex gap-3 pt-4 border-t dark:border-gray-800">
                 <button
-                  onClick={(e) => { e.preventDefault(); handleSubmit(e); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }}
                   disabled={submitting}
                   className="flex-1 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
                 >
-                  {submitting ? (editMode ? "Updating..." : "Creating...") : (editMode ? "Update" : "Create")}
+                  {submitting
+                    ? editMode
+                      ? "Updating..."
+                      : "Creating..."
+                    : editMode
+                    ? "Update"
+                    : "Create"}
                 </button>
                 <button
                   onClick={() => setFormModal(false)}
@@ -319,14 +396,14 @@ const Announcements = () => {
               Delete "<strong>{deleteModal.title}</strong>" permanently?
             </p>
             <div className="flex gap-3 justify-center">
-              <button 
-                onClick={handleDelete} 
+              <button
+                onClick={handleDelete}
                 className="px-5 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition"
               >
                 Yes, Delete
               </button>
-              <button 
-                onClick={() => setDeleteModal(null)} 
+              <button
+                onClick={() => setDeleteModal(null)}
                 className="px-5 py-2 border border-gray-300 dark:border-gray-700 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
               >
                 Cancel

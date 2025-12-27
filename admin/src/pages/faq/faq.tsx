@@ -10,13 +10,13 @@ import toast from "react-hot-toast";
 // import { Skeleton } from "../../../components/ui/Skeleton/Skeleton";
 import { Plus, Search, Edit, Trash2, AlertCircle, X } from "lucide-react";
 // import Label from "../../../components/form/Label";
-import { 
-    TableHeader,
-    Table,
+import {
+  TableHeader,
+  Table,
   TableBody,
   TableRow,
   TableCell,
- } from "../../components/ui/table";
+} from "../../components/ui/table";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import PageMeta from "../../components/common/PageMeta";
 import Input from "../../components/form/input/InputField";
@@ -39,6 +39,13 @@ interface FAQ {
   createdAt: string;
   updatedAt: string;
 }
+
+interface ModalProps {
+  title?: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}
+
 
 /* =========================
    COMPONENT
@@ -75,8 +82,7 @@ const FAQPage = () => {
 
       const sorted = res.data.sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
       setFaqs(sorted);
@@ -134,8 +140,12 @@ const FAQPage = () => {
       setCreateModal(false);
       setFormData({ question: "", answer: "" });
       fetchFaqs();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Create failed");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Create failed");
+      } else {
+        toast.error("Create failed");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -159,8 +169,12 @@ const FAQPage = () => {
       setEditModal(null);
       setFormData({ question: "", answer: "" });
       fetchFaqs();
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Update failed");
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        toast.error(err.response?.data?.message || "Update failed");
+      } else {
+        toast.error("Update failed");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -205,9 +219,7 @@ const FAQPage = () => {
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">
-              FAQs ({faqs.length})
-            </h1>
+            <h1 className="text-2xl font-bold">FAQs ({faqs.length})</h1>
             <p className="text-gray-500 mt-1">
               Manage frequently asked questions
             </p>
@@ -245,9 +257,15 @@ const FAQPage = () => {
               {loading ? (
                 Array.from({ length: 6 }).map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell><Skeleton className="h-6 w-72" /></TableCell>
-                    <TableCell><Skeleton className="h-6 w-full" /></TableCell>
-                    <TableCell><Skeleton className="h-10 w-32 mx-auto" /></TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-72" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-full" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-10 w-32 mx-auto" />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : paginatedFaqs.length === 0 ? (
@@ -327,13 +345,13 @@ const FAQPage = () => {
           <form onSubmit={editModal ? handleUpdate : handleCreate}>
             <div className="space-y-4">
               <div>
-                <Label >Question</Label>
+                <Label>Question</Label>
                 <Input
                   value={formData.question}
                   onChange={(e) =>
                     setFormData({ ...formData, question: e.target.value })
                   }
-                //   required
+                  //   required
                 />
               </div>
               <div>
@@ -371,16 +389,12 @@ const FAQPage = () => {
       {deleteModal && (
         <Modal onClose={() => setDeleteModal(null)}>
           <AlertCircle className="w-14 h-14 text-red-600 mx-auto mb-4" />
-          <h3 className="text-xl font-bold mb-4 text-center">
-            Delete FAQ?
-          </h3>
+          <h3 className="text-xl font-bold mb-4 text-center">Delete FAQ?</h3>
           <p className="text-center mb-6">
             Are you sure you want to delete this FAQ?
           </p>
           <div className="flex gap-4">
-            <Button onClick={handleDelete}>
-              Delete
-            </Button>
+            <Button onClick={handleDelete}>Delete</Button>
             <Button variant="outline" onClick={() => setDeleteModal(null)}>
               Cancel
             </Button>
@@ -396,7 +410,7 @@ export default FAQPage;
 /* =========================
    MODAL COMPONENT
 ========================= */
-const Modal = ({ title, children, onClose }: any) => (
+const Modal = ({ title, children, onClose }: ModalProps) => (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-99999 p-4">
     <div className="bg-white rounded-2xl p-6 max-w-lg w-full relative">
       {title && (
