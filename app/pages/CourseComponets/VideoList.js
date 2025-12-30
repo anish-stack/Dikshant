@@ -139,7 +139,7 @@ const handleVideoPress = async (video) => {
       courseId: String(courseId),
     }).toString();
 
-    const url = `http://192.168.1.9:5173/?${params}`;
+    const url = `https://www.dikshantias.com/player/?${params}`;
 
     // 🌐 Open web player
     await Linking.openURL(url);
