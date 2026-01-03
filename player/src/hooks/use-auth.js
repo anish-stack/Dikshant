@@ -25,7 +25,7 @@ const useAuth = (token) => {
       })
 
       if (response.data && response.data.
-status ==="success") {
+        status === "success") {
         setUser(response.data.data)
         setIsAuthenticated(true)
         setError(null)

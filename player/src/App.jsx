@@ -565,14 +565,14 @@ function LMSContent() {
         <div className="w-full bg-black aspect-video max-h-[70vh] relative shadow-lg">
           {currentVideo && (
             <>
-              {currentVideo.isLive && (
+              {/* {currentVideo.isLive && hasEnded && (
                 <LiveStatusOverlay
                   canJoin={canJoin}
                   hasEnded={hasEnded}
                   timeToLive={timeToLive}
                   onJoinLive={handleJoinLive}
                 />
-              )}
+              )} */}
               <VideoPlayer
                 video={currentVideo}
                 playableUrl={playableUrl}
@@ -617,6 +617,7 @@ function LMSContent() {
             {activeTab === "live" ? (
               <div className="h-[500px] md:h-auto">
                 <LiveChat
+                  user={user}
                   videoId={currentVideo?.id}
                   userId={userId}
                   visible={true}
@@ -641,8 +642,10 @@ function LMSContent() {
 }
 
 export default function Home() {
+  const UserParams = new URLSearchParams(window.location.search)
+  const userId = UserParams.get("userId")
   return (
-    <SocketProvider>
+    <SocketProvider userId={userId}>
       <LMSContent />
     </SocketProvider>
   )

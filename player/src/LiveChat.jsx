@@ -5,6 +5,7 @@ import { MessageCircle, Users, X, Send } from "lucide-react"
 import { useSocket } from "./context/socket"
 
 export default function LiveChat({
+  user,
   videoId,
   userId,
   visible,
@@ -19,6 +20,7 @@ export default function LiveChat({
   const messagesEndRef = useRef(null)
   const { socket } = useSocket()
 
+  console.log("user,",user)
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -27,7 +29,7 @@ export default function LiveChat({
     const normalized = {
       id: msg.id || msg._id || `msg-${Date.now()}-${Math.random()}`,
       userId: msg.userId?.toString(),
-      userName: msg.userName || "Unknown",
+      userName: user.name || "Unknown",
       message: msg.message || "",
       timestamp: msg.timestamp || msg.createdAt || new Date(),
       type: msg.messageType || "message",
@@ -123,7 +125,7 @@ export default function LiveChat({
     const messageData = {
       videoId,
       userId: userId.toString(),
-      userName: "Student",
+      userName: user?.name || "Student",
       message: trimmed,
       messageType: "message",
       timestamp: new Date(),

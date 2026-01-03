@@ -111,7 +111,7 @@ export default function CourseVideos() {
       setError(false);
 
       const [videoRes, subjectRes] = await Promise.all([
-        axios.get(`${API_URL}/batch/${batchId}`),
+        axios.get(`${API_URL}/batch/${batchId}?admin=true`),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
 

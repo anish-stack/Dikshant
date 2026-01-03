@@ -15,6 +15,7 @@ import * as Haptics from "expo-haptics";
 import { colors } from "../../constant/color";
 import { useSocket } from "../../context/SocketContext";
 import { useAuthStore } from "../../stores/auth.store";
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get("window");
 
@@ -29,7 +30,7 @@ export default function VideoList({
 }) {
   const { socket } = useSocket();
   const { token } = useAuthStore();
-
+  const navigation = useNavigation()
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -199,7 +200,7 @@ export default function VideoList({
         courseId: String(courseId),
       }).toString();
 
-      const url = `http://192.168.1.4:5173/?${params}`;
+      const url = `https://www.player.dikshantias.com/?${params}`;
 
       await Linking.openURL(url);
 
@@ -225,7 +226,7 @@ export default function VideoList({
     setSelectedDateIndex(index);
   };
 
-  
+
 
   useEffect(() => {
     return () => {
@@ -476,7 +477,13 @@ export default function VideoList({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.mainTitle}>📚 All Lectures</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.mainTitle}>📚 All Lectures</Text>
+
+        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos',{id:courseId,token,userId})}>
+          <Text style={styles.viewAllText}>View All </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Month Selector */}
       <View style={styles.monthContainer}>
@@ -1062,5 +1069,24 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+
+  mainTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111",
+  },
+
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2563EB", // blue
   },
 });

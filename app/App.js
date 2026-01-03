@@ -51,6 +51,7 @@ import ForgotPassword from "./screens/auth/ForgotPassword";
 import { SocketProvider } from "./context/SocketContext";
 import { colors } from "./constant/color";
 import AnnouncementDetails from "./components/AnnouncementDetails";
+import ViewAllVideos from "./pages/CourseComponets/ViewAllVideos";
 
 const Stack = createNativeStackNavigator();
 
@@ -82,7 +83,7 @@ export default function App() {
 
 
   const linking = {
-    prefixes: ["http://192.168.1.9:5173"],
+    prefixes: ["https://www.player.dikshantias.com"],
     config: {
       screens: {
         Home: "app/open-home",
@@ -391,7 +392,9 @@ export default function App() {
         <Stack.Screen name="ShareApp" component={ShareAppScreen} />
         <Stack.Screen name="RateUs" component={RateUsScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="view-all-videos" component={ViewAllVideos} />
 
+{/* */}
         <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
 
         <Stack.Screen name="CourseDetail" component={CourseDetail} />
