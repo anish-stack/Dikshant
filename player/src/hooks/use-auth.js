@@ -1,63 +1,52 @@
-import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+"use client"
 
-export default function useAuth(token) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+import { useState, useEffect, useCallback } from "react"
+import axios from "axios"
 
-  const fetchProfile = useCallback(async () => {
+const useAuth = (token) => {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  // console.log(token)
+  const refetch = useCallback(async () => {
     if (!token) {
-      setData(null);
-      setError(null);
-      setLoading(false);
-      return;
+      setLoading(false)
+      setIsAuthenticated(false)
+      return
     }
-
-    const controller = new AbortController();
-
-    setLoading(true);
-    setError(null);
 
     try {
-      const response = await axios.get(
-        "https://www.dikapi.olyox.in/api/auth/profile-details",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          signal: controller.signal,
-        }
-      );
-     
-      setData(response.data);
+      setLoading(true)
+      const response = await axios.get("https://www.dikapi.olyox.in/api/auth/profile-details", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.data && response.data.
+status ==="success") {
+        setUser(response.data.data)
+        setIsAuthenticated(true)
+        setError(null)
+      } else {
+        throw new Error("Failed to fetch user data")
+      }
     } catch (err) {
-              console.log(err)
-
-      if (err.name === "CanceledError") return;
-
-      setData(null);
-      setError(err.response?.data?.message || err.message);
+      console.error("Auth refetch error:", err)
+      setError(err.message || "Authentication failed")
+      setIsAuthenticated(false)
+      setUser(null)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-
-    return () => controller.abort();
-  }, [token]);
+  }, [token])
 
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    refetch()
+  }, [refetch])
 
-  const refetch = useCallback(() => {
-    fetchProfile();
-  }, [fetchProfile]);
-
-  return {
-    user: data,
-    loading,
-    error,
-    isAuthenticated: Boolean(data),
-    refetch,
-  };
+  return { user, loading, error, isAuthenticated, refetch }
 }
+
+export default useAuth

@@ -133,67 +133,73 @@ class VideoCourseController {
     }
   }
 
-  static async FindByBathId(req, res) {
-    try {
-      const { id } = req.params;
+ static async FindByBathId(req, res) {
+  try {
+    const isAdmin = req.query.admin === "true"; 
+    const { id } = req.params;
 
-      const items = await VideoCourse.findAll({
-        where: { batchId: id },
-        order: [["createdAt", "ASC"]],
-      });
+    const items = await VideoCourse.findAll({
+      where: { batchId: id },
+      order: [["createdAt", "ASC"]],
+    });
 
-      const response = items.map((video) => {
+    const response = items.map((video) => {
+      let secureToken = null;
 
-        const secureToken = encryptVideoPayload({
+      if (!isAdmin) {
+        secureToken = encryptVideoPayload({
           videoUrl: video.url,
           videoId: video.id,
           batchId: video.batchId,
           videoSource: video.videoSource,
           exp: Date.now() + 15 * 60 * 1000, // 15 min
         });
+      }
 
-        return {
-          id: video.id,
-          title: video.title,
-          imageUrl: video.imageUrl,
-          videoSource: video.videoSource,
+      return {
+        id: video.id,
+        title: video.title,
+        imageUrl: video.imageUrl,
+        videoSource: video.videoSource,
 
-          batchId: video.batchId,
-          subjectId: video.subjectId,
+        batchId: video.batchId,
+        subjectId: video.subjectId,
 
-          isDownloadable: video.isDownloadable,
-          isDemo: video.isDemo,
+        isDownloadable: video.isDownloadable,
+        isDemo: video.isDemo,
+        status: video.status,
 
-          status: video.status,
+        isLive: video.isLive,
+        isLiveEnded: video.isLiveEnded,
+        LiveEndAt: video.LiveEndAt,
+        DateOfLive: video.DateOfLive,
+        TimeOfLIve: video.TimeOfLIve,
 
-          isLive: video.isLive,
-          isLiveEnded: video.isLiveEnded,
-          LiveEndAt: video.LiveEndAt,
-          DateOfLive: video.DateOfLive,
-          TimeOfLIve: video.TimeOfLIve,
+        dateOfClass: video.dateOfClass,
+        TimeOfClass: video.TimeOfClass,
 
-          dateOfClass: video.dateOfClass,
-          TimeOfClass: video.TimeOfClass,
+        createdAt: video.createdAt,
 
-          createdAt: video.createdAt,
+        // 🔐 admin → direct url, user → secure token
+        ...(isAdmin
+          ? { url: video.url }
+          : { secureToken }),
+      };
+    });
 
-          // 🔒 ONLY THIS instead of url
-          secureToken,
-        };
-      });
-
-      return res.json({
-        success: true,
-        data: response,
-      });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({
-        success: false,
-        message: "Server error",
-      });
-    }
+    return res.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
+}
+
 
 
   static async decryptAndPassVideo(req, res) {

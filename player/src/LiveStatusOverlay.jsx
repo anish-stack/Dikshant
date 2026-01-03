@@ -1,13 +1,8 @@
-import { Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle } from "lucide-react"
 
-export default function LiveStatusOverlay({ 
-  canJoin, 
-  hasEnded, 
-  timeToLive, 
-  onJoinLive 
-}) {
+export default function LiveStatusOverlay({ canJoin, hasEnded, timeToLive, onJoinLive }) {
   // If can join, don't show overlay
-  if (canJoin) return null;
+  if (canJoin) return null
 
   // Live session ended
   if (hasEnded) {
@@ -16,16 +11,14 @@ export default function LiveStatusOverlay({
         <div className="text-center text-white p-8 max-w-md">
           <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-400" />
           <h3 className="text-2xl font-bold mb-2">Live Session Ended</h3>
-          <p className="text-gray-300 mb-4">
-            This live session has concluded. The recording will be available soon.
-          </p>
+          <p className="text-gray-300 mb-4">This live session has concluded. The recording will be available soon.</p>
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 rounded-lg text-sm">
             <CheckCircle className="w-4 h-4" />
             <span>Check back later for the recording</span>
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   // Live session not started yet
@@ -38,16 +31,14 @@ export default function LiveStatusOverlay({
             <div className="w-24 h-24 border-4 border-blue-400/30 rounded-full animate-ping" />
           </div>
         </div>
-        
+
         <h3 className="text-2xl font-bold mb-3">Live Session Coming Soon</h3>
-        
+
         <div className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 backdrop-blur-md rounded-full text-lg font-semibold mb-4">
           {timeToLive}
         </div>
-        
-        <p className="text-blue-100 mb-6">
-          You can join the session 5 minutes before it starts
-        </p>
+
+        <p className="text-blue-100 mb-6">You can join the session 5 minutes before it starts</p>
 
         <div className="flex flex-col gap-3 text-sm text-blue-200">
           <div className="flex items-center justify-center gap-2">
@@ -60,10 +51,7 @@ export default function LiveStatusOverlay({
           </div>
         </div>
 
-        <button
-          disabled
-          className="mt-6 px-6 py-2.5 bg-white/20 text-white rounded-lg cursor-not-allowed opacity-50"
-        >
+        <button disabled className="mt-6 px-6 py-2.5 bg-white/20 text-white rounded-lg cursor-not-allowed opacity-50">
           Join Session (Not Available Yet)
         </button>
       </div>
@@ -80,5 +68,5 @@ export default function LiveStatusOverlay({
         }
       `}</style>
     </div>
-  );
+  )
 }

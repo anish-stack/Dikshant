@@ -53,7 +53,7 @@ export default function SmartVideoPlayer({
       token, // ⚠️ consider short-lived token in prod
     }).toString();
 
-    const url = `https://www.player.dikshantias.com/?${params}`;
+    const url = `http://192.168.1.4:5173/?${params}`;
     await Linking.openURL(url);
   }, [video, userId, courseId, token]);
 
