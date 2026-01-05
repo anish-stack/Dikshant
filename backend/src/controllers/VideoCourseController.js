@@ -148,24 +148,47 @@ static async create(req, res) {
   }
 
 static async FindByBathId(req, res) {
-    try {
-      const isAdmin = req.query.admin === "true";
-      const { id } = req.params;
+  try {
+    const isAdmin = req.query.admin === "true";
+    const { id } = req.params;
 
-      const items = await VideoCourse.findAll({
-        where: { batchId: id },
-        order: [["createdAt", "ASC"]],
+    // Fetch all videos for the batch
+    let items = await VideoCourse.findAll({
+      where: { batchId: id },
+      order: [["createdAt", "ASC"]],
+    });
+
+    if (items.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
       });
+    }
 
-      const response = items.map((video) => {
-        // Deterministic stable token (same har baar)
-        const secureToken = encryptVideoPayload({
-          videoId: video.id,
-          batchId: video.batchId,
-          videoSource: video.videoSource,
-          // Optional: long expiry ya no expiry
-          exp: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year
-        });
+
+    // Process each video: ensure stable secureToken exists
+    const response = await Promise.all(
+      items.map(async (video) => {
+        let secureToken = video.secureToken; // DB se pehle check
+
+        // Agar token nahi hai → generate + save
+        if (!secureToken) {
+          secureToken = encryptVideoPayload({
+            videoId: video.id,
+            batchId: video.batchId,
+            videoSource: video.videoSource,
+            exp: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year stable
+          });
+
+          // Save to DB for future calls
+          try {
+            await video.update({ secureToken });
+            console.log(`Generated & saved secureToken for video ID: ${video.id}`);
+          } catch (updateErr) {
+            console.error(`Failed to save secureToken for video ${video.id}:`, updateErr);
+            // Continue anyway – token abhi bhi valid hai
+          }
+        }
 
         return {
           id: video.id,
@@ -191,26 +214,27 @@ static async FindByBathId(req, res) {
 
           createdAt: video.createdAt,
 
-          // Stable token – har refresh pe same!
+          // Guaranteed stable token
           secureToken,
 
-          // Admin ko direct URL
+          // Admin gets raw URL
           ...(isAdmin ? { url: video.url } : {}),
         };
-      });
+      })
+    );
 
-      return res.json({
-        success: true,
-        data: response,
-      });
-    } catch (error) {
-      console.error("FindByBathId error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Server error",
-      });
-    }
+    return res.json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error("FindByBathId error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
+}
 
 static async decryptAndPassVideo(req, res) {
     try {
