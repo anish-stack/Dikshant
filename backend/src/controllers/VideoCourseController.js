@@ -68,7 +68,6 @@ static async create(req, res) {
     const item = await VideoCourse.create(payload);
 
     // GENERATE STABLE SECURE TOKEN USING DETERMINISTIC ENCRYPTION
-    const { encryptVideoPayload } = require("../utils/videoEncryption"); // adjust path if needed
 
     const secureToken = encryptVideoPayload({
       videoId: item.id,
