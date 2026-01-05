@@ -244,8 +244,7 @@ static async decryptAndPassVideo(req, res) {
         return res.status(404).json({ message: "Video not found" });
       }
 
-      // User access check
-      const Order = require("../models/Order"); // adjust path
+   
       const hasAccess = await Order.findOne({
         where: {
           userId,
