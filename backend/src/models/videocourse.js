@@ -41,6 +41,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TIME,
       allowNull: true
     },
+    secureToken:{
+       type: DataTypes.TEXT,
+      allowNull: true
+    },
 
     dateOfClass: {
       type: DataTypes.DATEONLY,
