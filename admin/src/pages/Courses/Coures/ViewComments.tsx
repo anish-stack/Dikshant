@@ -21,7 +21,7 @@ const ViewComments = () => {
   const [searchText, setSearchText] = useState("");
   const [filterType, setFilterType] = useState<"all" | "today" | "week" | "month">("all");
 
-  const API_URL = `http://localhost:5001/api/comments/admin-comment/${id}`;
+  const API_URL = `https://www.dikapi.olyox.in/api/comments/admin-comment/${id}`;
 
   /* =========================
      FETCH COMMENTS (SAFE)

@@ -18,7 +18,7 @@ const useAuth = (token) => {
 
     try {
       setLoading(true)
-      const response = await axios.get("http://localhost:5001/api/auth/profile-details", {
+      const response = await axios.get("https://www.dikapi.olyox.in/api/auth/profile-details", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

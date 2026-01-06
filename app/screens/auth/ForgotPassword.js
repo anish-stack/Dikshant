@@ -51,7 +51,7 @@ const ForgotPassword = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5001/api/auth/update-password",
+        "https://www.dikapi.olyox.in/api/auth/update-password",
         {
           mobile,
           newPassword,

@@ -16,7 +16,7 @@ const StudentChats = () => {
   const [loading, setLoading] = useState(true);
 
   const VIDEO_ID = id;
-  const API_URL = `http://localhost:5001/api/chat/chat-message/${VIDEO_ID}`;
+  const API_URL = `https://www.dikapi.olyox.in/api/chat/chat-message/${VIDEO_ID}`;
 
   const chatRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
