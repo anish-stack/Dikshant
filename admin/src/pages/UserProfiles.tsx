@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios,{ AxiosError } from "axios";
+import axios, { AxiosError } from "axios";
 import { API_URL } from "../constant/constant";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -72,7 +72,6 @@ interface ApiResponse {
   totalPages: number;
   data: User[];
 }
-
 
 interface BatchResponse {
   total: number;
@@ -176,8 +175,79 @@ export default function UserProfiles() {
     setPage(1);
   };
 
-const handleToggleBlock = async (user: User) => {
-  try {
+  const handleToggleBlock = async (user: User) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
+      }
+
+      await axios.patch(
+        `${API_URL}/auth/users/${user.id}/toggle-active`,
+        null,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update UI
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id ? { ...u, is_active: !u.is_active } : u
+        )
+      );
+
+      // Success toast
+      toast.success(
+        user.is_active
+          ? "User blocked successfully"
+          : "User unblocked successfully"
+      );
+    } catch (err) {
+      const error = err as AxiosError<{ message?: string }>;
+
+      console.error("Failed to toggle block:", error);
+
+      // ❌ No response (network issue)
+      if (!error.response) {
+        toast.error("Network error. Please check your internet.");
+        return;
+      }
+
+      const { status, data } = error.response;
+
+      // ❌ Auth error
+      if (status === 401) {
+        toast.error("Unauthorized. Please login again.");
+      }
+      // ❌ Forbidden
+      else if (status === 403) {
+        toast.error(
+          data?.message || "You are not allowed to perform this action"
+        );
+      }
+      // ❌ User not found
+      else if (status === 404) {
+        toast.error("User not found");
+      }
+      // ❌ Server error
+      else if (status >= 500) {
+        toast.error("Server error. Please try again later.");
+      }
+      // ❌ Custom backend message
+      else {
+        toast.error(data?.message || "Failed to update user status");
+      }
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
     const token = localStorage.getItem("accessToken");
 
     if (!token) {
@@ -185,128 +255,61 @@ const handleToggleBlock = async (user: User) => {
       return;
     }
 
- await axios.patch(
-      `${API_URL}/auth/users/${user.id}/toggle-active`,
-      null,
-      {
+    try {
+      await axios.delete(`${API_URL}/auth/users/${selectedUser.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+      });
+
+      // ✅ Update UI
+      setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
+
+      toast.success("User deleted successfully");
+
+      // ✅ Reset selection & close modal
+      setIsDeleteModalOpen(false);
+      setSelectedUser(null);
+    } catch (err) {
+      // ✅ Type-safe error
+      const error = err as AxiosError<{ error?: string }>;
+
+      console.error("Failed to delete user:", error);
+
+      // ❌ Network / no response
+      if (!error.response) {
+        toast.error("Network error. Please check your internet.");
+        return;
       }
-    );
 
-    // Update UI
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === user.id ? { ...u, is_active: !u.is_active } : u
-      )
-    );
+      const { status, data } = error.response;
 
-    // Success toast
-    toast.success(
-      user.is_active
-        ? "User blocked successfully"
-        : "User unblocked successfully"
-    );
-  } catch (err) {
-  const error = err as AxiosError<{ message?: string }>;
-
-  console.error("Failed to toggle block:", error);
-
-  // ❌ No response (network issue)
-  if (!error.response) {
-    toast.error("Network error. Please check your internet.");
-    return;
-  }
-
-  const { status, data } = error.response;
-
-  // ❌ Auth error
-  if (status === 401) {
-    toast.error("Unauthorized. Please login again.");
-  }
-  // ❌ Forbidden
-  else if (status === 403) {
-    toast.error(data?.message || "You are not allowed to perform this action");
-  }
-  // ❌ User not found
-  else if (status === 404) {
-    toast.error("User not found");
-  }
-  // ❌ Server error
-  else if (status >= 500) {
-    toast.error("Server error. Please try again later.");
-  }
-  // ❌ Custom backend message
-  else {
-    toast.error(data?.message || "Failed to update user status");
-  }
-}
-}
-
-const handleDeleteUser = async () => {
-  if (!selectedUser) return;
-
-  const token = localStorage.getItem("accessToken");
-
-  if (!token) {
-    toast.error("Session expired. Please login again.");
-    return;
-  }
-
-  try {
-    await axios.delete(`${API_URL}/auth/users/${selectedUser.id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    // ✅ Update UI
-    setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
-
-    toast.success("User deleted successfully");
-
-    // ✅ Reset selection & close modal
-    setIsDeleteModalOpen(false);
-    setSelectedUser(null);
-  } catch (err) {
-    // ✅ Type-safe error
-    const error = err as AxiosError<{ error?: string }>;
-
-    console.error("Failed to delete user:", error);
-
-    // ❌ Network / no response
-    if (!error.response) {
-      toast.error("Network error. Please check your internet.");
-      return;
+      // ❌ Handle different status codes
+      switch (status) {
+        case 401:
+          toast.error("Unauthorized. Please login again.");
+          break;
+        case 403:
+          toast.error(data?.error || "You are not allowed to delete this user");
+          break;
+        case 404:
+          toast.error("User not found");
+          break;
+        case 409:
+          toast.error(
+            data?.error || "User cannot be deleted due to dependencies"
+          );
+          break;
+        default:
+          if (status >= 500) {
+            toast.error("Server error. Please try again later.");
+          } else {
+            toast.error(data?.error || "Failed to delete user");
+          }
+          break;
+      }
     }
-
-    const { status, data } = error.response;
-
-    // ❌ Handle different status codes
-    switch (status) {
-      case 401:
-        toast.error("Unauthorized. Please login again.");
-        break;
-      case 403:
-        toast.error(data?.error || "You are not allowed to delete this user");
-        break;
-      case 404:
-        toast.error("User not found");
-        break;
-      case 409:
-        toast.error(data?.error || "User cannot be deleted due to dependencies");
-        break;
-      default:
-        if (status >= 500) {
-          toast.error("Server error. Please try again later.");
-        } else {
-          toast.error(data?.error || "Failed to delete user");
-        }
-        break;
-    }
-  }
-};
+  };
 
   const openAssignModal = (user: User) => {
     setSelectedUser(user);
@@ -314,88 +317,88 @@ const handleDeleteUser = async () => {
     fetchBatches();
   };
 
-const handleAssignCourse = async () => {
-  if (!selectedUser || !selectedBatch) {
-    toast.error("Please select a course");
-    return;
-  }
-
-  setAssignLoading(true);
-
-  try {
-    const token = localStorage.getItem("accessToken");
-
-    if (!token) {
-      toast.error("Session expired. Please login again.");
+  const handleAssignCourse = async () => {
+    if (!selectedUser || !selectedBatch) {
+      toast.error("Please select a course");
       return;
     }
 
-    await axios.post(
-      `${API_URL}/orders/admin/assign-course`,
-      {
-        userId: selectedUser.id,
-        type: "batch",
-        itemId: selectedBatch,
-        accessValidityDays,
-        reason: assignReason || "Admin Assignment",
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    setAssignLoading(true);
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
       }
-    );
 
-    toast.success("Course assigned successfully");
-
-    setIsConfirmAssignOpen(false);
-    setIsAssignCourseOpen(false);
-    setSelectedBatch(null);
-    setAccessValidityDays(365);
-    setAssignReason("");
-
-    fetchUsers(page, searchTerm, limit);
-  } catch (err) {
-    // ✅ Type-safe error handling
-    const error = err as AxiosError<{ message?: string }>;
-
-    console.error("Failed to assign course:", error);
-
-    if (!error.response) {
-      toast.error("Network error. Please check your internet.");
-      return;
-    }
-
-    const { status, data } = error.response;
-
-    switch (status) {
-      case 401:
-        toast.error("Unauthorized. Please login again.");
-        break;
-      case 403:
-        toast.error(data?.message || "You are not allowed to assign courses");
-        break;
-      case 404:
-        toast.error(data?.message || "User or course not found");
-        break;
-      case 409:
-        toast.error(data?.message || "Course already assigned to this user");
-        break;
-      case 422:
-        toast.error(data?.message || "Invalid assignment data");
-        break;
-      default:
-        if (status >= 500) {
-          toast.error("Server error. Please try again later.");
-        } else {
-          toast.error(data?.message || "Failed to assign course");
+      await axios.post(
+        `${API_URL}/orders/admin/assign-course`,
+        {
+          userId: selectedUser.id,
+          type: "batch",
+          itemId: selectedBatch,
+          accessValidityDays,
+          reason: assignReason || "Admin Assignment",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-        break;
+      );
+
+      toast.success("Course assigned successfully");
+
+      setIsConfirmAssignOpen(false);
+      setIsAssignCourseOpen(false);
+      setSelectedBatch(null);
+      setAccessValidityDays(365);
+      setAssignReason("");
+
+      fetchUsers(page, searchTerm, limit);
+    } catch (err) {
+      // ✅ Type-safe error handling
+      const error = err as AxiosError<{ message?: string }>;
+
+      console.error("Failed to assign course:", error);
+
+      if (!error.response) {
+        toast.error("Network error. Please check your internet.");
+        return;
+      }
+
+      const { status, data } = error.response;
+
+      switch (status) {
+        case 401:
+          toast.error("Unauthorized. Please login again.");
+          break;
+        case 403:
+          toast.error(data?.message || "You are not allowed to assign courses");
+          break;
+        case 404:
+          toast.error(data?.message || "User or course not found");
+          break;
+        case 409:
+          toast.error(data?.message || "Course already assigned to this user");
+          break;
+        case 422:
+          toast.error(data?.message || "Invalid assignment data");
+          break;
+        default:
+          if (status >= 500) {
+            toast.error("Server error. Please try again later.");
+          } else {
+            toast.error(data?.message || "Failed to assign course");
+          }
+          break;
+      }
+    } finally {
+      setAssignLoading(false);
     }
-  } finally {
-    setAssignLoading(false);
-  }
-};
+  };
 
   const filteredBatches = batches.filter(
     (batch) =>
@@ -549,9 +552,15 @@ const handleAssignCourse = async () => {
 
                       <TableCell className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                         <Badge color={user.courses.length > 0 ? "success" : "light"} size="sm">
-  {user.courses.length} Course{user.courses.length !== 1 ? "s" : ""}
-</Badge>
+                          <Badge
+                            color={
+                              user.courses.length > 0 ? "success" : "light"
+                            }
+                            size="sm"
+                          >
+                            {user.courses.length} Course
+                            {user.courses.length !== 1 ? "s" : ""}
+                          </Badge>
 
                           {user.courses.length > 0 && (
                             <Button
@@ -588,44 +597,40 @@ const handleAssignCourse = async () => {
                       </TableCell>
                       <TableCell className="px-2 py-2">
                         <div className="flex items-center justify-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0"
-                            onClick={() => openAssignModal(user)}
-            
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
+                        <Button
+  size="sm"
+  variant="outline"
+  className="p-1 flex items-center justify-center"
+  onClick={() => openAssignModal(user)}
+>
+  <Plus className="w-4 h-4" />
+</Button>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0"
-                            
-                            onClick={() => handleToggleBlock(user)}
-                          
-                          >
-                            {user.is_active ? (
-                              <Lock className="w-4 h-4" />
-                            ) : (
-                              <Unlock className="w-4 h-4" />
-                            )}
-                          </Button>
+<Button
+  size="sm"
+  variant="outline"
+  className="p-1 flex items-center justify-center"
+  onClick={() => handleToggleBlock(user)}
+>
+  {user.is_active ? (
+    <Lock className="w-4 h-4" />
+  ) : (
+    <Unlock className="w-4 h-4" />
+  )}
+</Button>
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 w-7 p-0"
-                           
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsDeleteModalOpen(true);
-                            }}
-                            
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+<Button
+  size="sm"
+  variant="outline"
+  className="p-1 flex items-center justify-center"
+  onClick={() => {
+    setSelectedUser(user);
+    setIsDeleteModalOpen(true);
+  }}
+>
+  <Trash2 className="w-4 h-4" />
+</Button>
+
                         </div>
                       </TableCell>
                     </TableRow>
@@ -849,7 +854,6 @@ const handleAssignCourse = async () => {
                 onChange={(e) =>
                   setAccessValidityDays(parseInt(e.target.value) || 365)
                 }
-            
                 placeholder="365"
               />
             </div>

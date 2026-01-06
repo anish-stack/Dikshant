@@ -9,7 +9,7 @@ router.get("/", ctrl.findAll);
 router.get("/:id", ctrl.findOne);
 
 router.post( "/",  upload.single("imageUrl"), ctrl.create);
-router.put( "/:id", auth, role(["admin"]), upload.single("imageUrl"), ctrl.update);
-router.delete("/:id", auth, role(["admin"]), ctrl.delete);
+router.put( "/:id",  upload.single("imageUrl"), ctrl.update);
+router.delete("/:id",  ctrl.delete);
 
 module.exports = router;

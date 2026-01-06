@@ -104,7 +104,7 @@ const Banner = () => {
       editItem ? editItem.position.toString() : nextPosition.toString()
     );
     data.append("status", "true");
-    if (form.image) data.append("image", form.image);
+    if (form.image) data.append("imageUrl", form.image);
 
     try {
       if (editItem) {
