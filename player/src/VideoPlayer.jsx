@@ -59,7 +59,7 @@ export default function VideoPlayer({
   const [currentQuality, setCurrentQuality] = useState("auto")
 
   const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-  const API_BASE = "https://www.dikapi.olyox.in/api"
+  const API_BASE = "http://localhost:5001/api"
 
   // 🔐 Extract video ID from DECRYPTED playableUrl (not from video.url)
   const getVideoId = () => {

@@ -2,6 +2,8 @@
 const router = require('express').Router();
 
 router.use('/auth', require('./auth'));
+router.use('/admin/dashboard', require('./admin'));
+
 router.use('/programs', require('./programs'));
 router.use('/subjects', require('./subjects'));
 router.use('/batchs', require('./batchs'));

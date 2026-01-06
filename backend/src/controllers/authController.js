@@ -1,4 +1,4 @@
-const { User } = require("../models");
+const { User,Order,Batch ,Program, Subject, Sequelize, sequelize, Notification} = require("../models");
 const bcrypt = require("bcrypt");
 const { sign, verify } = require("../utils/generateToken");
 const redis = require("../config/redis");
@@ -677,14 +677,9 @@ exports.getAllProfile = async (req, res) => {
   try {
     let { page = 1, limit = 10, search = "", role } = req.query;
 
-    page = parseInt(page);
-    limit = parseInt(limit);
+    page = Math.max(parseInt(page) || 1, 1);
+    limit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
 
-    if (isNaN(page) || page < 1) page = 1;
-    if (isNaN(limit) || limit < 1) limit = 10;
-    if (limit > 100) limit = 100; // Max limit
-
-    // Build where clause
     const whereClause = {};
 
     if (search) {
@@ -695,17 +690,90 @@ exports.getAllProfile = async (req, res) => {
       ];
     }
 
-    if (role) {
-      whereClause.role = role;
-    }
+    if (role) whereClause.role = role;
 
-    const { count, rows } = await User.findAndCountAll({
+    /** 1️⃣ Fetch Users */
+    const { count, rows: users } = await User.findAndCountAll({
       where: whereClause,
       limit,
       offset: (page - 1) * limit,
       order: [["createdAt", "DESC"]],
       attributes: { exclude: ["password", "refresh_token", "otp"] },
     });
+
+    const userIds = users.map(u => u.id);
+
+    /** 2️⃣ Fetch Orders of All Users */
+    const orders = await Order.findAll({
+      where: { userId: userIds },
+      order: [["createdAt", "DESC"]],
+    });
+
+    /** 3️⃣ Group Orders by userId */
+    const orderMap = {};
+    for (const order of orders) {
+      if (!orderMap[order.userId]) {
+        orderMap[order.userId] = [];
+      }
+      orderMap[order.userId].push(order);
+    }
+
+    /** 4️⃣ Fetch Batches + Program + Subjects */
+    const batchOrders = orders.filter(o => o.type === "batch");
+
+    const batchIds = batchOrders.map(o => o.itemId);
+
+    const batches = await Batch.findAll({
+      where: { id: batchIds },
+      include: [
+        {
+          model: Program,
+          as: "program",
+          attributes: ["id", "name", "slug"],
+        },
+      ],
+    });
+
+    const batchMap = {};
+    batches.forEach(b => (batchMap[b.id] = b));
+
+    /** 5️⃣ Attach Courses to Users */
+    const finalUsers = await Promise.all(
+      users.map(async (user) => {
+        const userOrders = orderMap[user.id] || [];
+
+        const courses = await Promise.all(
+          userOrders.map(async (order) => {
+            if (order.type !== "batch") return order.toJSON();
+
+            const batch = batchMap[order.itemId];
+            if (!batch) return order.toJSON();
+
+            let subjectIds = [];
+            try {
+              subjectIds = JSON.parse(batch.subjectId || "[]");
+            } catch {}
+
+            const subjects = await Subject.findAll({
+              where: { id: subjectIds },
+              attributes: ["id", "name", "slug"],
+            });
+
+            return {
+              ...order.toJSON(),
+              batch: batch.toJSON(),
+              subjects,
+            };
+          })
+        );
+
+        return {
+          ...user.toJSON(),
+          hasCourse: courses.length > 0,
+          courses,
+        };
+      })
+    );
 
     res.json({
       status: "success",
@@ -714,12 +782,12 @@ exports.getAllProfile = async (req, res) => {
       page,
       limit,
       totalPages: Math.ceil(count / limit),
-      data: rows,
+      data: finalUsers,
     });
   } catch (err) {
     console.error("Get All Profiles Error:", err);
     res.status(500).json({
-      error: "Unable to fetch profiles. Please try again.",
+      error: "Unable to fetch profiles",
     });
   }
 };
@@ -825,6 +893,141 @@ exports.updatePassword = async (req, res) => {
     console.error("Update Password Error:", err);
     res.status(500).json({
       error: "Unable to update password. Please try again",
+    });
+  }
+};
+
+
+exports.toggleUserActive = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        error: "User ID is required",
+      });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    // Prevent admin from blocking themselves
+    if (req.user && req.user.id === user.id) {
+      return res.status(403).json({
+        error: "You cannot block/unblock yourself",
+      });
+    }
+
+    // Prevent blocking other admins (optional security)
+    if (user.role === "admin") {
+      return res.status(403).json({
+        error: "Cannot block/unblock admin users",
+      });
+    }
+
+    // Toggle active status
+    user.is_active = !user.is_active;
+    await user.save();
+
+    // Clear user's refresh token if blocking
+    if (!user.is_active) {
+      user.refresh_token = null;
+      user.fcm_token = null;
+      await user.save();
+
+      // Clear any cached data
+      await redis.del(`user:${userId}`);
+      await redis.del(`orders:${userId}`);
+    }
+
+    res.json({
+      status: "success",
+      message: user.is_active
+        ? "User activated successfully"
+        : "User blocked successfully",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        is_active: user.is_active,
+      },
+    });
+  } catch (err) {
+    console.error("Toggle User Active Error:", err);
+    res.status(500).json({
+      error: "Unable to update user status. Please try again.",
+    });
+  }
+};
+
+
+exports.deleteUser = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const user = await User.findByPk(userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Prevent self delete
+    if (req.user && req.user.id === user.id) {
+      return res.status(403).json({ error: "You cannot delete yourself" });
+    }
+
+    // Prevent admin delete
+    if (user.role === "admin") {
+      return res.status(403).json({ error: "Cannot delete admin users" });
+    }
+
+    // 1️⃣ Delete notifications
+    await Notification.destroy({
+      where: { userId: user.id },
+      transaction,
+    });
+
+    // 2️⃣ Delete orders
+    const deletedOrders = await Order.destroy({
+      where: { userId: user.id },
+      transaction,
+    });
+
+    // 3️⃣ Delete user
+    await user.destroy({ transaction });
+
+    // 4️⃣ Clear Redis cache
+    await redis.del(`user:${userId}`);
+    await redis.del(`orders:${userId}`);
+    await redis.del(`otp:${userId}`);
+
+    await transaction.commit();
+
+    res.json({
+      status: "success",
+      message: "User deleted successfully",
+      deleted: {
+        userId: user.id,
+        orders: deletedOrders,
+      },
+    });
+  } catch (err) {
+    await transaction.rollback();
+    console.error("Delete User Error:", err);
+    res.status(500).json({
+      error: "Unable to delete user",
     });
   }
 };

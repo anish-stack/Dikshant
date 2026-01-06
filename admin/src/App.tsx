@@ -121,7 +121,14 @@ export default function App(){
         </Routes>
       </Router>
 
-      <Toaster position="top-right" />
+<Toaster
+  position="top-right"
+  toastOptions={{
+    style: {
+      zIndex: 999999999999,
+    },
+  }}
+/>
     </>
   );
 }

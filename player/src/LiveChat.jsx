@@ -50,7 +50,7 @@ export default function LiveChat({
 
   const fetchChatHistory = async () => {
     try {
-      const res = await fetch(`https://www.dikapi.olyox.in/api/chat/history/${videoId}?limit=500`)
+      const res = await fetch(`http://localhost:5001/api/chat/history/${videoId}?limit=500`)
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
         const chatMessages = data.data.filter((msg) => msg.messageType === "message")

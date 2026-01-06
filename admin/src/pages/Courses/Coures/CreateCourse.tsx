@@ -21,9 +21,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-const BATCH_API = "https://www.dikapi.olyox.in/api/batchs";
-const SUBJECTS_API = "https://www.dikapi.olyox.in/api/subjects";
-const PROGRAMS_API = "https://www.dikapi.olyox.in/api/programs";
+const BATCH_API = "http://localhost:5001/api/batchs";
+const SUBJECTS_API = "http://localhost:5001/api/subjects";
+const PROGRAMS_API = "http://localhost:5001/api/programs";
 
 interface Subject {
   id: number;

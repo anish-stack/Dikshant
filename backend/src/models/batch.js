@@ -66,11 +66,19 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true
   });
 
-  Batch.associate = function (models) {
-    Batch.belongsTo(models.Program, { foreignKey: 'programId', as: 'program' });
-    Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
-    Batch.belongsToMany(models.Subject, { through: "batch_subjects" })
-  };
+Batch.associate = function (models) {
+  Batch.belongsTo(models.Program, { foreignKey: 'programId', as: 'program' });
+  Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
+  Batch.belongsToMany(models.Subject, { through: "batch_subjects" });
+  
+  // Add this line:
+  Batch.hasMany(models.Order, { 
+    foreignKey: 'itemId', 
+    as: 'orders',
+    constraints: false
+  });
+};
 
   return Batch;
 };
+

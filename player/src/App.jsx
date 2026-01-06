@@ -142,7 +142,7 @@ function LMSContent() {
         setVideoSource(null);
 
         const res = await axios.post(
-          `https://www.dikapi.olyox.in/api/videocourses/decrypt/batch/${userId}`,
+          `http://localhost:5001/api/videocourses/decrypt/batch/${userId}`,
           { token: currentVideo.secureToken },
           {
             headers: {
@@ -201,11 +201,11 @@ useEffect(() => {
       const timeout = setTimeout(() => controller.abort(), 10000);
 
       const [batchRes, videosRes] = await Promise.all([
-        fetch(`https://www.dikapi.olyox.in/api/batchs/${courseId}`, {
+        fetch(`http://localhost:5001/api/batchs/${courseId}`, {
           signal: controller.signal,
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch(`https://www.dikapi.olyox.in/api/videocourses/batch/${courseId}`, {
+        fetch(`http://localhost:5001/api/videocourses/batch/${courseId}`, {
           signal: controller.signal,
           headers: { Authorization: `Bearer ${token}` },
         }),

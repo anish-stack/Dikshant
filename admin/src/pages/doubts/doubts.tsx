@@ -22,7 +22,7 @@ import Label from "../../components/form/Label";
 /* =========================
    API
 ========================= */
-const API_URL = "https://www.dikapi.olyox.in/api/doubt";
+const API_URL = "http://localhost:5001/api/doubt";
 
 /* =========================
    TYPES

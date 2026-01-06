@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
     razorpayOrderId: DataTypes.STRING,
     razorpayPaymentId: DataTypes.STRING,
     razorpaySignature: DataTypes.STRING,
-
+    reason: DataTypes.STRING,
     status: DataTypes.ENUM("pending", "success", "failed"),
     paymentDate: DataTypes.DATE,
     accessValidityDays: DataTypes.INTEGER,
@@ -27,11 +27,22 @@ module.exports = (sequelize, DataTypes) => {
     couponDiscount: DataTypes.FLOAT,
     couponDiscountType: DataTypes.ENUM("flat", "percentage"),
 
-
   }, {
     tableName: "orders",
     timestamps: true
   });
+
+  Order.associate = function (models) {
+    Order.belongsTo(models.Batch, { 
+      foreignKey: 'itemId', 
+      as: 'batch',
+      constraints: false
+    });
+    Order.belongsTo(models.User, { 
+      foreignKey: 'userId', 
+      as: 'user' 
+    });
+  };
 
   return Order;
 };

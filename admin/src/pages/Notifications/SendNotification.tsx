@@ -45,7 +45,7 @@ const SendNotification: React.FC = () => {
     setError('');
 
     try {
-      await axios.post('https://www.dikapi.olyox.in/api/notifications/send-notification', {
+      await axios.post('http://localhost:5001/api/notifications/send-notification', {
         title: form.title.trim(),
         message: form.message.trim(),
         channel: form.channel,
