@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios,{ AxiosError } from "axios";
 import { API_URL } from "../constant/constant";
 import PageBreadcrumb from "../components/common/PageBreadCrumb";
 import PageMeta from "../components/common/PageMeta";
@@ -30,11 +30,27 @@ import { Skeleton } from "../components/ui/Skeleton/Skeleton";
 import Modal from "./UiElements/AlertDialog";
 import { useNavigate } from "react-router";
 
+interface Batch {
+  id: number;
+  name: string;
+  slug: string;
+  imageUrl: string;
+  batchPrice: number;
+  batchDiscountPrice: number;
+  category: string;
+  c_status: string;
+  program: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+}
+
 interface Course {
   id: number;
   title: string;
+  batch?: Batch; // optional, kyunki batch null/undefined ho sakta hai
 }
-
 interface User {
   id: number;
   name: string;
@@ -57,21 +73,6 @@ interface ApiResponse {
   data: User[];
 }
 
-interface Batch {
-  id: number;
-  name: string;
-  slug: string;
-  imageUrl: string;
-  batchPrice: number;
-  batchDiscountPrice: number;
-  category: string;
-  c_status: string;
-  program: {
-    id: number;
-    name: string;
-    slug: string;
-  };
-}
 
 interface BatchResponse {
   total: number;
@@ -184,7 +185,7 @@ const handleToggleBlock = async (user: User) => {
       return;
     }
 
-    const res = await axios.patch(
+ await axios.patch(
       `${API_URL}/auth/users/${user.id}/toggle-active`,
       null,
       {
@@ -207,69 +208,71 @@ const handleToggleBlock = async (user: User) => {
         ? "User blocked successfully"
         : "User unblocked successfully"
     );
-  } catch (error: any) {
-    console.error("Failed to toggle block:", error);
+  } catch (err) {
+  const error = err as AxiosError<{ message?: string }>;
 
-    // ❌ No response (network issue)
-    if (!error.response) {
-      toast.error("Network error. Please check your internet.");
-      return;
-    }
+  console.error("Failed to toggle block:", error);
 
-    const { status, data } = error.response;
-
-    // ❌ Auth error
-    if (status === 401) {
-      toast.error("Unauthorized. Please login again.");
-    }
-    // ❌ Forbidden
-    else if (status === 403) {
-      toast.error(data?.message || "You are not allowed to perform this action");
-    }
-    // ❌ User not found
-    else if (status === 404) {
-      toast.error("User not found");
-    }
-    // ❌ Server error
-    else if (status >= 500) {
-      toast.error("Server error. Please try again later.");
-    }
-    // ❌ Custom backend message
-    else {
-      toast.error(data?.message || "Failed to update user status");
-    }
+  // ❌ No response (network issue)
+  if (!error.response) {
+    toast.error("Network error. Please check your internet.");
+    return;
   }
-};
 
+  const { status, data } = error.response;
 
- const handleDeleteUser = async () => {
+  // ❌ Auth error
+  if (status === 401) {
+    toast.error("Unauthorized. Please login again.");
+  }
+  // ❌ Forbidden
+  else if (status === 403) {
+    toast.error(data?.message || "You are not allowed to perform this action");
+  }
+  // ❌ User not found
+  else if (status === 404) {
+    toast.error("User not found");
+  }
+  // ❌ Server error
+  else if (status >= 500) {
+    toast.error("Server error. Please try again later.");
+  }
+  // ❌ Custom backend message
+  else {
+    toast.error(data?.message || "Failed to update user status");
+  }
+}
+}
+
+const handleDeleteUser = async () => {
   if (!selectedUser) return;
 
+  const token = localStorage.getItem("accessToken");
+
+  if (!token) {
+    toast.error("Session expired. Please login again.");
+    return;
+  }
+
   try {
-    const token = localStorage.getItem("accessToken");
+    await axios.delete(`${API_URL}/auth/users/${selectedUser.id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-    if (!token) {
-      toast.error("Session expired. Please login again.");
-      return;
-    }
-
-    await axios.delete(
-      `${API_URL}/auth/users/${selectedUser.id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    // Update UI
+    // ✅ Update UI
     setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
 
     toast.success("User deleted successfully");
 
+    // ✅ Reset selection & close modal
     setIsDeleteModalOpen(false);
     setSelectedUser(null);
-  } catch (error: any) {
+  } catch (err) {
+    // ✅ Type-safe error
+    const error = err as AxiosError<{ error?: string }>;
+
     console.error("Failed to delete user:", error);
 
     // ❌ Network / no response
@@ -280,33 +283,30 @@ const handleToggleBlock = async (user: User) => {
 
     const { status, data } = error.response;
 
-    // ❌ Unauthorized
-    if (status === 401) {
-      toast.error("Unauthorized. Please login again.");
-    }
-    // ❌ Forbidden (admin/self delete etc.)
-    else if (status === 403) {
-      toast.error(data?.error || "You are not allowed to delete this user");
-    }
-    // ❌ User not found
-    else if (status === 404) {
-      toast.error("User not found");
-    }
-    // ❌ Conflict / FK constraint / business rule
-    else if (status === 409) {
-      toast.error(data?.error || "User cannot be deleted due to dependencies");
-    }
-    // ❌ Server error
-    else if (status >= 500) {
-      toast.error("Server error. Please try again later.");
-    }
-    // ❌ Fallback
-    else {
-      toast.error(data?.error || "Failed to delete user");
+    // ❌ Handle different status codes
+    switch (status) {
+      case 401:
+        toast.error("Unauthorized. Please login again.");
+        break;
+      case 403:
+        toast.error(data?.error || "You are not allowed to delete this user");
+        break;
+      case 404:
+        toast.error("User not found");
+        break;
+      case 409:
+        toast.error(data?.error || "User cannot be deleted due to dependencies");
+        break;
+      default:
+        if (status >= 500) {
+          toast.error("Server error. Please try again later.");
+        } else {
+          toast.error(data?.error || "Failed to delete user");
+        }
+        break;
     }
   }
 };
-
 
   const openAssignModal = (user: User) => {
     setSelectedUser(user);
@@ -355,10 +355,12 @@ const handleAssignCourse = async () => {
     setAssignReason("");
 
     fetchUsers(page, searchTerm, limit);
-  } catch (error: any) {
+  } catch (err) {
+    // ✅ Type-safe error handling
+    const error = err as AxiosError<{ message?: string }>;
+
     console.error("Failed to assign course:", error);
 
-    // ❌ Network issue
     if (!error.response) {
       toast.error("Network error. Please check your internet.");
       return;
@@ -366,39 +368,34 @@ const handleAssignCourse = async () => {
 
     const { status, data } = error.response;
 
-    // ❌ Unauthorized
-    if (status === 401) {
-      toast.error("Unauthorized. Please login again.");
-    }
-    // ❌ Forbidden
-    else if (status === 403) {
-      toast.error(data?.message || "You are not allowed to assign courses");
-    }
-    // ❌ Not found (user/batch)
-    else if (status === 404) {
-      toast.error(data?.message || "User or course not found");
-    }
-    // ❌ Conflict (already assigned)
-    else if (status === 409) {
-      toast.error(data?.message || "Course already assigned to this user");
-    }
-    // ❌ Validation error
-    else if (status === 422) {
-      toast.error(data?.message || "Invalid assignment data");
-    }
-    // ❌ Server error
-    else if (status >= 500) {
-      toast.error("Server error. Please try again later.");
-    }
-    // ❌ Fallback
-    else {
-      toast.error(data?.message || "Failed to assign course");
+    switch (status) {
+      case 401:
+        toast.error("Unauthorized. Please login again.");
+        break;
+      case 403:
+        toast.error(data?.message || "You are not allowed to assign courses");
+        break;
+      case 404:
+        toast.error(data?.message || "User or course not found");
+        break;
+      case 409:
+        toast.error(data?.message || "Course already assigned to this user");
+        break;
+      case 422:
+        toast.error(data?.message || "Invalid assignment data");
+        break;
+      default:
+        if (status >= 500) {
+          toast.error("Server error. Please try again later.");
+        } else {
+          toast.error(data?.message || "Failed to assign course");
+        }
+        break;
     }
   } finally {
     setAssignLoading(false);
   }
 };
-
 
   const filteredBatches = batches.filter(
     (batch) =>
@@ -552,18 +549,14 @@ const handleAssignCourse = async () => {
 
                       <TableCell className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Badge
-                            color={
-                              user.courses.length > 0 ? "success" : "secondary"
-                            }
-                          >
-                            {user.courses.length} Course
-                            {user.courses.length !== 1 ? "s" : ""}
-                          </Badge>
+                         <Badge color={user.courses.length > 0 ? "success" : "light"} size="sm">
+  {user.courses.length} Course{user.courses.length !== 1 ? "s" : ""}
+</Badge>
+
                           {user.courses.length > 0 && (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="primary"
                               onClick={() => {
                                 setSelectedUser(user);
                                 setIsViewCoursesOpen(true);
@@ -596,22 +589,22 @@ const handleAssignCourse = async () => {
                       <TableCell className="px-2 py-2">
                         <div className="flex items-center justify-center gap-1">
                           <Button
-                            size="icon"
+                            size="sm"
                             variant="outline"
                             className="h-7 w-7 p-0"
                             onClick={() => openAssignModal(user)}
-                            title="Assign Course"
+            
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
 
                           <Button
-                            size="icon"
+                            size="sm"
                             variant="outline"
                             className="h-7 w-7 p-0"
-                            color={user.is_active ? "error" : "success"}
+                            
                             onClick={() => handleToggleBlock(user)}
-                            title={user.is_active ? "Block" : "Unblock"}
+                          
                           >
                             {user.is_active ? (
                               <Lock className="w-4 h-4" />
@@ -621,15 +614,15 @@ const handleAssignCourse = async () => {
                           </Button>
 
                           <Button
-                            size="icon"
+                            size="sm"
                             variant="outline"
                             className="h-7 w-7 p-0"
-                            color="error"
+                           
                             onClick={() => {
                               setSelectedUser(user);
                               setIsDeleteModalOpen(true);
                             }}
-                            title="Delete"
+                            
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -667,7 +660,7 @@ const handleAssignCourse = async () => {
                       <Button
                         key={pageNum}
                         size="sm"
-                        variant={page === pageNum ? "default" : "outline"}
+                        variant={page === pageNum ? "primary" : "outline"}
                         onClick={() => handlePageChange(pageNum)}
                       >
                         {pageNum}
@@ -679,7 +672,7 @@ const handleAssignCourse = async () => {
                       <span className="px-2 text-gray-500">...</span>
                       <Button
                         size="sm"
-                        variant={page === totalPages ? "default" : "outline"}
+                        variant={page === totalPages ? "primary" : "outline"}
                         onClick={() => handlePageChange(totalPages)}
                       >
                         {totalPages}
@@ -856,7 +849,7 @@ const handleAssignCourse = async () => {
                 onChange={(e) =>
                   setAccessValidityDays(parseInt(e.target.value) || 365)
                 }
-                min={1}
+            
                 placeholder="365"
               />
             </div>
@@ -989,7 +982,7 @@ const handleAssignCourse = async () => {
             >
               Cancel
             </Button>
-            <Button color="error" onClick={handleDeleteUser}>
+            <Button variant="primary" onClick={handleDeleteUser}>
               Delete User
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import toast from "react-hot-toast";
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
@@ -12,9 +12,7 @@ import {
   Package,
   Video,
   PlayCircle,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
+  AlertCircle,
 } from "lucide-react";
 import { API_URL } from "../../constant/constant";
 import Badge from "../../components/ui/badge/Badge";
@@ -113,16 +111,19 @@ export default function Home() {
       setStats(statsRes.data.data);
       setMonthlyData(monthlyRes.data.data);
       setTopBatches(batchesRes.data.data);
-    } catch (error: any) {
-      console.error("Failed to fetch statistics:", error);
-      toast.error(
-        error?.response?.data?.message || "Failed to load dashboard statistics"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    } catch (err) {
+  const error = err as AxiosError<{ message?: string }>;
+  console.error("Failed to fetch statistics:", error);
 
+  if (!error.response) {
+    toast.error("Network error. Please check your internet.");
+  } else {
+    toast.error(error.response.data?.message || "Failed to load dashboard statistics");
+  }
+} finally {
+  setLoading(false);
+}
+  }
   useEffect(() => {
     fetchAdminStatistics();
   }, []);
@@ -179,7 +180,7 @@ export default function Home() {
         position: "top",
         horizontalAlign: "left",
         fontFamily: "Outfit",
-        markers: { radius: 12 },
+        markers: { size: 12 },
       },
       yaxis: [
         {
@@ -214,10 +215,6 @@ export default function Home() {
   };
 
   const getRevenueTargetOptions = (): ApexOptions => {
-    const totalRevenue = parseFloat(stats?.revenue.totalRevenue || "0");
-    const monthlyRevenue = parseFloat(stats?.revenue.monthlyRevenue || "0");
-    const targetPercentage =
-      totalRevenue > 0 ? (monthlyRevenue / totalRevenue) * 100 : 0;
 
     return {
       colors: ["#465FFF"],
@@ -260,7 +257,7 @@ export default function Home() {
   if (loading) {
     return (
       <>
-        <PageMeta title="Admin Dashboard | Loading..." />
+        <PageMeta description="Admin Dashboard" title="Admin Dashboard | Loading..." />
         <div className="grid grid-cols-12 gap-4 md:gap-6">
           <div className="col-span-12 space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 md:gap-6">
@@ -488,7 +485,7 @@ export default function Home() {
                   </h4>
                   <p className="text-xs text-gray-400 mt-1">Admin assigned</p>
                 </div>
-                <Badge color="secondary" variant="light">
+                <Badge color="primary" variant="light">
                   Free
                 </Badge>
               </div>
@@ -742,9 +739,10 @@ export default function Home() {
           </td>
 
           <td className="py-4 px-6 text-center">
-            <Badge variant="light" className="text-xs">
-              {category}
-            </Badge>
+           <Badge variant="light" size="sm" color="light">
+  {category}
+</Badge>
+
           </td>
 
           <td className="py-4 px-6 text-center">
@@ -767,16 +765,17 @@ export default function Home() {
 
           <td className="py-4 px-6 text-center">
             <Badge
-              color={
-                c_status === "Live"
-                  ? "success"
-                  : c_status === "Upcoming"
-                  ? "warning"
-                  : "secondary"
-              }
-            >
-              {c_status}
-            </Badge>
+  color={
+    c_status === "Live"
+      ? "success"
+      : c_status === "Upcoming"
+      ? "warning"
+      : "dark"
+  }
+>
+  {c_status}
+</Badge>
+
           </td>
         </tr>
       );
