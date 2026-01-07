@@ -1,7 +1,16 @@
-const Razorpay = require("razorpay");
-require('dotenv').config();
+"use strict";
 
-module.exports = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY || "rzp_live_1SWl87h7M6UCNY",
-  key_secret: process.env.RAZORPAY_SECRET || "fgaSKuNHViLq3ZGuuMt0bSWB"
+const Razorpay = require("razorpay");
+
+if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  console.error("❌ Razorpay ENV missing");
+}
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY,
+  key_secret: process.env.RAZORPAY_SECRET,
 });
+
+console.log("✅ Razorpay Initialized");
+
+module.exports = razorpay;

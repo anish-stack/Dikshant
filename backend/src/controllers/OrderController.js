@@ -1,9 +1,10 @@
 "use strict";
 
 const { Order, Coupon, Batch, Program, Subject, Sequelize } = require("../models");
-const razorpay = require("../config/razorpay");
 const redis = require("../config/redis");
 const NotificationController = require("./NotificationController");
+const razorpay = require("../config/razorpay");
+
 
 class OrderController {
 
