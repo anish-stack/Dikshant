@@ -93,7 +93,7 @@ static async createOrder(req, res) {
     /* 🔐 Razorpay Keys Debug */
     console.log("🔐 Razorpay Key Loaded:", {
       key_id: process.env.RAZORPAY_KEY ? "✅ YES" : "❌ NO",
-      key_secret: process.env.RAZORPAY_KEY_SECRET ? "✅ YES" : "❌ NO"
+      key_secret: process.env.RAZORPAY_SECRET ? "✅ YES" : "❌ NO"
     });
 
     /* 💳 Razorpay Order */
