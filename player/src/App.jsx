@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Menu, WifiOff, AlertTriangle, RefreshCw, Shield } from "lucide-react";
-import Sidebar from "./sidebar";
+import Sidebar from "./Sidebar";
 import LiveChat from "./LiveChat";
 import LiveStatusOverlay from "./LiveStatusOverlay";
 import useLiveSession from "./hooks/use-live-session.js";

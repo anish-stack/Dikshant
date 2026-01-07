@@ -48,9 +48,7 @@ export default function VideoPlayer({
   const [expandedReplies, setExpandedReplies] = useState({})
   const [loading, setLoading] = useState(false)
 
-  console.log("video,",video)
   const [sending, setSending] = useState(false)
-
   // Speed and quality states
   const [showSpeedMenu, setShowSpeedMenu] = useState(false)
   const [showQualityMenu, setShowQualityMenu] = useState(false)

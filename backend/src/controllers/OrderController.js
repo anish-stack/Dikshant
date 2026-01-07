@@ -12,7 +12,7 @@ class OrderController {
     try {
       const {
         userId,
-        type,          // batch / test
+        type,         
         itemId,
         amount,
         gst = 0,
