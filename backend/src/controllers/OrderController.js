@@ -9,150 +9,151 @@ const razorpay = require("../config/razorpay");
 class OrderController {
 
   // CREATE RAZORPAY ORDER
-static async createOrder(req, res) {
-  console.log("🟡 CREATE ORDER API HIT");
-  console.log("➡️ BODY:", req.body);
+  static async createOrder(req, res) {
+    console.log("🟡 CREATE ORDER API HIT");
+    console.log("➡️ BODY:", req.body);
 
-  try {
-    const {
-      userId,
-      type,
-      itemId,
-      amount,
-      gst = 0,
-      couponCode
-    } = req.body;
+    try {
+      const {
+        userId,
+        type,
+        itemId,
+        amount,
+        gst = 0,
+        couponCode
+      } = req.body;
 
-    console.log("📦 Parsed Fields:", {
-      userId, type, itemId, amount, gst, couponCode
-    });
-
-    if (!userId || !type || !itemId || !amount) {
-      console.warn("❌ Missing required fields");
-      return res.status(400).json({ message: "Missing required fields" });
-    }
-
-    let discount = 0;
-    let couponSnapshot = {
-      couponId: null,
-      couponCode: null,
-      couponDiscount: null,
-      couponDiscountType: null
-    };
-
-    /* 🎟 Coupon Validation */
-    if (couponCode) {
-      console.log("🎫 Coupon Code Received:", couponCode);
-
-      const coupon = await Coupon.findOne({
-        where: { code: couponCode.toUpperCase() }
+      console.log("📦 Parsed Fields:", {
+        userId, type, itemId, amount, gst, couponCode
       });
 
-      console.log("🎫 Coupon Found:", coupon?.id);
-
-      if (!coupon) {
-        console.warn("❌ Invalid coupon");
-        return res.status(404).json({ message: "Invalid coupon code" });
+      if (!userId || !type || !itemId || !amount) {
+        console.warn("❌ Missing required fields");
+        return res.status(400).json({ message: "Missing required fields" });
       }
 
-      const now = new Date();
-      if (now > coupon.validTill) {
-        console.warn("❌ Coupon expired");
-        return res.status(400).json({ message: "Coupon expired" });
-      }
-
-      couponSnapshot = {
-        couponId: coupon.id,
-        couponCode: coupon.code,
-        couponDiscount: coupon.discount,
-        couponDiscountType: coupon.discountType
+      let discount = 0;
+      let couponSnapshot = {
+        couponId: null,
+        couponCode: null,
+        couponDiscount: null,
+        couponDiscountType: null
       };
 
-      if (coupon.discountType === "flat") {
-        discount = coupon.discount;
-      }
+      /* 🎟 Coupon Validation */
+      if (couponCode) {
+        console.log("🎫 Coupon Code Received:", couponCode);
 
-      if (coupon.discountType === "percentage") {
-        discount = (amount * coupon.discount) / 100;
-        if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-          discount = coupon.maxDiscount;
+        const coupon = await Coupon.findOne({
+          where: { code: couponCode.toUpperCase() }
+        });
+
+        console.log("🎫 Coupon Found:", coupon?.id);
+
+        if (!coupon) {
+          console.warn("❌ Invalid coupon");
+          return res.status(404).json({ message: "Invalid coupon code" });
         }
+
+        const now = new Date();
+        if (now > coupon.validTill) {
+          console.warn("❌ Coupon expired");
+          return res.status(400).json({ message: "Coupon expired" });
+        }
+
+        couponSnapshot = {
+          couponId: coupon.id,
+          couponCode: coupon.code,
+          couponDiscount: coupon.discount,
+          couponDiscountType: coupon.discountType
+        };
+
+        if (coupon.discountType === "flat") {
+          discount = coupon.discount;
+        }
+
+        if (coupon.discountType === "percentage") {
+          discount = (amount * coupon.discount) / 100;
+          if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+            discount = coupon.maxDiscount;
+          }
+        }
+
+        console.log("💸 Discount Calculated:", discount);
       }
 
-      console.log("💸 Discount Calculated:", discount);
+      const totalAmount = amount - discount + gst;
+
+      console.log("🧮 Final Amount:", {
+        amount,
+        discount,
+        gst,
+        totalAmount
+      });
+
+      /* 🔐 Razorpay Keys Debug */
+      console.log("🔐 Razorpay Key Loaded:", {
+        key_id: process.env.RAZORPAY_KEY ? "✅ YES" : "❌ NO",
+        key_secret: process.env.RAZORPAY_SECRET ? "✅ YES" : "❌ NO"
+      });
+
+      /* 💳 Razorpay Order */
+      console.log("🚀 Creating Razorpay Order...");
+
+      const razorOrder = await razorpay.orders.create({
+        amount: Math.round(totalAmount * 100),
+        currency: "INR",
+        receipt: `order_${Date.now()}`
+      });
+
+      console.log("✅ Razorpay Order Created:", razorOrder.id);
+
+      /* 🧾 DB Order */
+      const newOrder = await Order.create({
+        userId,
+        type,
+        itemId,
+        amount,
+        discount,
+        gst,
+        totalAmount,
+        razorpayOrderId: razorOrder.id,
+        status: "pending",
+        couponId: couponSnapshot.couponId,
+        couponCode: couponSnapshot.couponCode,
+        couponDiscount: couponSnapshot.couponDiscount,
+        couponDiscountType: couponSnapshot.couponDiscountType,
+        accessValidityDays: req.body.accessValidityDays || null,
+        enrollmentStatus: "active"
+      });
+
+      console.log("📦 Order Saved:", newOrder.id);
+
+      await redis.del(`orders:${userId}`);
+      console.log("🧹 Redis cache cleared");
+
+      return res.json({
+        success: true,
+        message: "Order created successfully",
+        razorOrder,
+        key: process.env.RAZORPAY_KEY,
+        order: newOrder
+      });
+
+    } catch (error) {
+      console.error("🔥 ORDER CREATE ERROR FULL:", {
+        message: error.message,
+        statusCode: error.statusCode,
+        error: error.error,
+        stack: error.stack
+      });
+
+      return res.status(500).json({
+        message: "Order creation failed",
+        razorpayError: error.error || null
+      });
     }
-
-    const totalAmount = amount - discount + gst;
-
-    console.log("🧮 Final Amount:", {
-      amount,
-      discount,
-      gst,
-      totalAmount
-    });
-
-    /* 🔐 Razorpay Keys Debug */
-    console.log("🔐 Razorpay Key Loaded:", {
-      key_id: process.env.RAZORPAY_KEY ? "✅ YES" : "❌ NO",
-      key_secret: process.env.RAZORPAY_SECRET ? "✅ YES" : "❌ NO"
-    });
-
-    /* 💳 Razorpay Order */
-    console.log("🚀 Creating Razorpay Order...");
-
-    const razorOrder = await razorpay.orders.create({
-      amount: Math.round(totalAmount * 100),
-      currency: "INR",
-      receipt: `order_${Date.now()}`
-    });
-
-    console.log("✅ Razorpay Order Created:", razorOrder.id);
-
-    /* 🧾 DB Order */
-    const newOrder = await Order.create({
-      userId,
-      type,
-      itemId,
-      amount,
-      discount,
-      gst,
-      totalAmount,
-      razorpayOrderId: razorOrder.id,
-      status: "pending",
-      couponId: couponSnapshot.couponId,
-      couponCode: couponSnapshot.couponCode,
-      couponDiscount: couponSnapshot.couponDiscount,
-      couponDiscountType: couponSnapshot.couponDiscountType,
-      accessValidityDays: req.body.accessValidityDays || null,
-      enrollmentStatus: "active"
-    });
-
-    console.log("📦 Order Saved:", newOrder.id);
-
-    await redis.del(`orders:${userId}`);
-    console.log("🧹 Redis cache cleared");
-
-    return res.json({
-      success: true,
-      message: "Order created successfully",
-      razorOrder,
-      order: newOrder
-    });
-
-  } catch (error) {
-    console.error("🔥 ORDER CREATE ERROR FULL:", {
-      message: error.message,
-      statusCode: error.statusCode,
-      error: error.error,
-      stack: error.stack
-    });
-
-    return res.status(500).json({
-      message: "Order creation failed",
-      razorpayError: error.error || null
-    });
   }
-}
 
   // ADMIN: ASSIGN COURSE WITHOUT PAYMENT
   static async adminAssignCourse(req, res) {
@@ -245,7 +246,7 @@ static async createOrder(req, res) {
         type: "course",
         relatedId: order.id,
       });
-      
+
       await redis.del(`orders:${order.userId}`);
 
       return res.json({ success: true, message: "Payment verified", order });
@@ -262,7 +263,11 @@ static async createOrder(req, res) {
       const userId = req.params.userId;
 
       const orders = await Order.findAll({
-        where: { userId },
+        where: {
+          userId,
+          status: "success",
+        },
+
         order: [["createdAt", "DESC"]],
       });
 

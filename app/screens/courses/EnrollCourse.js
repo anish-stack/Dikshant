@@ -56,7 +56,7 @@ export default function EnrollCourse() {
   const [paymentStatus, setPaymentStatus] = useState(null); // 'success' | 'failed'
   const [paymentMessage, setPaymentMessage] = useState("");
   const [showCouponsModal, setShowCouponsModal] = useState(false);
-
+  
   // Fetch batch details
   const { data: batchData, isLoading: batchLoading } = useSWR(
     batchId ? `/batchs/${batchId}` : null,
@@ -178,13 +178,13 @@ export default function EnrollCourse() {
         throw new Error(orderResponse.data.message || "Failed to create order");
       }
 
-      const { razorOrder } = orderResponse.data;
+      const { razorOrder ,key } = orderResponse.data;
 
       const options = {
         description: `Enrollment for ${batchData?.name}`,
         image: "https://www.dikshantias.com/_next/image?url=https%3A%2F%2Fdikshantiasnew-web.s3.ap-south-1.amazonaws.com%2Fweb%2F1757750048833-e5243743-d7ec-40f6-950d-849cd31d525f-dikshant-logo.png&w=384&q=75",
         currency: "INR",
-        key: "rzp_live_1SWl87h7M6UCNY",
+        key: key || "rzp_live_S0aOl8Cd5iz5jk",
         amount: razorOrder.amount,
         name: "Dikshant IAS",
         order_id: razorOrder.id,

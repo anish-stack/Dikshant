@@ -12,15 +12,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useSettings } from "../../hooks/useSettings";
 
-const MIN_LOADING_TIME = 3500; 
+const MIN_LOADING_TIME = 3500;
 
 const PlayerScreen = ({ route }) => {
   const { settings } = useSettings();
   const { video, batchId, userId, token, courseId } = route.params || {};
-  
-  const playerUrl = `${
-    settings?.playerUrl || "http://192.168.1.4:5173/"
-  }?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
+
+  const playerUrl = `${settings?.playerUrl || "https://www.player.dikshantias.com/" || "http://192.168.1.4:5173/"
+    }?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
 
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
