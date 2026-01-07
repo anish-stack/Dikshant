@@ -31,61 +31,72 @@ export default function ViewAllVideos({ route, navigation }) {
 
     const videos = videosData?.success ? videosData.data : [];
 
-    const parseDateTime = (dateStr, timeStr) => {
-        if (!dateStr || !timeStr) return null;
-        return new Date(`${dateStr}T${timeStr}.000Z`);
+const parseDateTime = (dateStr, timeStr) => {
+  if (!dateStr || !timeStr) return null;
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+
+  // लोकल टाइमज़ोन में डेट बनाओ
+  const date = new Date(year, month - 1, day, hours, minutes, seconds || 0);
+
+  if (isNaN(date.getTime())) return null;
+
+  return date;
+};
+
+const getVideoStatus = (video) => {
+  const now = new Date();
+
+  let classDateTime = null;
+  if (video.dateOfClass && video.TimeOfClass) {
+    const [year, month, day] = video.dateOfClass.split('-').map(Number);
+    const [hours, minutes, seconds = 0] = video.TimeOfClass.split(':').map(Number);
+    classDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
+  }
+
+  // Explicit live from backend
+  if (video.isLive && !video.isLiveEnded) {
+    return {
+      status: 'live',
+      label: 'LIVE NOW',
+      color: '#dc2626',
+      icon: 'circle',
+      iconLibrary: 'materialCommunity',
     };
+  }
 
-    const getVideoStatus = (video) => {
-        const now = new Date();
-        const liveDateTime = parseDateTime(video.DateOfLive, video.TimeOfLIve);
-        const classDateTime = parseDateTime(video.dateOfClass, video.TimeOfClass);
-
-        if (
-            video.isLive &&
-            !video.isLiveEnded &&
-            liveDateTime &&
-            now >= new Date(liveDateTime.getTime() - 5 * 60 * 1000) &&
-            now <= new Date(liveDateTime.getTime() + 3 * 60 * 60 * 1000)
-        ) {
-            return {
-                status: 'live',
-                label: 'LIVE NOW',
-                color: '#dc2626',
-                icon: 'circle',
-                iconLibrary: 'materialCommunity',
-            };
-        }
-
-        if (video.isLive && video.isLiveEnded) {
-            return {
-                status: 'completed',
-                label: 'Available',
-                color: '#16a34a',
-                icon: 'lock-open',
-                iconLibrary: 'materialCommunity',
-            };
-        }
-
-        if (classDateTime && now < classDateTime) {
-            return {
-                status: 'upcoming',
-                label: 'Upcoming',
-                color: '#d97706',
-                icon: 'lock',
-                iconLibrary: 'materialCommunity',
-            };
-        }
-
-        return {
-            status: 'completed',
-            label: 'Available',
-            color: '#16a34a',
-            icon: 'lock-open',
-            iconLibrary: 'materialCommunity',
-        };
+  // Class time passed → Available
+  if (classDateTime && now >= classDateTime) {
+    return {
+      status: 'completed',
+      label: 'Available',
+      color: '#16a34a',
+      icon: 'lock-open',
+      iconLibrary: 'materialCommunity',
     };
+  }
 
+  // Future → Upcoming
+  if (classDateTime && now < classDateTime) {
+    return {
+      status: 'upcoming',
+      label: 'Upcoming',
+      color: '#d97706',
+      icon: 'lock',
+      iconLibrary: 'materialCommunity',
+    };
+  }
+
+  // Default
+  return {
+    status: 'completed',
+    label: 'Available',
+    color: '#16a34a',
+    icon: 'lock-open',
+    iconLibrary: 'materialCommunity',
+  };
+};
     const filteredVideos = useMemo(() => {
         let list = videos;
 
@@ -158,15 +169,22 @@ export default function ViewAllVideos({ route, navigation }) {
                 courseId: String(id),
             }).toString();
 
-            const url = `https://www.player.dikshantias.com/?${params}`;
+            navigation.navigate("PlayerScreen", {
+                video: video.secureToken,
+                batchId: video?.batchId ?? "",
+                userId: String(user.id),
+                token,
+                courseId: String(id),
+            })
+            // const url = `https://www.player.dikshantias.com/?${params}`;
 
-            const supported = await Linking.canOpenURL(url);
-            if (!supported) {
-                Alert.alert("Error", "Cannot open this URL");
-                return;
-            }
+            // const supported = await Linking.canOpenURL(url);
+            // if (!supported) {
+            //     Alert.alert("Error", "Cannot open this URL");
+            //     return;
+            // }
 
-            await Linking.openURL(url);
+            // await Linking.openURL(url);
         } catch (error) {
             console.error("openVideo error:", error);
             Alert.alert("Error", "Failed to open video");
@@ -248,6 +266,7 @@ export default function ViewAllVideos({ route, navigation }) {
                     </View>
                 }
                 renderItem={({ item }) => {
+                    console.log(item)
                     const status = getVideoStatus(item);
                     const IconComponent = status.iconLibrary === 'materialCommunity' ? MaterialCommunityIcons : Ionicons;
 
@@ -298,39 +317,46 @@ export default function ViewAllVideos({ route, navigation }) {
                                     </View>
 
                                     {/* Date Info */}
-                                   {item?.dateOfClass && (
-    <>
-      {/* LIVE & NOT ENDED */}
-      {item?.isLive && !item?.isLiveEnded ? (
-        <>
-          <Text style={styles.liveBadge}>🔴 LIVE</Text>
+                                    {item?.dateOfClass && (
+                                        <>
+                                            {/* LIVE & NOT ENDED */}
+                                            {item?.isLive && !item?.isLiveEnded ? (
+                                                <>
+                                                    <Text style={styles.liveBadge}>🔴 LIVE</Text>
 
-          <Text style={styles.dateText}>
-            {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-            })}
-          </Text>
+                                                    <Text style={styles.dateText}>
+                                                        {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
+                                                            year: "numeric",
+                                                            month: "short",
+                                                            day: "numeric",
+                                                        })}
+                                                    </Text>
 
-          {item?.TimeOfLIve && (
-            <Text style={styles.timeText}>
-              {item.TimeOfLIve}
-            </Text>
-          )}
-        </>
-      ) : (
-        /* NORMAL / RECORDED */
-        <Text style={styles.dateText}>
-          {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        </Text>
-      )}
-    </>
-  )}
+                                                    {item?.TimeOfLIve && (
+                                                        <Text style={styles.timeText}>
+                                                            {item.TimeOfLIve}
+                                                        </Text>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                /* NORMAL / RECORDED */
+                                                <>
+                                                    <Text style={styles.dateText}>
+                                                       {item.TimeOfClass.substring(0, 5)} {/* 16:58 दिखाने के लिए */}
+                                                    </Text>
+
+                                                    <Text style={styles.dateText}>
+                                                        {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
+                                                            year: "numeric",
+                                                            month: "short",
+                                                            day: "numeric",
+                                                        })}
+                                                    </Text>
+                                                </>
+
+                                            )}
+                                        </>
+                                    )}
                                 </View>
 
                                 {/* Arrow Indicator */}

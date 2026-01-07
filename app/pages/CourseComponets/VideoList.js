@@ -200,8 +200,8 @@ export default function VideoList({
         courseId: String(courseId),
       }).toString();
 
-      // const url = `https://www.player.dikshantias.com/?${params}`;
-
+      // const url = `http://192.168.1.4:5173/?${params}`;
+// 
       // await Linking.openURL(url);
       navigation.navigate("PlayerScreen", {
         video: video.secureToken,

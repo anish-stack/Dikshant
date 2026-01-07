@@ -597,40 +597,39 @@ export default function UserProfiles() {
                       </TableCell>
                       <TableCell className="px-2 py-2">
                         <div className="flex items-center justify-center gap-1">
-                        <Button
-  size="sm"
-  variant="outline"
-  className="p-1 flex items-center justify-center"
-  onClick={() => openAssignModal(user)}
->
-  <Plus className="w-4 h-4" />
-</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="p-1 flex items-center justify-center"
+                            onClick={() => openAssignModal(user)}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
 
-<Button
-  size="sm"
-  variant="outline"
-  className="p-1 flex items-center justify-center"
-  onClick={() => handleToggleBlock(user)}
->
-  {user.is_active ? (
-    <Lock className="w-4 h-4" />
-  ) : (
-    <Unlock className="w-4 h-4" />
-  )}
-</Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="p-1 flex items-center justify-center"
+                            onClick={() => handleToggleBlock(user)}
+                          >
+                            {user.is_active ? (
+                              <Lock className="w-4 h-4" />
+                            ) : (
+                              <Unlock className="w-4 h-4" />
+                            )}
+                          </Button>
 
-<Button
-  size="sm"
-  variant="outline"
-  className="p-1 flex items-center justify-center"
-  onClick={() => {
-    setSelectedUser(user);
-    setIsDeleteModalOpen(true);
-  }}
->
-  <Trash2 className="w-4 h-4" />
-</Button>
-
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="p-1 flex items-center justify-center"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setIsDeleteModalOpen(true);
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -846,16 +845,29 @@ export default function UserProfiles() {
           <div className="space-y-3 pt-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Access Validity (Days)
+                Access Valid Until
               </label>
               <Input
-                type="number"
-                value={accessValidityDays}
-                onChange={(e) =>
-                  setAccessValidityDays(parseInt(e.target.value) || 365)
-                }
-                placeholder="365"
+                type="date"
+                min={new Date().toISOString().split("T")[0]}
+                onChange={(e) => {
+                  const selectedDate = new Date(e.target.value);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  selectedDate.setHours(0, 0, 0, 0);
+
+                  const diffTime = selectedDate.getTime() - today.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                  setAccessValidityDays(diffDays > 0 ? diffDays : 0);
+                }}
+                placeholder="Select end date"
               />
+              {accessValidityDays > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Valid for {accessValidityDays} days from today
+                </p>
+              )}
             </div>
 
             <div>

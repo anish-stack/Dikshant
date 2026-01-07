@@ -2,7 +2,7 @@
 
 const Razorpay = require("razorpay");
 
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+if (!process.env.RAZORPAY_KEY || !process.env.RAZORPAY_KEY) {
   console.error("❌ Razorpay ENV missing");
 }
 

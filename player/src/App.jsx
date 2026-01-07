@@ -11,10 +11,6 @@ import useAuth from "./hooks/use-auth";
 import axios from "axios";
 import CommentsSection from "./comments-section";
 
-// === DevTools Detection Imports ===
-import devtools from "devtools-detect";
-import { addListener, launch } from "devtools-detector";
-
 function LMSContent() {
   const urlParams = new URLSearchParams(window.location.search);
   const userId = urlParams.get("userId");
@@ -52,9 +48,6 @@ function LMSContent() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [retryCount, setRetryCount] = useState(0);
 
-  // === NEW: DevTools Detection State ===
-  const [devToolsOpen, setDevToolsOpen] = useState(false);
-
   // Scroll handler
   useEffect(() => {
     const handleScroll = () => {
@@ -63,90 +56,6 @@ function LMSContent() {
     window.addEventListener("scroll", handleScroll);
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  // === DevTools Detection + Anti-Piracy Safeguards ===
-  useEffect(() => {
-    if (!isAuthenticated || loading || userLoading) return;
-
-    // Initial check
-    if (devtools.isOpen) {
-      setDevToolsOpen(true);
-    }
-
-    // devtools-detect listener
-    const handleChange = (event) => {
-      setDevToolsOpen(event.detail.isOpen);
-    };
-    window.addEventListener("devtoolschange", handleChange);
-
-    // devtools-detector (more aggressive detection)
-    addListener((isOpen) => {
-      setDevToolsOpen(isOpen);
-    });
-    launch(); // Start detector
-
-    // Fallback periodic check
-    const interval = setInterval(() => {
-      if (devtools.isOpen) {
-        setDevToolsOpen(true);
-      }
-    }, 800);
-
-    // Block right-click
-    const blockContext = (e) => e.preventDefault();
-    document.addEventListener("contextmenu", blockContext);
-
-    // Block common DevTools shortcuts
-    const blockShortcuts = (e) => {
-      if (
-        e.keyCode === 123 || // F12
-        (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
-        (e.ctrlKey && e.keyCode === 85) // Ctrl+U
-      ) {
-        e.preventDefault();
-        setDevToolsOpen(true);
-      }
-    };
-    window.addEventListener("keydown", blockShortcuts);
-
-    return () => {
-      window.removeEventListener("devtoolschange", handleChange);
-      window.removeEventListener("contextmenu", blockContext);
-      window.removeEventListener("keydown", blockShortcuts);
-      clearInterval(interval);
-    };
-  }, [isAuthenticated, loading, userLoading]);
-
-  // === When DevTools detected → Block everything ===
-  useEffect(() => {
-    if (devToolsOpen) {
-      setPlayableUrl(null);
-      setVideoSource(null);
-      setError({
-        type: "devtools",
-        message:
-          "Developer Tools detected! Access blocked to prevent unauthorized recording or inspection. Close DevTools and refresh the page.",
-        icon: AlertTriangle,
-      });
-    }
-  }, [devToolsOpen]);
-
-  // URL params validation
-  const validateUrlParams = () => {
-    const required = ["userId", "token"];
-    const missing = required.filter((p) => !urlParams.get(p));
-    if (missing.length > 0 || (token && token.length < 20)) {
-      setNotFound(true);
-      return false;
-    }
-    return true;
-  };
-
-  useEffect(() => {
-    if (!validateUrlParams()) {
-      setLoading(false);
-    }
   }, []);
 
   // Network monitoring
@@ -203,7 +112,7 @@ function LMSContent() {
 
   // Video decryption
   useEffect(() => {
-    if (!currentVideo?.secureToken || devToolsOpen) return;
+    if (!currentVideo?.secureToken) return;
 
     const decryptVideo = async () => {
       try {
@@ -224,10 +133,8 @@ function LMSContent() {
 
         const { videoUrl, videoSource: src, refreshedToken } = res.data;
 
-        if (!devToolsOpen) {
-          setPlayableUrl(videoUrl);
-          setVideoSource(src);
-        }
+        setPlayableUrl(videoUrl);
+        setVideoSource(src);
 
         if (refreshedToken) {
           updateVideoToken(currentVideo.id, refreshedToken);
@@ -253,11 +160,11 @@ function LMSContent() {
     };
 
     decryptVideo();
-  }, [currentVideo, userId, token, devToolsOpen]);
+  }, [currentVideo, userId, token]);
 
-  // Fetch data effect
+  // Fetch batch and videos
   useEffect(() => {
-    if (!isOnline || !validateAccess() || devToolsOpen) {
+    if (!isOnline || !validateAccess()) {
       setLoading(false);
       return;
     }
@@ -307,22 +214,17 @@ function LMSContent() {
         const videoList = videosData.data;
         setVideos(videoList);
 
-        const currentUrlParams = new URLSearchParams(window.location.search);
-        const urlVideoToken = currentUrlParams.get("video")?.trim();
-
         let selectedVideo = videoList[0];
 
-        if (urlVideoToken) {
-          const match = videoList.find((v) => v.secureToken === urlVideoToken);
-          if (match) {
-            selectedVideo = match;
-          }
+        if (urlVideoParam) {
+          const match = videoList.find((v) => v.secureToken === urlVideoParam.trim());
+          if (match) selectedVideo = match;
         }
 
         setCurrentVideo(selectedVideo);
 
-        const currentTokenInUrl = currentUrlParams.get("video");
-        if (currentTokenInUrl !== selectedVideo.secureToken) {
+        // Update URL to reflect current video
+        if (urlVideoParam !== selectedVideo.secureToken) {
           const newUrl = new URL(window.location);
           newUrl.searchParams.set("video", selectedVideo.secureToken);
           window.history.replaceState({}, "", newUrl.toString());
@@ -331,14 +233,14 @@ function LMSContent() {
         setRetryCount(0);
       } catch (err) {
         console.error("Fetch error:", err);
-        // Handle other errors if needed
+        // You can enhance error handling here if needed
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [isOnline, courseId, token, devToolsOpen]);
+  }, [isOnline, courseId, token]);
 
   const handleVideoClick = (video) => {
     setCurrentVideo(video);
@@ -352,10 +254,10 @@ function LMSContent() {
 
   const handleRetry = () => {
     setRetryCount((prev) => prev + 1);
-    window.location.reload(); // Force refresh on retry if needed
+    window.location.reload();
   };
 
-  // === RENDERING LOGIC (same as before, with devtools error added) ===
+  // === RENDERING ===
 
   if (loading || userLoading) {
     return (
@@ -382,47 +284,6 @@ function LMSContent() {
             </button>
             <button onClick={() => window.history.back()} className="px-8 py-3 bg-secondary rounded-lg font-medium ml-3">
               Go Back
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    const Icon = error.icon || AlertTriangle;
-    const title =
-      error.type === "network" ? "Connection Error" :
-      error.type === "auth" ? "Access Denied" :
-      error.type === "devtools" ? "Security Alert" :
-      "Error";
-
-    return (
-      <div className="flex h-screen items-center justify-center bg-background p-4">
-        <div className="bg-card rounded-2xl shadow-2xl p-8 max-w-md w-full text-center border">
-          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Icon className="w-10 h-10 text-destructive" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">{title}</h2>
-          <p className="text-muted-foreground mb-6">{error.message}</p>
-          <div className="space-y-3">
-            {error.type !== "devtools" && (error.type === "network" || error.type === "timeout" || error.type === "server") && (
-              <button onClick={handleRetry} className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg">
-                <RefreshCw className="w-5 h-5" /> Retry
-              </button>
-            )}
-            {error.type === "auth" && (
-              <button onClick={() => (window.location.href = "/login")} className="w-full px-6 py-3 bg-primary text-white rounded-lg">
-                Go to Login
-              </button>
-            )}
-            {(error.type === "devtools") && (
-              <button onClick={() => window.location.reload()} className="w-full px-6 py-3 bg-primary text-white rounded-lg">
-                Refresh Page
-              </button>
-            )}
-            <button onClick={() => (window.location.href = "/")} className="w-full px-6 py-3 bg-secondary rounded-lg">
-              Go to Home
             </button>
           </div>
         </div>
@@ -471,7 +332,13 @@ function LMSContent() {
       )}
 
       <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
-        <Sidebar videos={videos} currentVideo={currentVideo} batch={batch} onVideoClick={handleVideoClick} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          videos={videos}
+          currentVideo={currentVideo}
+          batch={batch}
+          onVideoClick={handleVideoClick}
+          onClose={() => setSidebarOpen(false)}
+        />
       </aside>
 
       <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50">
@@ -496,7 +363,7 @@ function LMSContent() {
         </header>
 
         <div className="w-full bg-black aspect-video max-h-[70vh] relative">
-          {currentVideo && !devToolsOpen && (
+          {currentVideo && (
             <VideoPlayer
               video={currentVideo}
               playableUrl={playableUrl}
@@ -504,19 +371,9 @@ function LMSContent() {
               isLive={isLive}
               viewerCount={viewerCount}
               token={token}
+                user={user}
               userId={userId}
             />
-          )}
-
-          {/* Optional: Extra black overlay if DevTools open */}
-          {devToolsOpen && (
-            <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-              <div className="text-white text-center p-8">
-                <AlertTriangle className="w-16 h-16 mx-auto mb-4" />
-                <p className="text-xl font-bold">Access Blocked</p>
-                <p className="text-sm mt-2">Close Developer Tools and refresh.</p>
-              </div>
-            </div>
           )}
         </div>
 
@@ -541,7 +398,14 @@ function LMSContent() {
 
           <div className="flex-1">
             {activeTab === "live" ? (
-              <LiveChat user={user} videoId={currentVideo?.id} userId={userId} visible={true} onLiveCountChange={setLiveCount} inline={true} />
+              <LiveChat
+                user={user}
+                videoId={currentVideo?.id}
+                userId={userId}
+                visible={true}
+                onLiveCountChange={setLiveCount}
+                inline={true}
+              />
             ) : (
               <div className="p-4">
                 <CommentsSection video={currentVideo} userId={userId} token={token} />

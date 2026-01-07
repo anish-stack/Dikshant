@@ -14,12 +14,42 @@ import { useSettings } from "../../hooks/useSettings";
 
 const MIN_LOADING_TIME = 3500;
 
+const injectedConsoleJS = `
+(function () {
+  if (window.__consoleInjected) return;
+  window.__consoleInjected = true;
+
+  function send(type, args) {
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        type,
+        message: Array.from(args).map(a =>
+          typeof a === 'object' ? JSON.stringify(a) : String(a)
+        ).join(' ')
+      })
+    );
+  }
+
+  console.log = function () {
+    send('log', arguments);
+  };
+
+  console.warn = function () {
+    send('warn', arguments);
+  };
+
+  console.error = function () {
+    send('error', arguments);
+  };
+})();
+true;
+`;
+
 const PlayerScreen = ({ route }) => {
   const { settings } = useSettings();
   const { video, batchId, userId, token, courseId } = route.params || {};
 
-  const playerUrl = `${settings?.playerUrl || "https://www.player.dikshantias.com/" || "http://192.168.1.4:5173/"
-    }?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
+  const playerUrl = `${"https://www.player.dikshantias.com/"}?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
 
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
@@ -90,17 +120,28 @@ const PlayerScreen = ({ route }) => {
           <WebView
             ref={webViewRef}
             source={{ uri: playerUrl }}
-            javaScriptEnabled
-            domStorageEnabled
-            allowsFullscreenVideo
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            allowsFullscreenVideo={true}
+            allowsInlineMediaPlayback={true}                    // Crucial for iOS
+            mediaPlaybackRequiresUserAction={false}             // Allows autoplay/unmute on iOS
+            androidLayerType="hardware"                         // Fixes black screen on Android
+            mixedContentMode="compatibility"                    // Helps with HTTP on Android
+            thirdPartyCookiesEnabled={true}
+            injectedJavaScriptBeforeContentLoaded={injectedConsoleJS}
             onLoadEnd={() => setPageLoaded(true)}
-            onError={() => setHasError(true)}
-            onMessage={(e) => {
-              if (e.nativeEvent.data === "VIDEO_READY") {
-                setPageLoaded(true);
-              }
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('WebView error: ', nativeEvent);
+              setHasError(true);
             }}
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              console.warn('HTTP error: ', nativeEvent.statusCode);
+            }}
+            onMessage={(event) => { /* your existing handler */ }}
           />
+
         )}
 
         {/* 🔥 LOADER + SKELETON */}

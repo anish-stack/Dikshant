@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect, useRef, useState } from "react"
@@ -21,13 +22,14 @@ import {
   Settings,
   Gauge,
 } from "lucide-react"
+import VideoWatermark from "./VideoWatermark"
 
 export default function VideoPlayer({
   video,
   playableUrl,
   videoSource,
   isLive,
-  durationSet,
+  user,
   viewerCount,
   onReady,
   token,
@@ -179,6 +181,7 @@ const getVideoId = () => {
       }
     }
   }, [playableUrl, videoSource])
+  
 
   useEffect(() => {
     if (!playerReady || videoSource !== "youtube") return
@@ -198,6 +201,7 @@ const getVideoId = () => {
     return () => clearTimeout(timeout)
   }, [playerReady, videoSource])
 
+  
   useEffect(() => {
   if (playableUrl && videoSource === "youtube") {
     console.log("Playable URL received:", playableUrl);
@@ -258,7 +262,8 @@ const getVideoId = () => {
         playsinline: 1,
         enablejsapi: 1,
         iv_load_policy: 3,
-        mute: 1, // Mute by default for autoplay
+        mute: 1, 
+        origin: window.location.origin,
       },
       events: {
         onReady: (event) => {
@@ -290,6 +295,28 @@ const getVideoId = () => {
     })
   }
 
+
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (!playerRef.current) return
+
+    if (document.hidden) {
+      console.log("[v0] Tab hidden – pausing video")
+      playerRef.current.pauseVideo()
+    } else {
+      console.log("[v0] Tab visible – resuming video")
+      playerRef.current.playVideo()
+    }
+  }
+
+  document.addEventListener("visibilitychange", handleVisibilityChange)
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibilityChange)
+  }
+}, [])
+
+
   useEffect(() => {
     if (!playerReady || videoSource !== "youtube") return
 
@@ -301,7 +328,6 @@ const getVideoId = () => {
           setCurrentTime(time)
           if (dur > 0) {
             setProgress((time / dur) * 100)
-            durationSet(dur)
             setDuration(dur)
 
             const videoId = getVideoId()
@@ -410,16 +436,20 @@ const getVideoId = () => {
   }
 
   const fullscreen = () => {
-    const playerElement = document.getElementById("yt-player")
-    if (playerElement) {
-      if (playerElement.requestFullscreen) {
-        playerElement.requestFullscreen()
-      } else if (playerElement.webkitRequestFullscreen) {
-        playerElement.webkitRequestFullscreen()
-      } else if (playerElement.mozRequestFullScreen) {
-        playerElement.mozRequestFullScreen()
-      } else if (playerElement.msRequestFullscreen) {
-        playerElement.msRequestFullscreen()
+    const container = document.querySelector('.relative.w-full.h-full.bg-black')
+    if (container) {
+      if (container.requestFullscreen) {
+        container.requestFullscreen()
+        // Auto-rotate on fullscreen
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {})
+        }
+      } else if (container.webkitRequestFullscreen) {
+        container.webkitRequestFullscreen()
+      } else if (container.mozRequestFullScreen) {
+        container.mozRequestFullScreen()
+      } else if (container.msRequestFullscreen) {
+        container.msRequestFullscreen()
       }
     }
   }
@@ -647,11 +677,27 @@ const getVideoId = () => {
       {/* YouTube Player Container */}
       <div className="relative w-full h-full">
         <div id="yt-player" className="absolute inset-0 w-full h-full" />
-        {/* Overlay for touch controls */}
+<VideoWatermark
+  userId={`${user?.name}+${new Date().toLocaleTimeString()}+${user.id}`}
+/>
+        {/* 🔐 SECURITY OVERLAY - BLOCKS ALL YOUTUBE PLAYER INTERACTIONS */}
         <div 
-          onClick={togglePlayPause}
-          className="absolute inset-0 pointer-events-none"
+          className="absolute inset-0 w-full h-full z-40"
+          onClick={(e) => {
+            e.stopPropagation()
+            togglePlayPause(e)
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            return false
+          }}
+          style={{
+            cursor: "pointer",
+            pointerEvents: "auto"
+          }}
         />
+        
       </div>
 
       {/* Custom Controls */}
@@ -662,7 +708,7 @@ const getVideoId = () => {
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative z-10 space-y-3 sm:space-y-4 pointer-events-auto">
+        <div className="relative z-50 space-y-3 sm:space-y-4 pointer-events-auto">
           {/* Progress Bar */}
           <div className="px-1 sm:px-2">
             <input
@@ -768,9 +814,13 @@ const getVideoId = () => {
           </div>
         </div>
 
+        {/* 🔐 BLOCK YOUTUBE UI ELEMENTS */}
+        <div className="absolute top-0 left-0 right-0 h-16 z-45 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-12 z-45 pointer-events-none" />
+
         {/* Live Badge */}
         {isLive && (
-          <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 rounded-full text-white text-xs sm:text-sm font-semibold shadow-lg">
+          <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 rounded-full text-white text-xs sm:text-sm font-semibold shadow-lg z-50">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
             <span>LIVE</span>
             {viewerCount > 0 && (
@@ -783,7 +833,6 @@ const getVideoId = () => {
           </div>
         )}
       </div>
-
       {showComments && (
         <div
           className="absolute right-0 top-0 bottom-0 w-full lg:w-96 bg-black/95 backdrop-blur-lg border-l border-gray-800"

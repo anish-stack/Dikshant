@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import * as Haptics from "expo-haptics";
 import YoutubePlayer from "react-native-youtube-iframe";
 import WebView from "react-native-webview";
+import axios from "axios";
+import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
+import { useAuthStore } from "../../stores/auth.store";
 const { width } = Dimensions.get("window");
 
 // Updated color scheme
@@ -128,12 +131,14 @@ export default function CourseDetail() {
   const [webHeight, setWebHeight] = useState(0);
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
   const TAB_BAR_HEIGHT = isGestureNavigation ? 72 : 56;
-
+  const { token } = useAuthStore()
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
   const [currentVideo, setCurrentVideo] = useState(null);
   const [playing, setPlaying] = useState(false);
+  const [isCourseAlreadyPurchased, setIsCourseAlreadyPurchased] = useState(false)
+  const [AlreadyPurchased, setAlreadyPurchased] = useState(null)
 
   // Fetch batch details
   const {
@@ -162,6 +167,50 @@ export default function CourseDetail() {
       return [];
     }
   }, [videosResponse]);
+
+
+  const FetchCourseAlreadyPurchased = async () => {
+    try {
+      console.log("🔍 Checking if batch already purchased:", batchId);
+
+      const response = await axios.get(
+        `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
+        {
+          params: {
+            type: "batch",
+            itemId: batchId,
+          },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("✅ Purchase Check Response:", response.data);
+
+      if (response.data?.purchased) {
+         setAlreadyPurchased(response.data)
+        setIsCourseAlreadyPurchased(true);
+      } else {
+                 setAlreadyPurchased(null)
+
+        setIsCourseAlreadyPurchased(false);
+      }
+
+    } catch (error) {
+      console.error(
+        "🔥 Error checking purchase status:",
+        error?.response?.data || error.message
+      );
+      setIsCourseAlreadyPurchased(false);
+    }
+  };
+
+  useEffect(() => {
+    FetchCourseAlreadyPurchased()
+  }, [batchId])
+
+
 
   const { demoVideos, lockedVideos } = useMemo(() => {
     try {
@@ -405,8 +454,8 @@ export default function CourseDetail() {
                 androidLayerType="hardware"
                 nestedScrollEnabled={true}
                 source={{ html: htmlContent }}
-                style={{ height: 450 }}    
-                scrollEnabled={true}   
+                style={{ height: 450 }}
+                scrollEnabled={true}
                 showsVerticalScrollIndicator={true}
               />
             </View>
@@ -624,31 +673,58 @@ export default function CourseDetail() {
       </ScrollView>
 
       {/* Fixed Enroll Button */}
-      <View
-        style={[
-          styles.enrollContainer,
-          {
-            height: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
-            paddingBottom: isGestureNavigation ? insets.bottom : 0,
-          },
-        ]}
-      >
-        <View style={styles.enrollPriceInfo}>
-          <Text style={styles.enrollPriceLabel}>Total Price</Text>
-          <Text style={styles.enrollPriceValue}>
-            ₹{formatCurrency(finalPrice ?? 0)}
-          </Text>
-        </View>
+      {isCourseAlreadyPurchased ? (
+        <View
+          style={[
+            styles.enrollContainer,
+            {
 
-        <TouchableOpacity
-          style={styles.enrollButton}
-          onPress={handleEnrollPress}
-          activeOpacity={0.9}
+              height: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
+              paddingBottom: isGestureNavigation ? insets.bottom : 0,
+            },
+          ]}
         >
-          <Text style={styles.enrollButtonText}>Enroll Now</Text>
-          <Feather name="arrow-right" size={20} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+
+
+          <TouchableOpacity
+            style={styles.enrollButton}
+            onPress={() => navigation.navigate("my-course", {
+              unlocked: isCourseAlreadyPurchased,
+              courseId:batchId || AlreadyPurchased?.orderId,
+            })}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.enrollButtonText}>View Course</Text>
+            <Feather name="arrow-right" size={20} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.enrollContainer,
+            {
+              height: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
+              paddingBottom: isGestureNavigation ? insets.bottom : 0,
+            },
+          ]}
+        >
+          <View style={styles.enrollPriceInfo}>
+            <Text style={styles.enrollPriceLabel}>Total Price</Text>
+            <Text style={styles.enrollPriceValue}>
+              ₹{formatCurrency(finalPrice ?? 0)}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.enrollButton}
+            onPress={handleEnrollPress}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.enrollButtonText}>Enroll Now</Text>
+            <Feather name="arrow-right" size={20} color={colors.white} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Video Modal */}
       <Modal

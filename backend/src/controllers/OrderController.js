@@ -225,37 +225,59 @@ class OrderController {
       const {
         razorpayOrderId,
         razorpayPaymentId,
-        razorpaySignature
+        razorpaySignature,
       } = req.body;
+
       const order = await Order.findOne({ where: { razorpayOrderId } });
 
-      if (!order)
+      if (!order) {
         return res.status(404).json({ message: "Order not found" });
+      }
 
+      // ✅ Critical: Payment update
       await order.update({
         razorpayPaymentId,
         razorpaySignature,
         status: "success",
-        paymentDate: new Date()
+        paymentDate: new Date(),
       });
 
-      await NotificationController.createNotification({
-        userId: order.userId,
-        title: "Payment Successful & Enrollment Confirmed",
-        message: `Your payment was successful and you have been enrolled in the course.`,
-        type: "course",
-        relatedId: order.id,
+      // ✅ Non-critical: Notification (isolated)
+      try {
+        await NotificationController.createNotification({
+          userId: order.userId,
+          title: "Payment Successful & Enrollment Confirmed",
+          message: "Your payment was successful and you have been enrolled in the course.",
+          type: "course",
+          relatedId: order.id,
+        });
+      } catch (notifyErr) {
+        console.error("⚠️ Notification failed:", notifyErr);
+        // ❌ DO NOT throw
+      }
+
+      // ✅ Non-critical: Redis cleanup
+      try {
+        await redis.del(`orders:${order.userId}`);
+      } catch (redisErr) {
+        console.error("⚠️ Redis cleanup failed:", redisErr);
+      }
+
+      return res.json({
+        success: true,
+        message: "Payment verified",
+        order,
+        relatedId: order.itemId,
       });
-
-      await redis.del(`orders:${order.userId}`);
-
-      return res.json({ success: true, message: "Payment verified", order });
 
     } catch (e) {
-      console.log(e);
-      return res.status(500).json({ message: "Payment verification failed", e });
+      console.error("❌ Payment verification failed:", e);
+      return res.status(500).json({
+        message: "Payment verification failed",
+      });
     }
   }
+
 
   // USER ORDERS
   static async userOrders(req, res) {
@@ -267,7 +289,6 @@ class OrderController {
           userId,
           status: "success",
         },
-
         order: [["createdAt", "DESC"]],
       });
 
@@ -348,6 +369,69 @@ class OrderController {
     } catch (e) {
       console.log(e);
       return res.status(500).json({ message: "Error fetching order", e });
+    }
+  }
+
+
+  static async alreadyPurchased(req, res) {
+    console.log("🟡 ALREADY PURCHASED API HIT");
+    console.log("➡️ QUERY:", req.query);
+    console.log("➡️ USER:", req.user?.id);
+
+    try {
+      const userId = req.user?.id || req.query.userId;
+      const { itemId, type } = req.query;
+
+      console.log("📦 Parsed Fields:", { userId, itemId, type });
+
+      if (!userId || !itemId || !type) {
+        console.warn("❌ Missing required fields");
+        return res.status(400).json({
+          success: false,
+          message: "userId, itemId and type are required",
+        });
+      }
+
+      console.log("🔍 Checking successful order in DB...");
+
+      const order = await Order.findOne({
+        where: {
+          userId,
+          itemId,
+          type,
+          status: "success", 
+        },
+      });
+      console.log("✅ Already Purchased:", order);
+      if (order) {
+        console.log("✅ Already Purchased:", order.id);
+        return res.json({
+          success: true,
+          purchased: true,
+          orderId: order.id,
+          paymentDate: order.paymentDate,
+          totalAmount: order.totalAmount,
+          couponCode: order.couponCode,
+        });
+      }
+
+      console.log("ℹ️ Not Purchased Yet");
+
+      return res.json({
+        success: true,
+        purchased: false,
+      });
+
+    } catch (error) {
+      console.error("🔥 ALREADY PURCHASED ERROR FULL:", {
+        message: error.message,
+        stack: error.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to check purchase status",
+      });
     }
   }
 
