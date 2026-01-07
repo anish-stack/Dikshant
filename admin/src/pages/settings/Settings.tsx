@@ -41,15 +41,14 @@ interface Message {
   text: string;
 }
 
-const API_GET_URL = 'http://localhost:5001/api/appsettings';
-const API_SAVE_URL = 'http://localhost:5001/api/appsettings';
+const API_GET_URL = 'https://www.dikapi.olyox.in/api/appsettings';
+const API_SAVE_URL = 'https://www.dikapi.olyox.in/api/appsettings';
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [savingFields, setSavingFields] = useState<Record<string, boolean>>({});
   const [message, setMessage] = useState<Message | null>(null);
-  const [extraInput, setExtraInput] = useState<string>('{}');
 
   useEffect(() => {
     fetchSettings();
@@ -63,12 +62,7 @@ const Settings: React.FC = () => {
       if (response.data && response.data.length > 0) {
         const data = response.data[0];
         setSettings(data);
-        try {
-          const parsed = JSON.parse(data.extra || '{}');
-          setExtraInput(JSON.stringify(parsed, null, 2));
-        } catch {
-          setExtraInput('{}');
-        }
+        
       }
     } catch (error) {
       const err = error as AxiosError<{ message?: string }>;
@@ -125,14 +119,7 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleExtraSave = (): void => {
-    try {
-      JSON.parse(extraInput); // Validate JSON
-      saveField('extra', extraInput.trim());
-    } catch {
-      setMessage({ type: 'error', text: 'Invalid JSON format in Extra Config' });
-    }
-  };
+
 
   if (loading) {
     return (
