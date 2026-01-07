@@ -5,7 +5,7 @@ const auth = require("../middleware/auth");
 const role = require('../middleware/role');
 
 router.get("/allOrderss", auth, ctrl.allOrders);
-router.post("/", auth, ctrl.createOrder);
+router.post("/", ctrl.createOrder);
 router.post("/verify", ctrl.verifyPayment);
 router.get("/user/:userId", ctrl.userOrders);
 router.get("/:orderId", auth, ctrl.getOrderById);
