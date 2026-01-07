@@ -200,9 +200,16 @@ export default function VideoList({
         courseId: String(courseId),
       }).toString();
 
-      const url = `https://www.player.dikshantias.com/?${params}`;
+      // const url = `https://www.player.dikshantias.com/?${params}`;
 
-      await Linking.openURL(url);
+      // await Linking.openURL(url);
+      navigation.navigate("PlayerScreen", {
+        video: video.secureToken,
+        batchId: video?.batchId ?? "",
+        userId: String(userId),
+        token,
+        courseId: String(courseId),
+      })
 
       // 💬 Join live chat
       if (socket && video.isLive && !video.isEnded && userId) {
@@ -480,7 +487,7 @@ export default function VideoList({
       <View style={styles.headerContainer}>
         <Text style={styles.mainTitle}>📚 All Lectures</Text>
 
-        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos',{id:courseId,token,userId})}>
+        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId })}>
           <Text style={styles.viewAllText}>View All </Text>
         </TouchableOpacity>
       </View>

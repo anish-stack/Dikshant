@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Menu, WifiOff, AlertTriangle, RefreshCw, Shield } from "lucide-react";
 import Sidebar from "./sidebar";

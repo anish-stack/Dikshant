@@ -1,4 +1,6 @@
 import { NavigationContainer } from "@react-navigation/native";
+import { usePreventScreenCapture } from 'expo-screen-capture';
+
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import useFontStyle from "./hooks/useFontLoad";
 import Splash from "./screens/splash/splash";
@@ -9,7 +11,7 @@ import Signup from "./screens/auth/Signup";
 import CourseDetail from "./screens/courses/CourseDetail";
 import Course from "./screens/courses/Courses";
 import CoursePage from "./screens/courses/CoursePage";
-import { Text, TextInput, Alert, AppState ,StyleSheet} from "react-native";
+import { Text, TextInput, Alert, AppState, StyleSheet } from "react-native";
 import EBooks from "./pages/Books/EBooks";
 import TestScreen from "./screens/Tests/Tests";
 import QuesAndScreen from "./screens/Tests/QuesAndScreen";
@@ -52,6 +54,7 @@ import { SocketProvider } from "./context/SocketContext";
 import { colors } from "./constant/color";
 import AnnouncementDetails from "./components/AnnouncementDetails";
 import ViewAllVideos from "./pages/CourseComponets/ViewAllVideos";
+import PlayerScreen from "./screens/PlayerScreen/PlayerScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +71,7 @@ ExpoNotifications.setNotificationHandler({
 setupBackgroundNotifications();
 
 export default function App() {
+  usePreventScreenCapture();
   const fontsLoaded = useFontStyle();
   const [fcmToken, setFcmToken] = useState(null);
   const [notificationData, setNotificationData] = useState(null);
@@ -79,7 +83,7 @@ export default function App() {
   const navigationRef = useRef();
   const [isDevOptionsEnabled, setIsDevOptionsEnabled] = useState(false);
   const [showDevWarning, setShowDevWarning] = useState(false);
-  const { token ,user } = useAuthStore();
+  const { token, user } = useAuthStore();
 
 
   const linking = {
@@ -304,7 +308,7 @@ export default function App() {
 
   const checkDeveloperOptions = async () => {
     const enabled = await isDeveloperOptionsEnabled();
-    console.log("Dev Mode",enabled)
+    console.log("Dev Mode", enabled)
     setIsDevOptionsEnabled(enabled);
 
     if (enabled && !showDevWarning) {
@@ -329,42 +333,42 @@ export default function App() {
     return null;
   }
   if (isDevOptionsEnabled) {
-  return (
-    <Modal
-      visible={showDevWarning}
-      transparent
-      animationType="fade"
-      onRequestClose={() => setShowDevWarning(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.warningCard}>
-          <Text style={styles.warningIcon}>⚠️</Text>
-          <Text style={styles.warningTitle}>Developer Options Enabled</Text>
-          <Text style={styles.warningMessage}>
-            आपने अपने फोन में Developer Options ऑन कर रखा है।{"\n\n"}
-            यह ऐप की security और performance को प्रभावित कर सकता है।{"\n\n"}
-            कृपया इसे बंद कर दें:
-          </Text>
+    return (
+      <Modal
+        visible={showDevWarning}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDevWarning(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.warningCard}>
+            <Text style={styles.warningIcon}>⚠️</Text>
+            <Text style={styles.warningTitle}>Developer Options Enabled</Text>
+            <Text style={styles.warningMessage}>
+              आपने अपने फोन में Developer Options ऑन कर रखा है।{"\n\n"}
+              यह ऐप की security और performance को प्रभावित कर सकता है।{"\n\n"}
+              कृपया इसे बंद कर दें:
+            </Text>
 
-          <View style={styles.steps}>
-            <Text style={styles.stepText}>1. Settings → About Phone</Text>
-            <Text style={styles.stepText}>2. Build Number पर 7 बार टैप करें (बंद करने के लिए)</Text>
-            <Text style={styles.stepText}>3. Developer Options को ऑफ करें</Text>
+            <View style={styles.steps}>
+              <Text style={styles.stepText}>1. Settings → About Phone</Text>
+              <Text style={styles.stepText}>2. Build Number पर 7 बार टैप करें (बंद करने के लिए)</Text>
+              <Text style={styles.stepText}>3. Developer Options को ऑफ करें</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowDevWarning(false)}
+            >
+              <Text style={styles.closeButtonText}>समझ गया, बंद करूंगा</Text>
+            </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowDevWarning(false)}
-          >
-            <Text style={styles.closeButtonText}>समझ गया, बंद करूंगा</Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
-  );
-}
+      </Modal>
+    );
+  }
 
-  
+
 
   // Apply Geist font globally
   Text.defaultProps = Text.defaultProps || {};
@@ -375,50 +379,51 @@ export default function App() {
 
   return (
     <SocketProvider userId={user?.id}>
-    <NavigationContainer ref={navigationRef} linking={linking}>
-      <StatusBar style="auto" />
-      <Stack.Navigator
-        initialRouteName="Splash"
-        screenOptions={{
-          headerShown: false,
-          animation: "slide_from_right",
-        }}
-      >
-        <Stack.Screen name="Splash" component={Splash} />
-        <Stack.Screen name="Login" component={Login} />
-        <Stack.Screen name="Signup" component={Signup} />
-        <Stack.Screen name="Home" component={Home} />
+      <NavigationContainer ref={navigationRef} linking={linking}>
+        <StatusBar style="auto" />
+        <Stack.Navigator
+          initialRouteName="Splash"
+          screenOptions={{
+            headerShown: false,
+            animation: "slide_from_right",
+          }}
+        >
+          <Stack.Screen name="Splash" component={Splash} />
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="Signup" component={Signup} />
+          <Stack.Screen name="Home" component={Home} />
 
-        <Stack.Screen name="ShareApp" component={ShareAppScreen} />
-        <Stack.Screen name="RateUs" component={RateUsScreen} />
-        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-        <Stack.Screen name="view-all-videos" component={ViewAllVideos} />
+          <Stack.Screen name="ShareApp" component={ShareAppScreen} />
+          <Stack.Screen name="RateUs" component={RateUsScreen} />
+          <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+          <Stack.Screen name="view-all-videos" component={ViewAllVideos} />
 
-{/* */}
-        <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+          {/* PlayerScreen*/}
+          <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
 
-        <Stack.Screen name="CourseDetail" component={CourseDetail} />
-        <Stack.Screen name="Courses" component={CoursePage} />
-        <Stack.Screen name="enroll-course" component={EnrollCourse} />
-        <Stack.Screen name="my-course" component={MyEnrollCourse} />
-        <Stack.Screen name="annouce-details" component={AnnouncementDetails}/>
-        <Stack.Screen name="EBooks" component={EBooks} />
-        <Stack.Screen name="Quiz" component={TestScreen} />
-        <Stack.Screen name="startQuz" component={QuesAndScreen} />
-        <Stack.Screen name="Profile" component={Profile} />
-        <Stack.Screen name="Downloads" component={Downloads} />
-        <Stack.Screen name="RecordedCourses" component={RecordedCourses} />
-        <Stack.Screen name="TestSeries" component={TestSeries} />
-        <Stack.Screen name="Settings" component={Settings} />
-        <Stack.Screen name="Support" component={HelpSupport} />
-        <Stack.Screen name="About" component={About} />
-        <Stack.Screen name="Notifications" component={Notifications} />
-        <Stack.Screen name="Permissions" component={PermissionsScreen} />
-        <Stack.Screen name="apply-sch" component={Scholarship} />
-        <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
-      </Stack.Navigator>
-    </NavigationContainer>
-    
+          <Stack.Screen name="CourseDetail" component={CourseDetail} />
+          <Stack.Screen name="Courses" component={CoursePage} />
+          <Stack.Screen name="enroll-course" component={EnrollCourse} />
+          <Stack.Screen name="my-course" component={MyEnrollCourse} />
+          <Stack.Screen name="annouce-details" component={AnnouncementDetails} />
+          <Stack.Screen name="EBooks" component={EBooks} />
+          <Stack.Screen name="Quiz" component={TestScreen} />
+          <Stack.Screen name="startQuz" component={QuesAndScreen} />
+          <Stack.Screen name="Profile" component={Profile} />
+          <Stack.Screen name="Downloads" component={Downloads} />
+          <Stack.Screen name="RecordedCourses" component={RecordedCourses} />
+          <Stack.Screen name="TestSeries" component={TestSeries} />
+          <Stack.Screen name="Settings" component={Settings} />
+          <Stack.Screen name="Support" component={HelpSupport} />
+          <Stack.Screen name="About" component={About} />
+          <Stack.Screen name="Notifications" component={Notifications} />
+          <Stack.Screen name="Permissions" component={PermissionsScreen} />
+          <Stack.Screen name="apply-sch" component={Scholarship} />
+          <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
+        </Stack.Navigator>
+      </NavigationContainer>
+
     </SocketProvider>
 
   );

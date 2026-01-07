@@ -37,8 +37,9 @@ import StudnetsJoined from "./pages/Courses/Coures/StudnetsJoined";
 import StudentChats from "./pages/Courses/Coures/StudentChats";
 import ViewComments from "./pages/Courses/Coures/ViewComments";
 import SendNotification from "./pages/Notifications/SendNotification";
+import Settings from "./pages/settings/Settings";
 
-export default function App(){
+export default function App() {
   return (
     <>
       <Router>
@@ -85,8 +86,7 @@ export default function App(){
               />
 
               {/* end-notification */}
-              <Route path="/send-notification"element={<SendNotification />} />
-
+              <Route path="/send-notification" element={<SendNotification />} />
 
               {/* Subjects */}
               <Route path="/all-subject" element={<AllSubject />} />
@@ -98,13 +98,19 @@ export default function App(){
 
               {/* Banners */}
               <Route path="/app-baners" element={<Banner />} />
+{/* settings */}
+              <Route path="/setting" element={<Settings />} />
 
-              <Route path="/view-studnets-joined/:id" element={<StudnetsJoined />} />
+
+              <Route
+                path="/view-studnets-joined/:id"
+                element={<StudnetsJoined />}
+              />
               <Route path="/view-chat/:id" element={<StudentChats />} />
-              <Route path="/view-comments-joined/:id" element={<ViewComments />} />
-
-
-
+              <Route
+                path="/view-comments-joined/:id"
+                element={<ViewComments />}
+              />
 
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />
@@ -121,14 +127,14 @@ export default function App(){
         </Routes>
       </Router>
 
-<Toaster
-  position="top-right"
-  toastOptions={{
-    style: {
-      zIndex: 999999999999,
-    },
-  }}
-/>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            zIndex: 999999999999,
+          },
+        }}
+      />
     </>
   );
 }

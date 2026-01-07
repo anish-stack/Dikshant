@@ -8,7 +8,7 @@ router.get("/", ctrl.findAll);
 router.get("/:key", ctrl.findOne);
 
 router.post("/", auth, role(["admin"]), ctrl.save);
-router.put("/", auth, role(["admin"]), ctrl.save);   // same create/update
+router.put("/", auth, role(["admin"]), ctrl.save);  
 router.delete("/:id", auth, role(["admin"]), ctrl.delete);
 
 module.exports = router;

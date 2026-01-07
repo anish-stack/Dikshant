@@ -5,35 +5,104 @@ const redis = require("../config/redis");
 
 class AppSettingController {
 
+static async save(req, res) {
+  try {
+    const { key, value } = req.body;
 
-  // CREATE or UPDATE SETTING
-  static async save(req, res) {
-    try {
-      const { key, value } = req.body;
+    console.log("Received:", { key, value });
 
-      if (!key) return res.status(400).json({ message: "Key is required" });
+    if (!key) {
+      return res.status(400).json({ message: "Key is required" });
+    }
 
-      let setting = await AppSetting.findOne({ where: { key } });
+    // Fetch the single settings row
+    const setting = await AppSetting.findOne();
 
-      if (setting) {
-        await setting.update({ value });
-      } else {
-        setting = await AppSetting.create({ key, value });
-      }
+    if (!setting) {
+      return res.status(404).json({ message: "App settings row not found" });
+    }
 
+    // Map frontend key → model attribute (camelCase)
+    // These must EXACTLY match your model's defined attributes
+    const attributeMap = {
+      appName: "appName",
+      appVersion: "appVersion",
+      maintenanceMode: "maintenanceMode",
+      maintenanceMessage: "maintenanceMessage",
+      enableQuiz: "enableQuiz",
+      enableTestSeries: "enableTestSeries",
+      enableScholarship: "enableScholarship",
+      enableOffers: "enableOffers",
+      pushNotificationsEnabled: "pushNotificationsEnabled",
+      playStoreUrl: "playStoreUrl",
+      webSiteUrl: "webSiteUrl",
+      appStoreUrl: "appStoreUrl",
+      privacyPolicyUrl: "privacyPolicyUrl",
+      termsUrl: "termsUrl",
+      supportEmail: "supportEmail",
+      supportPhone: "supportPhone",
+      supportWhatsapp: "supportWhatsapp",
+      paymentsEnabled: "paymentsEnabled",
+      androidMinVersion: "androidMinVersion",
+      androidLatestVersion: "androidLatestVersion",
+      androidForceUpdate: "androidForceUpdate",
+      androidUpdateMessage: "androidUpdateMessage",
+      iosMinVersion: "iosMinVersion",
+      iosLatestVersion: "iosLatestVersion",
+      iosForceUpdate: "iosForceUpdate",
+      iosUpdateMessage: "iosUpdateMessage",
+      forceUpdatePlatform: "forceUpdatePlatform",
+      forceUpdate: "forceUpdate",
+      updateMessage: "updateMessage",
+      extra: "extra",
+    };
+
+    const attribute = attributeMap[key];
+
+    if (!attribute) {
+      return res.status(400).json({ message: `Invalid key: ${key}` });
+    }
+
+    // Use the model attribute name (camelCase)
+    const updateData = { [attribute]: value };
+
+    console.log("Updating with:", updateData); // ← Debug this!
+
+    const [affectedCount] = await AppSetting.update(updateData, {
+      where: { id: setting.id }, // or just { id: 6 } if fixed
+    });
+
+    // OR use instance.update() and force it
+    // await setting.update(updateData);
+
+    if (affectedCount === 0) {
+      console.log("No rows updated — possible value didn't change or field mismatch");
+    }
+
+    // Clear cache
+    const redis = req.app.get('redis');
+    if (redis) {
       await redis.del("appsettings");
       await redis.del(`appsettings:${key}`);
-
-      return res.json(setting);
-
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Error saving setting", error });
     }
+
+    return res.json({
+      success: true,
+      message: "Setting updated successfully",
+      key,
+      value,
+      updatedAttribute: attribute,
+      affectedRows: affectedCount
+    });
+
+  } catch (error) {
+    console.error("Error in save setting:", error);
+    return res.status(500).json({
+      message: "Error saving setting",
+      error: error.message
+    });
   }
-
-
-
+}
   // GET ALL SETTINGS
   static async findAll(req, res) {
     try {

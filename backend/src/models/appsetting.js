@@ -7,6 +7,10 @@ module.exports = (sequelize, DataTypes) => {
         autoIncrement: true,
         primaryKey: true,
       },
+      playerUrl: {
+        type: DataTypes.STRING(5000),
+        allowNull: true,
+      },
 
       // 🔧 App Meta
       appName: {
@@ -64,7 +68,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
 
-        webSiteUrl: {
+      webSiteUrl: {
         type: DataTypes.STRING,
         allowNull: true,
       },
@@ -183,7 +187,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       tableName: "appsettings",
-    timestamps: false,
+      timestamps: false,
       underscored: true,
     }
   );

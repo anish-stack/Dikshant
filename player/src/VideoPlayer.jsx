@@ -61,66 +61,89 @@ export default function VideoPlayer({
   const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
   const API_BASE = "https://www.dikapi.olyox.in/api"
 
-  // 🔐 Extract video ID from DECRYPTED playableUrl (not from video.url)
-  const getVideoId = () => {
-    if (!playableUrl) return null
+const getVideoId = () => {
+  if (!playableUrl) return null;
 
-    // For YouTube URLs
-    if (videoSource === "youtube") {
-      try {
-        const url = new URL(playableUrl)
+  let cleanUrl = playableUrl.trim();
 
-        // youtu.be/VIDEO_ID
-        if (url.hostname.includes("youtu.be")) {
-          return url.pathname.slice(1)
-        }
+  // Step 1: Remove < > brackets if present (your backend adds them)
+  if (cleanUrl.startsWith("<") && cleanUrl.endsWith(">")) {
+    cleanUrl = cleanUrl.slice(1, -1).trim();
+  }
 
-        // youtube.com/watch?v=VIDEO_ID
-        if (url.searchParams.get("v")) {
-          return url.searchParams.get("v")
-        }
+  console.log("Cleaned URL for ID extraction:", cleanUrl); // Debug this!
 
-        // youtube.com/embed/VIDEO_ID
-        const match = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/)
-        return match ? match[1] : null
-      } catch {
-        // Fallback: try regex on string
-        const match = playableUrl.match(/\/embed\/([a-zA-Z0-9_-]{11})/)
-        return match ? match[1] : null
-      }
+  try {
+    const url = new URL(cleanUrl);
+
+    // Case 1: youtu.be short link
+    if (url.hostname === "youtu.be") {
+      return url.pathname.slice(1).split("?")[0];
     }
 
-    // For S3 or other sources, use video.id
-    return video?.id || null
+    // Case 2: Standard watch?v=
+    if (url.searchParams.has("v")) {
+      return url.searchParams.get("v");
+    }
+
+    // Case 3: /live/VIDEO_ID (new live stream format)
+    const liveMatch = url.pathname.match(/\/live\/([a-zA-Z0-9_-]{11})/);
+    if (liveMatch) {
+      return liveMatch[1];
+    }
+
+    // Case 4: /embed/
+    const embedMatch = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embedMatch) return embedMatch[1];
+
+    // Case 5: Old /v/
+    const vMatch = url.pathname.match(/\/v\/([a-zA-Z0-9_-]{11})/);
+    if (vMatch) return vMatch[1];
+
+  } catch (e) {
+    // If URL() fails, fall back to regex
   }
+
+  // Fallback: Raw regex on cleaned string
+  const regexMatch = cleanUrl.match(/(?:youtube\.com\/live\/|v=|\/embed\/|youtu\.be\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+  if (regexMatch) {
+    return regexMatch[1];
+  }
+
+  console.error("Failed to extract YouTube ID from:", playableUrl);
+  return null;
+};
 
   const saveWatchProgress = (videoId, time) => {
     if (!videoId || time < 5) return
-    const key = `video_progress_${videoId}`
-    localStorage.setItem(
-      key,
-      JSON.stringify({
-        time,
-        timestamp: Date.now(),
-      }),
-    )
+    try {
+      const key = `video_progress_${videoId}`
+      if (typeof window !== 'undefined' && window.storage) {
+        window.storage.set(key, JSON.stringify({ time, timestamp: Date.now() }))
+      }
+    } catch (e) {
+      console.log("Progress save skipped")
+    }
   }
 
   const getWatchProgress = (videoId) => {
     if (!videoId) return 0
-    const key = `video_progress_${videoId}`
-    const saved = localStorage.getItem(key)
-    if (!saved) return 0
     try {
-      const data = JSON.parse(saved)
-      if (Date.now() - data.timestamp > 7 * 24 * 60 * 60 * 1000) {
-        localStorage.removeItem(key)
-        return 0
+      const key = `video_progress_${videoId}`
+      if (typeof window !== 'undefined' && window.storage) {
+        const saved = window.storage.get(key)
+        if (!saved) return 0
+        const data = JSON.parse(saved)
+        if (Date.now() - data.timestamp > 7 * 24 * 60 * 60 * 1000) {
+          window.storage.delete(key)
+          return 0
+        }
+        return data.time
       }
-      return data.time
     } catch {
       return 0
     }
+    return 0
   }
 
   // 🔐 Initialize player ONLY when playableUrl is available
@@ -177,6 +200,17 @@ export default function VideoPlayer({
     return () => clearTimeout(timeout)
   }, [playerReady, videoSource])
 
+  useEffect(() => {
+  if (playableUrl && videoSource === "youtube") {
+    console.log("Playable URL received:", playableUrl);
+    const id = getVideoId();
+    console.log("Extracted YouTube Video ID:", id);
+    if (!id) {
+      console.error("FAILED to extract video ID – player will not load");
+    }
+  }
+}, [playableUrl, videoSource]);
+
   const initPlayer = () => {
     if (!playableUrl) {
       console.error("[v0] No playable URL available")
@@ -217,15 +251,16 @@ export default function VideoPlayer({
     playerRef.current = new window.YT.Player("yt-player", {
       videoId: videoId,
       playerVars: {
-        autoplay: 1, // Ensured autoplay is enabled
+        autoplay: 1,
         controls: 0,
-        disablekb: 0, // Enabled keyboard for better UX
+        disablekb: 0,
         fs: 0,
         rel: 0,
         modestbranding: 1,
-        playsinline: 1, // Important for mobile
+        playsinline: 1,
         enablejsapi: 1,
         iv_load_policy: 3,
+        mute: 1, // Mute by default for autoplay
       },
       events: {
         onReady: (event) => {
@@ -239,7 +274,15 @@ export default function VideoPlayer({
             event.target.seekTo(savedTime, true)
           }
 
-          event.target.playVideo()
+          // Auto play on ready
+         setTimeout(() => {
+            event.target.playVideo()
+            event.target.unMute() // Unmute automatically
+            event.target.setVolume(100) // Set volume to max
+            setPlaying(true)
+            setMuted(false)
+          }, 500)   
+
           if (onReady) onReady(event)
         },
         onStateChange: (event) => {
@@ -283,12 +326,15 @@ export default function VideoPlayer({
     return () => clearInterval(interval)
   }, [playerReady, currentQuality, videoSource])
 
-  const togglePlayPause = () => {
+  const togglePlayPause = (e) => {
+    e?.stopPropagation()
     if (!playerRef.current) return
     if (playing) {
       playerRef.current.pauseVideo()
+      setPlaying(false)
     } else {
       playerRef.current.playVideo()
+      setPlaying(true)
     }
   }
 
@@ -387,7 +433,7 @@ export default function VideoPlayer({
 
   // Load Comments from API
   const loadComments = async () => {
-    const videoId = video?.id // Use video.id for comments
+    const videoId = video?.id
     if (!videoId || !token) return
 
     setLoading(true)
@@ -511,11 +557,11 @@ export default function VideoPlayer({
   const CommentItem = ({ comment, isReply = false }) => (
     <div className={`${isReply ? "ml-8 border-l-2 border-gray-700 pl-4" : ""} py-3`}>
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
           {comment.author?.[0] || comment.userId?.[0] || "U"}
         </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-white font-semibold text-sm">
               {comment.author || comment.userName || "Anonymous"}
             </span>
@@ -523,13 +569,13 @@ export default function VideoPlayer({
               {new Date(comment.timestamp || comment.createdAt).toLocaleDateString()}
             </span>
           </div>
-          <p className="text-gray-200 text-sm mb-2">{comment.text}</p>
-          <div className="flex items-center gap-4">
+          <p className="text-gray-200 text-sm mb-2 break-words">{comment.text}</p>
+          <div className="flex items-center gap-4 flex-wrap">
             <button
               onClick={() => handleToggleLike(comment.id || comment._id, isReply, comment.parentId)}
               className="flex items-center gap-1 text-gray-400 hover:text-red-500 transition-colors"
             >
-              <Heart className={`w-4 h-4 ${comment.isLikedByUser ? "fill-red-500 text-red-500" : ""}`} />
+              <Heart className={`w-4 h-4 flex-shrink-0 ${comment.isLikedByUser ? "fill-red-500 text-red-500" : ""}`} />
               <span className="text-xs">{comment.likes || 0}</span>
             </button>
             {!isReply && comment.userId !== userId && (
@@ -587,7 +633,7 @@ export default function VideoPlayer({
 
   return (
     <div
-      className="relative w-full h-full bg-black group touch-none" // Added touch-none for custom controls handling
+      className="relative w-full h-full bg-black group touch-none"
       onMouseMove={() => {
         setShowControls(true)
         clearTimeout(window.controlTimeout)
@@ -601,24 +647,26 @@ export default function VideoPlayer({
       onContextMenu={handleContextMenu}
     >
       {/* YouTube Player Container */}
-      <div onClick={togglePlayPause} className="relative w-full h-full pointer-events-none">
+      <div className="relative w-full h-full">
         <div id="yt-player" className="absolute inset-0 w-full h-full" />
+        {/* Overlay for touch controls */}
+        <div 
+          onClick={togglePlayPause}
+          className="absolute inset-0 pointer-events-none"
+        />
       </div>
-
 
       {/* Custom Controls */}
       <div
-       onClick={togglePlayPause} 
-        className={`absolute inset-0 flex flex-col justify-end p-4 lg:p-8 transition-opacity duration-300 ${
+        className={`absolute inset-0 flex flex-col justify-end p-2 sm:p-4 lg:p-8 transition-opacity duration-300 pointer-events-none ${
           showControls ? "opacity-100" : "opacity-0"
         }`}
-       
       >
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative z-10 space-y-4">
+        <div className="relative z-10 space-y-3 sm:space-y-4 pointer-events-auto">
           {/* Progress Bar */}
-          <div className="px-2">
+          <div className="px-1 sm:px-2">
             <input
               type="range"
               min="0"
@@ -628,53 +676,59 @@ export default function VideoPlayer({
               onChange={handleProgressChange}
               className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
             />
-            <div className="flex justify-between text-white text-xs mt-2">
+            <div className="flex justify-between text-white text-xs mt-1 sm:mt-2">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
           {/* Control Buttons */}
-          <div className="flex items-center justify-between gap-1">
-            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+          <div className="flex items-center justify-between gap-1 sm:gap-2">
+            <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2 flex-shrink-0 flex-wrap">
               <button
                 onClick={() => seek(-30)}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors hidden sm:block"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors hidden sm:block"
+                title="Rewind 30s"
               >
                 <SkipBack className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
               <button
                 onClick={() => seek(-10)}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                title="Rewind 10s"
               >
                 <RotateCcw className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
               <button
                 onClick={togglePlayPause}
-                className="p-2 lg:p-3 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                className="p-2 sm:p-2 lg:p-3 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                title={playing ? "Pause" : "Play"}
               >
                 {playing ? <Pause className="w-5 h-5 lg:w-6 lg:h-6" /> : <Play className="w-5 h-5 lg:w-6 lg:h-6" />}
               </button>
               <button
                 onClick={() => seek(10)}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                title="Forward 10s"
               >
                 <RotateCw className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
               <button
                 onClick={() => seek(30)}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors hidden sm:block"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors hidden sm:block"
+                title="Forward 30s"
               >
                 <SkipForward className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
               <button
                 onClick={toggleMute}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors ml-1 hidden sm:block"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors ml-0.5 sm:ml-1 hidden sm:block"
+                title={muted ? "Unmute" : "Mute"}
               >
                 {muted ? <VolumeX className="w-4 h-4 lg:w-5 lg:h-5" /> : <Volume2 className="w-4 h-4 lg:w-5 lg:h-5" />}
               </button>
             </div>
-            <div className="flex items-center gap-1 lg:gap-2 flex-shrink-0">
+            <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2 flex-shrink-0">
               {/* Speed Control */}
               <div className="relative">
                 <button
@@ -682,18 +736,19 @@ export default function VideoPlayer({
                     setShowSpeedMenu(!showSpeedMenu)
                     setShowQualityMenu(false)
                   }}
-                  className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors flex items-center gap-1"
+                  className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors flex items-center gap-1"
+                  title="Playback speed"
                 >
                   <Gauge className="w-4 h-4 lg:w-5 lg:h-5" />
                   <span className="text-xs hidden sm:inline">{playbackSpeed}x</span>
                 </button>
                 {showSpeedMenu && (
-                  <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-lg rounded-lg border border-gray-700 overflow-hidden">
+                  <div className="absolute bottom-full right-0 mb-2 bg-black/95 backdrop-blur-lg rounded-lg border border-gray-700 overflow-hidden z-50">
                     {speedOptions.map((speed) => (
                       <button
                         key={speed}
                         onClick={() => changeSpeed(speed)}
-                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-white/10 transition-colors ${
+                        className={`block w-full text-left px-3 sm:px-4 py-2 text-sm hover:bg-white/10 transition-colors ${
                           playbackSpeed === speed ? "text-blue-400 bg-white/5" : "text-white"
                         }`}
                       >
@@ -704,12 +759,10 @@ export default function VideoPlayer({
                 )}
               </div>
 
-
-
-             
               <button
                 onClick={fullscreen}
-                className="p-1.5 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                className="p-1.5 sm:p-2 lg:p-2 hover:bg-white/20 rounded-lg text-white transition-colors"
+                title="Fullscreen"
               >
                 <Maximize className="w-4 h-4 lg:w-5 lg:h-5" />
               </button>
@@ -719,7 +772,7 @@ export default function VideoPlayer({
 
         {/* Live Badge */}
         {isLive && (
-          <div className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 bg-red-600 rounded-full text-white text-sm font-semibold shadow-lg">
+          <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 rounded-full text-white text-xs sm:text-sm font-semibold shadow-lg">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
             <span>LIVE</span>
             {viewerCount > 0 && (
@@ -733,7 +786,6 @@ export default function VideoPlayer({
         )}
       </div>
 
-      {/* Comments Panel */}
       {showComments && (
         <div
           className="absolute right-0 top-0 bottom-0 w-full lg:w-96 bg-black/95 backdrop-blur-lg border-l border-gray-800"

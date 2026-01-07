@@ -184,7 +184,7 @@ export default function EnrollCourse() {
         description: `Enrollment for ${batchData?.name}`,
         image: "https://www.dikshantias.com/_next/image?url=https%3A%2F%2Fdikshantiasnew-web.s3.ap-south-1.amazonaws.com%2Fweb%2F1757750048833-e5243743-d7ec-40f6-950d-849cd31d525f-dikshant-logo.png&w=384&q=75",
         currency: "INR",
-        key: "rzp_test_Rl73ooMti6EjJ7",
+        key: "rzp_live_1SWl87h7M6UCNY",
         amount: razorOrder.amount,
         name: "Dikshant IAS",
         order_id: razorOrder.id,
