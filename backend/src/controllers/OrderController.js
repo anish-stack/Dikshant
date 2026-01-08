@@ -218,6 +218,77 @@ class OrderController {
       });
     }
   }
+  static async adminReverseAssignCourse(req, res) {
+  try {
+    const { userId, orderId, reason } = req.body;
+
+    if (!userId || !orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and orderId are required"
+      });
+    }
+
+    // 🔍 Find only ADMIN assigned order
+    const order = await Order.findOne({
+      where: {
+        id: orderId,
+        userId,
+        enrollmentStatus: "active"
+      }
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Active admin assigned course not found"
+      });
+    }
+
+    // ❌ Safety: Paid orders should not be reversed
+    if (order.amount > 0) {
+      return res.status(403).json({
+        success: false,
+        message: "Paid orders cannot be reversed by admin"
+      });
+    }
+
+    // 🔁 Reverse assignment
+    await order.update({
+      enrollmentStatus: "cancelled",
+      status: "failed",
+      reason: reason || "ADMIN_REVERSED"
+    });
+
+    // 🔔 Notify user
+    await NotificationController.createNotification({
+      userId,
+      title: "Course Access Revoked",
+      message: "Your course access has been revoked by the administrator.",
+      type: "course",
+      relatedId: order.id
+    });
+
+    // 🧹 Clear Redis cache
+    await redis.del(`orders:${userId}`);
+    await redis.del(`user:courses:${userId}`);
+
+    return res.json({
+      success: true,
+      message: "Course access revoked successfully",
+      order
+    });
+
+  } catch (error) {
+    console.error("ADMIN REVERSE ASSIGN ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to revoke course",
+      error: error.message
+    });
+  }
+}
+
 
   // VERIFY PAYMENT
   static async verifyPayment(req, res) {

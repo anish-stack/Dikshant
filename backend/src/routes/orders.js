@@ -13,4 +13,7 @@ router.get("/already-purchased", auth,ctrl.alreadyPurchased);
 router.get("/:orderId", auth, ctrl.getOrderById);
 router.delete("/:orderId", auth, ctrl.deleteOrder);
 router.post('/admin/assign-course', auth, role(["admin"]), ctrl.adminAssignCourse);
+router.post('/admin/reverse-assign-course', auth, role(["admin"]), ctrl.adminReverseAssignCourse);
+
+
 module.exports = router;

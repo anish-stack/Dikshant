@@ -1,5 +1,5 @@
 "use strict";
-const NotificationController = require("./NotificationController"); 
+const NotificationController = require("./NotificationController");
 const { ScholarshipApplication, Scholarship } = require("../models");
 const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
@@ -79,13 +79,13 @@ class ScholarshipApplicationController {
       });
 
 
-       await NotificationController.createNotification({
-      userId,
-      title: "Scholarship Application Submitted",
-      message: `Your application for the "${scholarship.name}" scholarship has been submitted successfully.`,
-      type: "scholarship",
-      relatedId: application.id,
-    });
+      await NotificationController.createNotification({
+        userId,
+        title: "Scholarship Application Submitted",
+        message: `Your application for the "${scholarship.name}" scholarship has been submitted successfully.`,
+        type: "scholarship",
+        relatedId: application.id,
+      });
 
 
       // Invalidate cache
@@ -140,6 +140,39 @@ class ScholarshipApplicationController {
     } catch (error) {
       console.error("listByScholarship error:", error);
       return res.status(500).json({ success: false, message: "Server error" });
+    }
+  }
+
+  static async allScholarshipApply(req, res) {
+    try {
+      const applications = await ScholarshipApplication.findAll({
+        include: [
+          { model: Scholarship, as: "scholarship", attributes: ["name"] },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      if (applications.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No Application Found",
+        });
+      }
+
+      // Return applications
+      return res.status(200).json({
+        success: true,
+        message: "Applications fetched successfully",
+        data: applications,
+      });
+
+    } catch (error) {
+      console.error("Error fetching scholarship applications:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Something went wrong",
+        error: error.message,
+      });
     }
   }
 

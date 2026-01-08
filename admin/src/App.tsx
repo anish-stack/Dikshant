@@ -38,6 +38,8 @@ import StudentChats from "./pages/Courses/Coures/StudentChats";
 import ViewComments from "./pages/Courses/Coures/ViewComments";
 import SendNotification from "./pages/Notifications/SendNotification";
 import Settings from "./pages/settings/Settings";
+import ScholarshipApply from "./pages/scholarship/ScholarshipApply";
+import Scholarship from "./pages/scholarship/Scholarship";
 
 export default function App() {
   return (
@@ -62,6 +64,8 @@ export default function App() {
               {/* Tables */}
               <Route path="/basic-tables" element={<BasicTables />} />
 
+
+
               {/* UI */}
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/avatars" element={<Avatars />} />
@@ -84,6 +88,10 @@ export default function App() {
                 path="/all-courses/add-video/:id"
                 element={<CourseVideos />}
               />
+
+              {/* scholarship-apply */}
+              <Route path="/scholarship-apply" element={<ScholarshipApply />} />
+              <Route path="/scholarship" element={<Scholarship />} />
 
               {/* end-notification */}
               <Route path="/send-notification" element={<SendNotification />} />

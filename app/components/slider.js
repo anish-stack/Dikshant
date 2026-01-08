@@ -82,11 +82,7 @@ export default function Slider({refreshing}) {
       style={styles.slide}
     >
       <Image source={{ uri: item.imageUrl }} style={styles.image} resizeMode="cover" />
-      {item.title ? (
-        <View style={styles.textOverlay}>
-          <Text style={styles.titleText}>{item.title}</Text>
-        </View>
-      ) : null}
+   
     </TouchableOpacity>
   );
 
@@ -165,21 +161,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  textOverlay: {
-    position: "absolute",
-    bottom: 8,
-    left: 12,
-    right: 12,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  titleText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+
   pagination: {
     position: "absolute",
     bottom: 16,
@@ -190,8 +172,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dot: {
-    width: 9,
-    height: 9,
+    width: 4,
+    height: 4,
     borderRadius: 5,
     marginHorizontal: 5,
   },

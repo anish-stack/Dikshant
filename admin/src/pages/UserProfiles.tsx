@@ -23,6 +23,7 @@ import {
   Unlock,
   CheckCircle,
   ChevronDown,
+  X,
 } from "lucide-react";
 import Input from "../components/form/input/InputField";
 import Button from "../components/ui/button/Button";
@@ -49,8 +50,9 @@ interface Batch {
 interface Course {
   id: number;
   title: string;
-  batch?: Batch; // optional, kyunki batch null/undefined ho sakta hai
+  batch?: Batch;
 }
+
 interface User {
   id: number;
   name: string;
@@ -81,7 +83,6 @@ interface BatchResponse {
   items: Batch[];
 }
 
-// Predefined reasons for quick selection
 const ASSIGNMENT_REASONS = [
   "Scholarship Student",
   "Free Trial",
@@ -106,6 +107,8 @@ export default function UserProfiles() {
   const [isAssignCourseOpen, setIsAssignCourseOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isConfirmAssignOpen, setIsConfirmAssignOpen] = useState(false);
+  const [isReverseAssignOpen, setIsReverseAssignOpen] = useState(false);
+  const [isConfirmReverseOpen, setIsConfirmReverseOpen] = useState(false);
 
   // Course assignment states
   const [batches, setBatches] = useState<Batch[]>([]);
@@ -115,6 +118,11 @@ export default function UserProfiles() {
   const [assignReason, setAssignReason] = useState<string>("");
   const [assignLoading, setAssignLoading] = useState(false);
   const [batchSearchTerm, setBatchSearchTerm] = useState("");
+
+  // Reverse assignment states
+  const [selectedCourseToRemove, setSelectedCourseToRemove] = useState<Course | null>(null);
+  const [reverseReason, setReverseReason] = useState<string>("");
+  const [reverseLoading, setReverseLoading] = useState(false);
 
   const fetchUsers = async (pageNum = 1, search = "", itemsPerPage = limit) => {
     setLoading(true);
@@ -144,7 +152,7 @@ export default function UserProfiles() {
     setLoadingBatches(true);
     try {
       const res = await axios.get<BatchResponse>(`${API_URL}/batchs`, {
-        params: { page: 1, limit: 500 }, // Increased limit to 500
+        params: { page: 1, limit: 500 },
       });
       setBatches(res.data.items);
     } catch (error) {
@@ -194,14 +202,12 @@ export default function UserProfiles() {
         }
       );
 
-      // Update UI
       setUsers((prev) =>
         prev.map((u) =>
           u.id === user.id ? { ...u, is_active: !u.is_active } : u
         )
       );
 
-      // Success toast
       toast.success(
         user.is_active
           ? "User blocked successfully"
@@ -212,7 +218,6 @@ export default function UserProfiles() {
 
       console.error("Failed to toggle block:", error);
 
-      // ❌ No response (network issue)
       if (!error.response) {
         toast.error("Network error. Please check your internet.");
         return;
@@ -220,26 +225,17 @@ export default function UserProfiles() {
 
       const { status, data } = error.response;
 
-      // ❌ Auth error
       if (status === 401) {
         toast.error("Unauthorized. Please login again.");
-      }
-      // ❌ Forbidden
-      else if (status === 403) {
+      } else if (status === 403) {
         toast.error(
           data?.message || "You are not allowed to perform this action"
         );
-      }
-      // ❌ User not found
-      else if (status === 404) {
+      } else if (status === 404) {
         toast.error("User not found");
-      }
-      // ❌ Server error
-      else if (status >= 500) {
+      } else if (status >= 500) {
         toast.error("Server error. Please try again later.");
-      }
-      // ❌ Custom backend message
-      else {
+      } else {
         toast.error(data?.message || "Failed to update user status");
       }
     }
@@ -262,21 +258,17 @@ export default function UserProfiles() {
         },
       });
 
-      // ✅ Update UI
       setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
 
       toast.success("User deleted successfully");
 
-      // ✅ Reset selection & close modal
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
     } catch (err) {
-      // ✅ Type-safe error
       const error = err as AxiosError<{ error?: string }>;
 
       console.error("Failed to delete user:", error);
 
-      // ❌ Network / no response
       if (!error.response) {
         toast.error("Network error. Please check your internet.");
         return;
@@ -284,7 +276,6 @@ export default function UserProfiles() {
 
       const { status, data } = error.response;
 
-      // ❌ Handle different status codes
       switch (status) {
         case 401:
           toast.error("Unauthorized. Please login again.");
@@ -359,7 +350,6 @@ export default function UserProfiles() {
 
       fetchUsers(page, searchTerm, limit);
     } catch (err) {
-      // ✅ Type-safe error handling
       const error = err as AxiosError<{ message?: string }>;
 
       console.error("Failed to assign course:", error);
@@ -400,6 +390,102 @@ export default function UserProfiles() {
     }
   };
 
+  const openReverseAssignModal = (user: User) => {
+    setSelectedUser(user);
+    setIsReverseAssignOpen(true);
+  };
+
+  const handleReverseAssignCourse = async () => {
+    if (!selectedUser || !selectedCourseToRemove) {
+      toast.error("Please select a course to remove");
+      return;
+    }
+
+    setReverseLoading(true);
+
+    try {
+      const token = localStorage.getItem("accessToken");
+
+      if (!token) {
+        toast.error("Session expired. Please login again.");
+        return;
+      }
+
+      await axios.post(
+        `${API_URL}/orders/admin/reverse-assign-course`,
+        {
+          userId: selectedUser.id,
+          orderId: selectedCourseToRemove.id,
+          reason: reverseReason || "Admin Removal",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      toast.success("Course removed successfully");
+
+      setIsConfirmReverseOpen(false);
+      setIsReverseAssignOpen(false);
+      setSelectedCourseToRemove(null);
+      setReverseReason("");
+
+      fetchUsers(page, searchTerm, limit);
+    }catch (err) {
+  const error = err as AxiosError<{ message?: string }>;
+
+  console.error("Failed to remove course:", error.response?.data);
+
+  // 🌐 Network / No response
+  if (!error.response) {
+    const msg = "Network error. Please check your internet.";
+    toast.error(msg);
+    alert(msg);
+    return;
+  }
+
+  const { status, data } = error.response;
+
+  let message = "Failed to remove course";
+
+  switch (status) {
+    case 401:
+      message = "Unauthorized. Please login again.";
+      break;
+
+    case 403:
+      message = data?.message || "You are not allowed to remove courses";
+      break;
+
+    case 404:
+      message = data?.message || "User or course not found";
+      break;
+
+    case 409:
+      message = data?.message || "Cannot remove course";
+      break;
+
+    default:
+      if (status >= 500) {
+        message = "Server error. Please try again later.";
+      } else {
+        message = data?.message || message;
+      }
+      break;
+  }
+
+  // 🔔 Toast + Alert
+  toast.error(message);
+  alert(message);
+
+} finally {
+  setReverseLoading(false);
+}
+
+  };
+
   const filteredBatches = batches.filter(
     (batch) =>
       batch.name.toLowerCase().includes(batchSearchTerm.toLowerCase()) ||
@@ -424,7 +510,6 @@ export default function UserProfiles() {
           </h3>
 
           <div className="flex items-center gap-3">
-            {/* Items per page selector */}
             <div className="relative">
               <select
                 value={limit}
@@ -441,7 +526,6 @@ export default function UserProfiles() {
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
@@ -595,6 +679,7 @@ export default function UserProfiles() {
                           year: "numeric",
                         })}
                       </TableCell>
+
                       <TableCell className="px-2 py-2">
                         <div className="flex items-center justify-center gap-1">
                           <Button
@@ -602,15 +687,29 @@ export default function UserProfiles() {
                             variant="outline"
                             className="p-1 flex items-center justify-center"
                             onClick={() => openAssignModal(user)}
+                          
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
+
+                          {user.courses.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="p-1 flex items-center justify-center"
+                              onClick={() => openReverseAssignModal(user)}
+                            
+                            >
+                              <X className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
 
                           <Button
                             size="sm"
                             variant="outline"
                             className="p-1 flex items-center justify-center"
                             onClick={() => handleToggleBlock(user)}
+                         
                           >
                             {user.is_active ? (
                               <Lock className="w-4 h-4" />
@@ -627,6 +726,7 @@ export default function UserProfiles() {
                               setSelectedUser(user);
                               setIsDeleteModalOpen(true);
                             }}
+                           
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -639,7 +739,6 @@ export default function UserProfiles() {
             </Table>
           </div>
 
-          {/* Pagination */}
           {!loading && users.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-white/[0.05] gap-4">
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -778,7 +877,6 @@ export default function UserProfiles() {
         title={`Assign Course to ${selectedUser?.name}`}
       >
         <div className="space-y-4">
-          {/* Search Batch */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
@@ -790,7 +888,6 @@ export default function UserProfiles() {
             />
           </div>
 
-          {/* Batch List */}
           <div className="max-h-96 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
             {loadingBatches ? (
               <div className="text-center py-8 text-gray-500">
@@ -841,7 +938,6 @@ export default function UserProfiles() {
             )}
           </div>
 
-          {/* Additional Fields */}
           <div className="space-y-3 pt-2">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -875,7 +971,6 @@ export default function UserProfiles() {
                 Assignment Reason
               </label>
 
-              {/* Quick select buttons */}
               <div className="flex flex-wrap gap-2 mb-3">
                 {ASSIGNMENT_REASONS.map((reason) => (
                   <button
@@ -894,7 +989,6 @@ export default function UserProfiles() {
                 ))}
               </div>
 
-              {/* Custom input */}
               <Input
                 type="text"
                 value={assignReason}
@@ -965,6 +1059,149 @@ export default function UserProfiles() {
             </Button>
             <Button onClick={handleAssignCourse} disabled={assignLoading}>
               {assignLoading ? "Assigning..." : "Confirm Assignment"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Remove Course Modal */}
+      <Modal
+        isOpen={isReverseAssignOpen}
+        onClose={() => {
+          setIsReverseAssignOpen(false);
+          setSelectedCourseToRemove(null);
+          setReverseReason("");
+        }}
+        title={`Remove Course from ${selectedUser?.name}`}
+      >
+        <div className="space-y-4">
+          {selectedUser?.courses && selectedUser.courses.length > 0 ? (
+            <>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select a course to remove:
+              </p>
+              <div className="space-y-2 max-h-96 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                {selectedUser.courses.map((course) => {
+                  const batch = course?.batch;
+                  const hasValidBatch = batch && batch?.name;
+
+                  return (
+                    <div
+                      key={course.id}
+                      onClick={() => setSelectedCourseToRemove(course)}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-2 transition-all
+                        ${
+                          selectedCourseToRemove?.id === course.id
+                            ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                        }`}
+                    >
+                      {batch?.imageUrl && (
+                        <img
+                          src={batch.imageUrl}
+                          alt={batch?.name}
+                          className="w-12 h-12 rounded-md object-cover"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white text-sm">
+                          {batch?.name || "N/A"}
+                        </p>
+                        {hasValidBatch && (
+                          <p className="text-xs text-gray-500">
+                            {batch?.program?.name}
+                          </p>
+                        )}
+                      </div>
+                      {selectedCourseToRemove?.id === course.id && (
+                        <CheckCircle className="w-5 h-5 text-red-500" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Removal Reason */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reason for Removal
+                </label>
+                <Input
+                  type="text"
+                  value={reverseReason}
+                  onChange={(e) => setReverseReason(e.target.value)}
+                  placeholder="e.g., Request by Student, Duplicate Enrollment, Policy Violation..."
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-500 py-10">
+              No courses to remove.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsReverseAssignOpen(false);
+                setSelectedCourseToRemove(null);
+                setReverseReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedCourseToRemove}
+              onClick={() => setIsConfirmReverseOpen(true)}
+            >
+              Proceed to Remove
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Confirm Remove Course Modal */}
+      <Modal
+        isOpen={isConfirmReverseOpen}
+        onClose={() => setIsConfirmReverseOpen(false)}
+        title="Confirm Course Removal"
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 p-4 border border-red-200 dark:border-red-800">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              <strong>Student:</strong> {selectedUser?.name}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              <strong>Course:</strong>{" "}
+              {selectedCourseToRemove?.batch?.name || "N/A"}
+            </p>
+            {reverseReason && (
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                <strong>Reason:</strong> {reverseReason}
+              </p>
+            )}
+          </div>
+
+          <p className="text-sm text-red-600 dark:text-red-400">
+            This will remove the course access from the student. They will no
+            longer be able to view course materials.
+          </p>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmReverseOpen(false)}
+              disabled={reverseLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleReverseAssignCourse}
+              disabled={reverseLoading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {reverseLoading ? "Removing..." : "Remove Course"}
             </Button>
           </div>
         </div>

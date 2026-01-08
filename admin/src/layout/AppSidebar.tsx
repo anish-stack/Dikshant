@@ -11,7 +11,7 @@ import {
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-import { Bell, ImageDown, Speaker } from "lucide-react";
+import { Bell, ImageDown, School2, Speaker } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -73,6 +73,14 @@ const navItems: NavItem[] = [
       { name: "About Us Page", path: "/about-us", pro: false },
       { name: "Privacy Policy", path: "/privacy-policy", pro: false },
       { name: "Terms & Condition", path: "/term-and-condition", pro: false },
+    ],
+  },
+  {
+    name: "Scholarship",
+    icon: <School2 />,
+    subItems: [
+      { name: "Scholarship", path: "/scholarship", pro: false },
+      { name: "Scholarship Apply", path: "/scholarship-apply", pro: false },
     ],
   },
 ];

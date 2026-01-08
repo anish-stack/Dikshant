@@ -71,7 +71,7 @@ ExpoNotifications.setNotificationHandler({
 setupBackgroundNotifications();
 
 export default function App() {
-  // usePreventScreenCapture();
+  usePreventScreenCapture();
   const fontsLoaded = useFontStyle();
   const [fcmToken, setFcmToken] = useState(null);
   const [notificationData, setNotificationData] = useState(null);

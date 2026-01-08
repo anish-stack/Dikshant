@@ -1,4 +1,4 @@
-import React,{useEffect} from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,14 +12,16 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import useSWR from "swr";
+import axios from "axios";
 import { fetcher } from "../../constant/fetcher";
 import { useNavigation } from "@react-navigation/native";
+import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
+import { useAuthStore } from "../../stores/auth.store";
 
 const { width } = Dimensions.get("window");
 const CARD_MARGIN = 12;
-const RECORDED_CARD_WIDTH = width * 0.72;
-
 const CARD_WIDTH = width * 0.72;
+
 // === Horizontal Section Component ===
 const HorizontalSection = ({
   title,
@@ -108,10 +110,13 @@ const HorizontalSection = ({
   );
 };
 
-const CourseCard = ({ item: batch, navigation }) => {
+const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
   const imageUrl = batch.imageUrl;
   const startDate = batch.startDate ? new Date(batch.startDate) : null;
-  const endDate = batch.endDate ? new Date(batch.endDate) : null;
+  
+  // Check if this course is purchased
+  const purchaseData = purchasedCourses[batch.id];
+  const isPurchased = !!purchaseData;
 
   // Calculate discount percentage
   const discountPercent = batch.batchPrice && batch.batchDiscountPrice
@@ -129,12 +134,20 @@ const CourseCard = ({ item: batch, navigation }) => {
   };
 
   const handlePress = () => {
-    navigation.navigate("CourseDetail", {
-      courseId: batch.id,
-      batchData: batch,
-    });
+    if (isPurchased) {
+      // Navigate to my-course if already purchased
+      navigation.navigate("my-course", {
+        unlocked: true,
+        courseId:batch.id,
+      });
+    } else {
+      // Navigate to course detail if not purchased
+      navigation.navigate("CourseDetail", {
+        courseId: batch.id,
+        batchData: batch,
+      });
+    }
   };
-
 
   return (
     <TouchableOpacity
@@ -155,13 +168,20 @@ const CourseCard = ({ item: batch, navigation }) => {
           </View>
         </View>
 
-        {/* Discount Badge */}
-        {discountPercent > 0 && (
-          <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>{discountPercent}% OFF</Text>
+        {/* Subscribed Badge - Top Priority */}
+        {isPurchased ? (
+          <View style={styles.subscribedBadge}>
+            <Feather name="check-circle" size={12} color="#ffffff" />
+            <Text style={styles.subscribedText}>SUBSCRIBED</Text>
           </View>
+        ) : (
+          /* Discount Badge - Only show if not subscribed */
+          discountPercent > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountText}>{discountPercent}% OFF</Text>
+            </View>
+          )
         )}
-
       </View>
 
       {/* Content Section */}
@@ -195,16 +215,23 @@ const CourseCard = ({ item: batch, navigation }) => {
 
         {/* Footer */}
         <View style={styles.cardFooter}>
-          <View style={styles.priceContainer}>
-            {batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
-              <>
-                <Text style={styles.originalPrice}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
-                <Text style={styles.discountPrice}>₹{batch.batchDiscountPrice.toLocaleString('en-IN')}</Text>
-              </>
-            ) : (
-              <Text style={styles.price}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
-            )}
-          </View>
+          {isPurchased ? (
+            <View style={styles.accessButton}>
+              <Feather name="play-circle" size={16} color="#22c55e" />
+              <Text style={styles.accessButtonText}>Go To ClassRoom</Text>
+            </View>
+          ) : (
+            <View style={styles.priceContainer}>
+              {batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
+                <>
+                  <Text style={styles.originalPrice}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.discountPrice}>₹{batch.batchDiscountPrice.toLocaleString('en-IN')}</Text>
+                </>
+              ) : (
+                <Text style={styles.price}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
+              )}
+            </View>
+          )}
 
           {batch.category && (
             <View style={[
@@ -229,11 +256,11 @@ const CourseCard = ({ item: batch, navigation }) => {
   );
 };
 
-
-// === Main Component ===
-export default function Course({ refreshing }) {
+export default function Course({ refreshing}) {
   const navigation = useNavigation();
-
+  const [purchasedCourses, setPurchasedCourses] = useState({});
+  const [checkingPurchases, setCheckingPurchases] = useState(false);
+  const {token} = useAuthStore()
   // Fetch courses from API
   const { data: coursesResponse, error, isLoading, mutate } = useSWR(
     "/batchs",
@@ -245,11 +272,66 @@ export default function Course({ refreshing }) {
     }
   );
 
-
   const courses = coursesResponse?.items || [];
+
+  // Function to check if courses are purchased
+  const checkPurchaseStatus = async (batchIds) => {
+    if (!token || batchIds.length === 0) return;
+
+    setCheckingPurchases(true);
+    const purchaseMap = {};
+
+    try {
+      // Check purchases in batches or individually
+      const checkPromises = batchIds.map(async (batchId) => {
+        try {
+          const response = await axios.get(
+            `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
+            {
+              params: {
+                type: "batch",
+                itemId: batchId,
+              },
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.data?.purchased) {
+            console.log(response.data)
+            purchaseMap[batchId] = response.data;
+          }
+        } catch (error) {
+          console.error(`Error checking purchase for batch ${batchId}:`, error);
+        }
+      });
+
+      await Promise.all(checkPromises);
+      setPurchasedCourses(purchaseMap);
+    } catch (error) {
+      console.error("Error checking purchase statuses:", error);
+    } finally {
+      setCheckingPurchases(false);
+    }
+  };
+
+  // Check purchase status when courses load
+  useEffect(() => {
+    if (courses.length > 0 && token) {
+      const batchIds = courses.map(course => course.id);
+      checkPurchaseStatus(batchIds);
+    }
+  }, [courses, token]);
+
   useEffect(() => {
     if (refreshing) {
-      mutate(); // SWR को force revalidate करो
+      mutate();
+      // Also refresh purchase status
+      if (courses.length > 0 && token) {
+        const batchIds = courses.map(course => course.id);
+        checkPurchaseStatus(batchIds);
+      }
     }
   }, [refreshing, mutate]);
 
@@ -261,7 +343,6 @@ export default function Course({ refreshing }) {
   const liveCourses = sortedCourses.filter(c => c.category === "online").slice(0, 6);
   const offlineCourses = sortedCourses.filter(c => c.category === "offline").slice(0, 6);
   const recordedCourses = sortedCourses.filter(c => c.category === "recorded").slice(0, 6);
-
 
   // Handle See All navigation
   const handleSeeAll = (courseType) => {
@@ -278,7 +359,14 @@ export default function Course({ refreshing }) {
       <HorizontalSection
         title="Live Courses"
         data={liveCourses}
-        renderItem={({ item }) => <CourseCard item={item} navigation={navigation} />}
+        renderItem={({ item }) => (
+          <CourseCard 
+            item={item} 
+            navigation={navigation} 
+            token={token}
+            purchasedCourses={purchasedCourses}
+          />
+        )}
         keyExtractor={(item) => `online-${item.id}`}
         cardWidth={CARD_WIDTH}
         isLoading={isLoading}
@@ -286,34 +374,47 @@ export default function Course({ refreshing }) {
         onSeeAll={() => handleSeeAll("Online")}
       />
 
-
       {/* Recorded Courses Section */}
       <HorizontalSection
         title="Recorded Courses"
         data={recordedCourses}
-        renderItem={({ item }) => <CourseCard item={item} navigation={navigation} />}
+        renderItem={({ item }) => (
+          <CourseCard 
+            item={item} 
+            navigation={navigation} 
+            token={token}
+            purchasedCourses={purchasedCourses}
+          />
+        )}
         keyExtractor={(item) => `recorded-${item.id}`}
         cardWidth={CARD_WIDTH}
         isLoading={isLoading}
         error={error}
         onSeeAll={() => handleSeeAll("Recorded")}
       />
+
+      {/* Offline Courses Section */}
       <HorizontalSection
         title="Offline Courses"
         data={offlineCourses}
-        renderItem={({ item }) => <CourseCard item={item} navigation={navigation} />}
+        renderItem={({ item }) => (
+          <CourseCard 
+            item={item} 
+            navigation={navigation} 
+            token={token}
+            purchasedCourses={purchasedCourses}
+          />
+        )}
         keyExtractor={(item) => `offline-${item.id}`}
         cardWidth={CARD_WIDTH}
         isLoading={isLoading}
         error={error}
         onSeeAll={() => handleSeeAll("Offline")}
       />
-
-
-
     </ScrollView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -321,41 +422,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 24,
-  },
-
-  // Stats Container
-  statsContainer: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#0f172a",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#64748b",
-    fontWeight: "500",
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: "#e2e8f0",
   },
 
   // Section Styles
@@ -452,42 +518,6 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
   },
 
-  // Global Empty State
-  globalEmptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 80,
-    gap: 12,
-  },
-  globalEmptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginTop: 16,
-  },
-  globalEmptyText: {
-    fontSize: 14,
-    color: "#64748b",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  refreshButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#3b82f6",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 8,
-  },
-  refreshButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-
   // Course Card Styles
   courseCard: {
     marginBottom: 12,
@@ -499,7 +529,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: .69,
+    elevation: 3,
   },
 
   // Image Section
@@ -531,6 +561,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Subscribed Badge (NEW)
+  subscribedBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ef4444",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  subscribedText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#ffffff",
+    letterSpacing: 0.5,
+  },
+
+  // Discount Badge
   discountBadge: {
     position: "absolute",
     top: 12,
@@ -543,30 +595,6 @@ const styles = StyleSheet.create({
   discountText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#ffffff",
-    letterSpacing: 0.5,
-  },
-  statusBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(34, 197, 94, 0.95)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#ffffff",
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: "700",
     color: "#ffffff",
     letterSpacing: 0.5,
   },
@@ -614,6 +642,25 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+
+  // Access Button (NEW)
+  accessButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#f0fdf4",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  accessButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#22c55e",
+    letterSpacing: -0.2,
+  },
+
+  // Price Container
   priceContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -637,6 +684,8 @@ const styles = StyleSheet.create({
     color: "#22c55e",
     letterSpacing: -0.3,
   },
+
+  // Category Tags
   categoryTag: {
     paddingHorizontal: 8,
     paddingVertical: 4,

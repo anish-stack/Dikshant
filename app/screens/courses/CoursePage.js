@@ -13,10 +13,12 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import useSWR from "swr";
+import axios from "axios";
 import { fetcher } from "../../constant/fetcher";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Layout from "../../components/layout";
-import { colors } from "../../constant/color";
+import { useAuthStore } from "../../stores/auth.store";
+import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 36) / 2;
@@ -25,17 +27,69 @@ const LIMIT_OPTIONS = [10, 20, 50];
 
 export default function CoursePage() {
   const navigation = useNavigation();
-  const route = useRoute()
-  const { filter } = route.params || ""
+  const route = useRoute();
+  const { filter } = route.params || {};
+  const {token} = useAuthStore()
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMode, setSelectedMode] = useState(filter ? filter : "all");
   const [priceRange, setPriceRange] = useState("all");
   const [limit, setLimit] = useState(10);
   const [page, setPage] = useState(1);
+  const [purchasedCourses, setPurchasedCourses] = useState({});
+  const [checkingPurchases, setCheckingPurchases] = useState(false);
 
   const { data: response, error, isLoading } = useSWR("/batchs", fetcher);
 
   const batches = useMemo(() => response?.items || [], [response]);
+
+  // Check purchase status for all courses
+  const checkPurchaseStatus = async (batchIds) => {
+    if (!token || batchIds.length === 0) return;
+
+    setCheckingPurchases(true);
+    const purchaseMap = {};
+
+    try {
+      const checkPromises = batchIds.map(async (batchId) => {
+        try {
+          const response = await axios.get(
+            `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
+            {
+              params: {
+                type: "batch",
+                itemId: batchId,
+              },
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.data?.purchased) {
+            purchaseMap[batchId] = response.data;
+          }
+        } catch (error) {
+          console.error(`Error checking purchase for batch ${batchId}:`, error);
+        }
+      });
+
+      await Promise.all(checkPromises);
+      setPurchasedCourses(purchaseMap);
+    } catch (error) {
+      console.error("Error checking purchase statuses:", error);
+    } finally {
+      setCheckingPurchases(false);
+    }
+  };
+
+  // Check purchase status when batches load
+  useEffect(() => {
+    if (batches.length > 0 && token) {
+      const batchIds = batches.map(batch => batch.id);
+      checkPurchaseStatus(batchIds);
+    }
+  }, [batches, token]);
 
   const filteredBatches = useMemo(() => {
     let filtered = [...batches];
@@ -109,16 +163,30 @@ export default function CoursePage() {
       ? Math.round(((originalPrice - price) / originalPrice) * 100)
       : 0;
 
+    // Check if course is purchased
+    const purchaseData = purchasedCourses[item.id];
+    const isPurchased = !!purchaseData;
+
+    const handlePress = () => {
+      if (isPurchased) {
+        // Navigate to my-course if already purchased
+        navigation.navigate("my-course", {
+          unlocked: true,
+          courseId:item.id,
+        });
+      } else {
+        // Navigate to course detail if not purchased
+        navigation.navigate("CourseDetail", {
+          courseId: item.id,
+          batchData: item,
+        });
+      }
+    };
+
     return (
       <TouchableOpacity
         style={styles.card}
-
-        onPress={() =>
-          navigation.navigate("CourseDetail", {
-            courseId: item.id,
-            batchData: item,
-          })
-        }
+        onPress={handlePress}
         activeOpacity={0.8}
       >
         <View style={styles.imageContainer}>
@@ -128,10 +196,19 @@ export default function CoursePage() {
             resizeMode="cover"
           />
 
-          {discountPercent > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{discountPercent}% OFF</Text>
+          {/* Subscribed Badge - Top Priority */}
+          {isPurchased ? (
+            <View style={styles.subscribedBadge}>
+              <Feather name="check-circle" size={10} color="#ffffff" />
+              <Text style={styles.subscribedText}>SUBSCRIBED</Text>
             </View>
+          ) : (
+            /* Discount Badge - Only show if not subscribed */
+            discountPercent > 0 && (
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountText}>{discountPercent}% OFF</Text>
+              </View>
+            )
           )}
 
           <View style={styles.categoryBadge}>
@@ -164,21 +241,28 @@ export default function CoursePage() {
             </View>
           </View>
 
-          <View style={styles.priceRow}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.price}>₹{price.toLocaleString("en-IN")}</Text>
-              {originalPrice && (
-                <Text style={styles.originalPrice}>
-                  ₹{originalPrice.toLocaleString("en-IN")}
-                </Text>
+          {isPurchased ? (
+            <View style={styles.accessButtonSmall}>
+              <Feather name="play-circle" size={12} color="#22c55e" />
+              <Text style={styles.accessButtonTextSmall}>Go To ClassRoom</Text>
+            </View>
+          ) : (
+            <View style={styles.priceRow}>
+              <View style={styles.priceContainer}>
+                <Text style={styles.price}>₹{price.toLocaleString("en-IN")}</Text>
+                {originalPrice && (
+                  <Text style={styles.originalPrice}>
+                    ₹{originalPrice.toLocaleString("en-IN")}
+                  </Text>
+                )}
+              </View>
+              {item.isEmi && (
+                <View style={styles.emiTag}>
+                  <Text style={styles.emiText}>EMI</Text>
+                </View>
               )}
             </View>
-            {item.isEmi && (
-              <View style={styles.emiTag}>
-                <Text style={styles.emiText}>EMI</Text>
-              </View>
-            )}
-          </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -510,6 +594,27 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+
+  // Subscribed Badge (NEW)
+  subscribedBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ef4444",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    gap: 3,
+  },
+  subscribedText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+
   discountBadge: {
     position: "absolute",
     top: 6,
@@ -584,6 +689,24 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#64748b",
   },
+
+  // Access Button Small (NEW)
+  accessButtonSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "#f0fdf4",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  accessButtonTextSmall: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#22c55e",
+  },
+
   priceRow: {
     flexDirection: "row",
     justifyContent: "space-between",

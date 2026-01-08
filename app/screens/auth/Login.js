@@ -451,6 +451,7 @@ export default function Login({ navigation }) {
                               ) : null}
                             </View>
                             <Button
+                            color={"#fff"}
                               title={
                                 isLoading ? "Verifying..." : "Verify & Sign in"
                               }
@@ -747,7 +748,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontFamily: "Geist",
     textAlign: "center",
-    color: "#000000",
+    color: "#fff",
     marginBottom: 8,
   },
   sheetSubtitle: {

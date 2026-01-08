@@ -694,7 +694,7 @@ export default function CourseDetail() {
             })}
             activeOpacity={0.9}
           >
-            <Text style={styles.enrollButtonText}>View Course</Text>
+            <Text style={styles.enrollButtonText}>Go To Class Room</Text>
             <Feather name="arrow-right" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>

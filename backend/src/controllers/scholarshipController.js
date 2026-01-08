@@ -8,45 +8,50 @@ class ScholarshipController {
   // ===============================
   // CREATE SCHOLARSHIP
   // ===============================
-  static async create(req, res) {
-    try {
-      const payload = {
-        name: req.body.name,
-        description: req.body.description || null,
+static async create(req, res) {
+  try {
+    const payload = {
+      name: req.body.name,
+      description: req.body.description || null,
+      applyStatus: req.body.applyStatus || "UPCOMING",
 
-        applyStatus: req.body.applyStatus || "UPCOMING",
+      // Ensure category is stored as an array
+      category: Array.isArray(req.body.category)
+        ? req.body.category
+        : typeof req.body.category === "string"
+        ? JSON.parse(req.body.category)
+        : null,
 
-        // category can be array or object → JSON
-        // example: ["GEN", "SC"]
-        category: req.body.category || null,
+      // Ensure offeredCourseIds is an array
+      offeredCourseIds: Array.isArray(req.body.offeredCourseIds)
+        ? req.body.offeredCourseIds
+        : typeof req.body.offeredCourseIds === "string"
+        ? JSON.parse(req.body.offeredCourseIds)
+        : null,
 
-        // example: [1, 3, 5]
-        offeredCourseIds: req.body.offeredCourseIds || null,
+      discountPercentage: req.body.discountPercentage ?? 100,
+      noOfQuestions: req.body.noOfQuestions || 0,
+      duration: req.body.duration || 0,
+    };
 
-        discountPercentage: req.body.discountPercentage ?? 100,
+    const scholarship = await Scholarship.create(payload);
 
-        noOfQuestions: req.body.noOfQuestions || 0,
-        duration: req.body.duration || 0
-      };
+    await redis.del("scholarships"); // Clear cache if any
 
-      const scholarship = await Scholarship.create(payload);
-
-      await redis.del("scholarships");
-
-      return res.status(201).json({
-        success: true,
-        data: scholarship
-      });
-
-    } catch (error) {
-      console.error("❌ Create Scholarship Error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Error creating scholarship",
-        error: error.message
-      });
-    }
+    return res.status(201).json({
+      success: true,
+      data: scholarship,
+    });
+  } catch (error) {
+    console.error("❌ Create Scholarship Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error creating scholarship",
+      error: error.message,
+    });
   }
+}
+
 
   // ===============================
   // GET ALL SCHOLARSHIPS
@@ -105,49 +110,65 @@ class ScholarshipController {
   // ===============================
   // UPDATE SCHOLARSHIP
   // ===============================
-  static async update(req, res) {
-    try {
-      const { id } = req.params;
+static async update(req, res) {
+  try {
+    const { id } = req.params;
 
-      const scholarship = await Scholarship.findByPk(id);
-      if (!scholarship) {
-        return res.status(404).json({
-          success: false,
-          message: "Scholarship not found"
-        });
-      }
-
-      await scholarship.update({
-        name: req.body.name ?? scholarship.name,
-        description: req.body.description ?? scholarship.description,
-
-        applyStatus: req.body.applyStatus ?? scholarship.applyStatus,
-        category: req.body.category ?? scholarship.category,
-        offeredCourseIds: req.body.offeredCourseIds ?? scholarship.offeredCourseIds,
-
-        discountPercentage:
-          req.body.discountPercentage ?? scholarship.discountPercentage,
-
-        noOfQuestions: req.body.noOfQuestions ?? scholarship.noOfQuestions,
-        duration: req.body.duration ?? scholarship.duration
-      });
-
-      await redis.del("scholarships");
-      await redis.del(`scholarship:${id}`);
-
-      return res.json({
-        success: true,
-        data: scholarship
-      });
-
-    } catch (error) {
-      console.error("❌ Update Scholarship Error:", error);
-      return res.status(500).json({
+    const scholarship = await Scholarship.findByPk(id);
+    if (!scholarship) {
+      return res.status(404).json({
         success: false,
-        message: "Error updating scholarship"
+        message: "Scholarship not found",
       });
     }
+
+    // Prepare update payload safely
+    const payload = {
+      name: req.body.name ?? scholarship.name,
+      description: req.body.description ?? scholarship.description,
+      applyStatus: req.body.applyStatus ?? scholarship.applyStatus,
+
+      // Ensure category is an array
+      category: Array.isArray(req.body.category)
+        ? req.body.category
+        : typeof req.body.category === "string"
+        ? JSON.parse(req.body.category)
+        : scholarship.category,
+
+      // Ensure offeredCourseIds is an array
+      offeredCourseIds: Array.isArray(req.body.offeredCourseIds)
+        ? req.body.offeredCourseIds
+        : typeof req.body.offeredCourseIds === "string"
+        ? JSON.parse(req.body.offeredCourseIds)
+        : scholarship.offeredCourseIds,
+
+      discountPercentage:
+        req.body.discountPercentage ?? scholarship.discountPercentage,
+
+      noOfQuestions: req.body.noOfQuestions ?? scholarship.noOfQuestions,
+      duration: req.body.duration ?? scholarship.duration,
+    };
+
+    await scholarship.update(payload);
+
+    // Clear cache
+    await redis.del("scholarships");
+    await redis.del(`scholarship:${id}`);
+
+    return res.json({
+      success: true,
+      data: scholarship,
+    });
+  } catch (error) {
+    console.error("❌ Update Scholarship Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error updating scholarship",
+      error: error.message,
+    });
   }
+}
+
 
   // ===============================
   // DELETE SCHOLARSHIP
