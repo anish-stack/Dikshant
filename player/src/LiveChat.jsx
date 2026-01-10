@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { MessageCircle, Users, X, Send } from "lucide-react"
+import { MessageCircle, Users, X, Send, AlertCircle } from "lucide-react"
 import { useSocket } from "./context/socket"
 
 export default function LiveChat({
@@ -11,37 +11,94 @@ export default function LiveChat({
   visible,
   onClose,
   onLiveCountChange,
-  inline = false, // Added inline prop for YouTube-style layout
+  inline = false,
 }) {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [liveCount, setLiveCount] = useState(0)
+  const [blockWarning, setBlockWarning] = useState("")
   const messagesEndRef = useRef(null)
   const { socket } = useSocket()
 
-  console.log("user,",user)
+  console.log("user:", user)
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // Content moderation - Block inappropriate content
+  const isMessageBlocked = (message) => {
+    const text = message.toLowerCase()
+
+    // Phone number patterns (Indian & International)
+    const phonePatterns = [
+      /\d{10}/, // 10 digit numbers
+      /\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}/, // International format
+      /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/, // xxx-xxx-xxxx
+      /\b\d{5}[-.\s]?\d{5}\b/, // xxxxx-xxxxx
+    ]
+
+    // Blocked keywords - porn, shopping, spam links
+    const blockedKeywords = [
+      // Adult content
+      'porn', 'sex', 'xxx', 'adult', 'nude', 'onlyfans', 'dating',
+      // Shopping sites (unwanted promotion)
+      'flipkart', 'amazon', 'myntra', 'ajio', 'meesho', 'snapdeal',
+      'aliexpress', 'ebay', 'shopify',
+      // Gambling/betting
+      'bet', 'casino', 'gambling', 'lottery',
+      // Spam words
+      'click here', 'buy now', 'limited offer', 'earn money', 'work from home',
+      'whatsapp', 'telegram', 'instagram', 'dm me',
+    ]
+
+    // URL patterns
+    const urlPattern = /(https?:\/\/|www\.)/i
+
+    // Check phone numbers
+    if (phonePatterns.some(pattern => pattern.test(message))) {
+      return "Phone numbers are not allowed"
+    }
+
+    // Check blocked keywords
+    for (const keyword of blockedKeywords) {
+      if (text.includes(keyword)) {
+        return "Inappropriate or promotional content not allowed"
+      }
+    }
+
+    // Check URLs (block all links for safety)
+    if (urlPattern.test(message)) {
+      return "Links are not allowed in chat"
+    }
+
+    return null
+  }
+
+  // console.log(user)
   const addMessage = (msg) => {
+    // FIXED: Sirf messageType === "message" wale messages add karo
+    if (msg.messageType !== "message") {
+      return // join, leave messages ignore karo
+    }
+
     const normalized = {
       id: msg.id || msg._id || `msg-${Date.now()}-${Math.random()}`,
       userId: msg.userId?.toString(),
-      userName: user.name || "Unknown",
+      userName: msg.userName || user?.name || "Unknown",
       message: msg.message || "",
       timestamp: msg.timestamp || msg.createdAt || new Date(),
       type: msg.messageType || "message",
     }
 
     setMessages((prev) => {
-      // Check for duplicates
       const exists = prev.some(
         (m) =>
-          m.message === normalized.message &&
-          m.userId === normalized.userId &&
-          Math.abs(new Date(m.timestamp) - new Date(normalized.timestamp)) < 2000,
+          m.id === normalized.id ||
+          (m.message === normalized.message &&
+            m.userId === normalized.userId &&
+            Math.abs(new Date(m.timestamp) - new Date(normalized.timestamp)) < 2000)
       )
       if (exists) return prev
       return [...prev, normalized]
@@ -53,6 +110,7 @@ export default function LiveChat({
       const res = await fetch(`https://www.dikapi.olyox.in/api/chat/history/${videoId}?limit=500`)
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
+        // FIXED: Sirf messageType === "message" filter karo
         const chatMessages = data.data.filter((msg) => msg.messageType === "message")
         chatMessages.forEach(addMessage)
         setTimeout(scrollToBottom, 100)
@@ -65,13 +123,14 @@ export default function LiveChat({
   useEffect(() => {
     if (!visible || !videoId || !userId || !socket) return
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages([])
     fetchChatHistory()
 
     socket.emit("join-chat", { videoId, userId })
 
     const handleNewMessage = (data) => {
+      console.log("New message received:", data)
+      // Sirf message type handle karo
       if (data.messageType === "message") {
         addMessage(data)
         setTimeout(scrollToBottom, 100)
@@ -93,11 +152,14 @@ export default function LiveChat({
 
     const handleAdminMessage = (data) => {
       console.log("Admin message:", data)
-      addMessage({
-        ...data,
-        userName: "Admin",
-        messageType: "message",
-      })
+      // Admin messages bhi sirf message type ke liye
+      if (data.messageType === "message") {
+        addMessage({
+          ...data,
+          userName: data.userName || "Admin",
+          messageType: "message",
+        })
+      }
     }
 
     socket.on("chat-message", handleNewMessage)
@@ -121,6 +183,14 @@ export default function LiveChat({
   const sendMessage = () => {
     const trimmed = newMessage.trim()
     if (!trimmed || !socket) return
+
+    // Content moderation check
+    const blockReason = isMessageBlocked(trimmed)
+    if (blockReason) {
+      setBlockWarning(blockReason)
+      setTimeout(() => setBlockWarning(""), 3000)
+      return
+    }
 
     const messageData = {
       videoId,
@@ -171,7 +241,7 @@ export default function LiveChat({
       {!inline && <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />}
 
       <div className={panelClasses}>
-        {/* Header - Hidden in inline if needed, but keeping for count */}
+        {/* Header */}
         <div
           className={`flex items-center justify-between p-3 border-b ${inline ? "bg-slate-50 text-slate-900" : "bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-3xl md:rounded-tl-3xl md:rounded-tr-none"}`}
         >
@@ -192,10 +262,11 @@ export default function LiveChat({
           )}
         </div>
 
-        {/* Messages - YouTube style */}
+        {/* Messages - Only messageType === "message" */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-white">
           {messages.map((msg) => {
             const isOwn = msg.userId === userId.toString()
+            
             return (
               <div key={msg.id} className="flex gap-2 text-sm items-start py-1">
                 <div className="w-6 h-6 rounded-full bg-blue-100 flex-shrink-0 flex items-center justify-center text-[10px] font-bold text-blue-700 uppercase">
@@ -210,10 +281,24 @@ export default function LiveChat({
               </div>
             )
           })}
+          {isTyping && (
+            <div className="flex gap-2 text-sm items-center py-1 text-slate-400 italic">
+              <div className="w-6 h-6" />
+              <span>Someone is typing...</span>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input - Compact */}
+        {/* Warning Banner */}
+        {blockWarning && (
+          <div className="px-3 py-2 bg-red-50 border-t border-red-200 flex items-center gap-2 text-red-700 text-xs">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span>{blockWarning}</span>
+          </div>
+        )}
+
+        {/* Input */}
         <div className="p-3 border-t bg-slate-50">
           <div className="flex gap-2 bg-white border border-slate-200 rounded-lg p-1">
             <input
@@ -229,7 +314,7 @@ export default function LiveChat({
             <button
               onClick={sendMessage}
               disabled={!newMessage.trim()}
-              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-30"
+              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md disabled:opacity-30 transition-all"
             >
               <Send className="w-4 h-4" />
             </button>

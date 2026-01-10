@@ -19,6 +19,8 @@ import { colors } from "../../constant/color";
 import { useSocket } from "../../context/SocketContext";
 import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuthStore } from "../../stores/auth.store";
+
 const BOTTOM_GESTURE_THRESHOLD = 16;
 const API_BASE = API_URL_LOCAL_ENDPOINT;
 
@@ -27,6 +29,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
   const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [liveCount, setLiveCount] = useState(0);
+  const { user } = useAuthStore();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef(null);
   const { socket } = useSocket();
@@ -34,6 +37,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
   const insets = useSafeAreaInsets();
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
   const TAB_BAR_HEIGHT = isGestureNavigation ? 12 : 56;
+
   // Animation
   useEffect(() => {
     if (visible) {
@@ -57,7 +61,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     outputRange: [800, 0],
   });
 
-  // Keyboard handling - Manual for reliability
+  // Keyboard handling
   useEffect(() => {
     const showListener = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
@@ -84,33 +88,33 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     const normalized = {
       id: msg.id || msg._id,
       userId: msg.userId?.toString(),
-      userName: msg.userName || "Unknown",
+      userName: msg.userName || "Unknown User",
       message: msg.message || "",
       timestamp: msg.timestamp || msg.createdAt || new Date(),
       type: msg.messageType || "message",
     };
 
     setMessages((prev) => {
-      const exists = prev.some(
-        (m) =>
-          m.message === normalized.message &&
-          m.userId === normalized.userId &&
-          Math.abs(new Date(m.timestamp) - new Date(normalized.timestamp)) < 2000
-      );
+      // Check if message already exists by ID
+      const existsById = prev.some((m) => m.id === normalized.id);
+      if (existsById) return prev;
 
-      if (exists) return prev;
-      return [...prev, normalized];
+      // Add the new message and sort by timestamp
+      const updated = [...prev, normalized].sort(
+        (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+      );
+      return updated;
     });
   };
-
 
   const fetchChatHistory = async () => {
     try {
       const res = await axios.get(`${API_BASE}/chat/history/${videoId}?limit=500`);
       if (res.data.success && Array.isArray(res.data.data)) {
-        const chatMessages = res.data.data.filter((msg) => msg.messageType === "message");
-        chatMessages.forEach(addMessage);
-        scrollToBottom(false);
+        // Reset messages and add all from API (including join/leave)
+        setMessages([]);
+        res.data.data.forEach(addMessage);
+        setTimeout(() => scrollToBottom(false), 200);
       }
     } catch (error) {
       console.error("Failed to fetch chat history:", error.message);
@@ -123,10 +127,11 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     }, 150);
   };
 
+  // Initial load + Socket setup
   useEffect(() => {
     if (!visible || !videoId || !userId) return;
 
-    setMessages([]);
+    // Load history on open
     fetchChatHistory();
 
     if (!socket) return;
@@ -134,10 +139,9 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     socket.emit("join-chat", { videoId, userId });
 
     const handleNewMessage = (data) => {
-      if (data.messageType === "message") {
-        addMessage(data);
-        scrollToBottom();
-      }
+      console.log("New socket message:", data);
+      addMessage(data);
+      scrollToBottom();
     };
 
     const handleTypingStart = (data) => {
@@ -146,30 +150,46 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
         setTimeout(() => setIsTyping(false), 3000);
       }
     };
-    socket.on("admin-message", (data) => {
-      console.log(data)
-    })
+
+    const handleAdminMessage = (data) => {
+      console.log("Admin message:", data);
+      addMessage(data);
+      scrollToBottom();
+    };
 
     const handleLiveCount = (data) => {
       const count = data.total || 0;
       setLiveCount(count);
-      fetchChatHistory()
-      // ← YEH LINE ADD KI — PARENT KO BHI UPDATE KAR DO
       if (onLiveCountChange) {
         onLiveCountChange(count);
       }
     };
+
     socket.on("chat-message", handleNewMessage);
     socket.on("user-typing", handleTypingStart);
+    socket.on("admin-message", handleAdminMessage);
     socket.on("live-watching-count", handleLiveCount);
 
     return () => {
       socket.off("chat-message", handleNewMessage);
       socket.off("user-typing", handleTypingStart);
+      socket.off("admin-message", handleAdminMessage);
       socket.off("live-watching-count", handleLiveCount);
       socket.emit("leave-chat", { videoId, userId });
     };
   }, [socket, visible, videoId, userId]);
+
+  // Periodic refresh removed - rely on socket events
+  // If you still need periodic refresh, uncomment below but it's not recommended
+  /*
+  */
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => {
+      fetchChatHistory();
+    }, 10000); // Reduced to 10 seconds
+    return () => clearInterval(interval);
+  }, [visible]);
 
   const sendMessage = () => {
     const trimmed = newMessage.trim();
@@ -178,7 +198,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     const messageData = {
       videoId,
       userId: userId.toString(),
-      userName: "Student",
+      userName: user?.name || "Student",
       message: trimmed,
       messageType: "message",
       timestamp: new Date(),
@@ -186,6 +206,7 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
 
     socket.emit("send-chat-message", messageData);
 
+    // Add optimistic message
     addMessage({
       ...messageData,
       id: `temp-${Date.now()}`,
@@ -195,20 +216,6 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scrollToBottom();
   };
-
-  // useEffect(() => {
-  //   // First immediate call
-  //   fetchChatHistory();
-
-  //   // Interval
-  //   const interval = setInterval(() => {
-  //     fetchChatHistory();
-  //   }, 5000);
-
-  //   // Cleanup (VERY IMPORTANT)
-  //   return () => clearInterval(interval);
-  // }, []);
-
 
   const handleTyping = () => {
     if (socket && newMessage.trim()) {
@@ -225,7 +232,21 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
 
   const renderMessage = ({ item }) => {
     const isOwn = item.userId === userId.toString();
+    const isSystemMessage = ["join", "leave"].includes(item.type);
 
+    // System messages (join/leave) - centered style
+    if (isSystemMessage) {
+      return (
+        <View style={styles.systemMessageContainer}>
+          <View style={styles.systemMessageBubble}>
+            <Text style={styles.systemMessageText}>{item.message}</Text>
+            <Text style={styles.systemMessageTime}>{formatTime(item.timestamp)}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Regular chat messages
     return (
       <View style={[styles.messageContainer, isOwn ? styles.ownMessage : styles.otherMessage]}>
         <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
@@ -233,7 +254,9 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
           <Text style={[styles.messageText, isOwn && styles.ownMessageText]}>
             {item.message}
           </Text>
-          <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
+          <Text style={[styles.messageTime, isOwn && styles.ownMessageTime]}>
+            {formatTime(item.timestamp)}
+          </Text>
         </View>
       </View>
     );
@@ -260,7 +283,6 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
           },
         ]}
       >
-        {/* Manual padding for keyboard */}
         <View style={{ flex: 1, paddingBottom: keyboardHeight }}>
           {/* Drag Handle */}
           <View style={styles.dragHandle} />
@@ -288,7 +310,6 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => scrollToBottom(false)}
-            onLayout={() => scrollToBottom(false)}
             keyboardShouldPersistTaps="always"
           />
 
@@ -298,9 +319,16 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
               <Text style={styles.typingText}>Someone is typing...</Text>
             </View>
           )}
-          <View style={[styles.inputContainer, {
-            marginBottom: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
-          }]}>
+
+          {/* Input Container */}
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                marginBottom: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
+              },
+            ]}
+          >
             <TextInput
               style={styles.messageInput}
               value={newMessage}
@@ -317,22 +345,15 @@ export default function LiveChat({ videoId, userId, visible, onClose, onLiveCoun
               blurOnSubmit={false}
             />
             <TouchableOpacity
-              style={[
-                styles.sendButton,
-                !newMessage.trim() && styles.sendButtonDisabled,
-              ]}
+              style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
               onPress={sendMessage}
               disabled={!newMessage.trim()}
               activeOpacity={0.7}
-              keyboardShouldPersistTaps="always"
             >
               <Feather name="send" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Fixed Input - Always at bottom */}
-
       </Animated.View>
     </Modal>
   );
@@ -451,8 +472,35 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     marginTop: 5,
+    color: colors.textLight,
     opacity: 0.7,
     alignSelf: "flex-end",
+  },
+  ownMessageTime: {
+    color: "#fff",
+  },
+  systemMessageContainer: {
+    alignItems: "center",
+    marginVertical: 8,
+  },
+  systemMessageBubble: {
+    backgroundColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    maxWidth: "70%",
+  },
+  systemMessageText: {
+    fontSize: 13,
+    color: colors.textLight,
+    textAlign: "center",
+  },
+  systemMessageTime: {
+    fontSize: 10,
+    color: colors.textLight,
+    opacity: 0.6,
+    textAlign: "center",
+    marginTop: 2,
   },
   typingIndicator: {
     paddingHorizontal: 20,

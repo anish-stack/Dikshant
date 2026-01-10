@@ -1,6 +1,6 @@
 const { Server } = require("socket.io");
 const ChatController = require("./controllers/ChatController");
-
+const { User } = require('./models')
 let io;
 
 // userId => socketId
@@ -59,11 +59,24 @@ function initSocket(server) {
     /* =======================
        SEND MESSAGE
     ========================*/
-    socket.on("send-chat-message", async data => {
+    socket.on("send-chat-message", async (data) => {
       try {
+        let finalUserName = data.userName;
+
+        // 🔍 If userName not provided, fetch from User table using userId
+        if (!finalUserName && data.userId) {
+          const user = await User.findById(data.userId).select("name");
+
+          if (user && user.name) {
+            finalUserName = user.name;
+          } else {
+            finalUserName = "Guest"; // fallback
+          }
+        }
+
         const result = await ChatController.saveMessage({
           ...data,
-          userName
+          userName: finalUserName,
         });
 
         const payload = result.success ? result.data : result.fallback;
@@ -75,13 +88,13 @@ function initSocket(server) {
           userName: payload.userName,
           message: payload.message,
           timestamp: payload.createdAt,
-          type: "message"
+          type: "message",
         });
+
       } catch (error) {
         console.error("❌ Chat save error:", error);
       }
     });
-
     /* =======================
        ADMIN MESSAGE
     ========================*/

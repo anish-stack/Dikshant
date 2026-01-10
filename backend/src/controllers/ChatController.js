@@ -1,4 +1,4 @@
-const { ChatMessage,User } = require("../models");
+const { ChatMessage, User } = require("../models");
 
 class ChatController {
   // ============================
@@ -109,18 +109,52 @@ class ChatController {
   // ============================
   // GET CHAT HISTORY
   // ============================
+
   static async getChatHistory(videoId, limit = 500) {
     try {
       const messages = await ChatMessage.findAll({
         where: { videoId },
         order: [["createdAt", "ASC"]],
         limit,
+        raw: true,
       });
+
+      // 🔍 Find messages where userName === "Student"
+      const userIdsToFetch = [
+        ...new Set(
+          messages
+            .filter(m => m.userName === "Student" && m.userId)
+            .map(m => m.userId)
+        )
+      ];
+
+      // 🧠 Fetch all required users in ONE query
+      let userMap = {};
+      if (userIdsToFetch.length > 0) {
+        const users = await User.findAll({
+          where: { id: userIdsToFetch },
+          attributes: ["id", "name"],
+          raw: true,
+        });
+
+        users.forEach(user => {
+          userMap[user.id] = user.name;
+        });
+      }
+
+      const updatedMessages = messages.map(m => ({
+        ...m,
+        userName:
+          m.userName === "Student" && userMap[m.userId]
+            ? userMap[m.userId]
+            : m.userName,
+      }));
 
       return {
         success: true,
-        data: messages.map((m) => m.get({ plain: true })),
+        data: updatedMessages,
       };
+
     } catch (error) {
       console.error("getChatHistory error:", error.message);
       return {
@@ -267,56 +301,56 @@ class ChatController {
 
     }
   }
-static async getAllChatsMessageFromVideo(req, res) {
-  try {
-    const { videoId } = req.params;
+  static async getAllChatsMessageFromVideo(req, res) {
+    try {
+      const { videoId } = req.params;
 
-    if (!videoId) {
-      return res.status(400).json({
+      if (!videoId) {
+        return res.status(400).json({
+          success: false,
+          message: "videoId required",
+        });
+      }
+
+      const messages = await ChatMessage.findAll({
+        where: {
+          videoId,
+          messageType: "message",
+        },
+        order: [["createdAt", "ASC"]],
+        raw: true,
+      });
+
+      // Collect unique userIds
+      const userIds = [...new Set(messages.map((m) => m.userId))];
+
+      // Fetch users
+      const users = await User.findAll({
+        where: { id: userIds },
+        attributes: ["id", "name"],
+        raw: true,
+      });
+
+      const userMap = {};
+      users.forEach((u) => (userMap[u.id] = u.name));
+
+      const formatted = messages.map((msg) => ({
+        ...msg,
+        userName: userMap[msg.userId] || msg.userName || "Unknown",
+      }));
+
+      return res.status(200).json({
+        success: true,
+        data: formatted,
+      });
+    } catch (error) {
+      console.error("getAllChatsMessageFromVideo error:", error);
+      return res.status(500).json({
         success: false,
-        message: "videoId required",
+        message: "Internal server error",
       });
     }
-
-    const messages = await ChatMessage.findAll({
-      where: {
-        videoId,
-        messageType: "message",
-      },
-      order: [["createdAt", "ASC"]],
-      raw: true,
-    });
-
-    // Collect unique userIds
-    const userIds = [...new Set(messages.map((m) => m.userId))];
-
-    // Fetch users
-    const users = await User.findAll({
-      where: { id: userIds },
-      attributes: ["id", "name"],
-      raw: true,
-    });
-
-    const userMap = {};
-    users.forEach((u) => (userMap[u.id] = u.name));
-
-    const formatted = messages.map((msg) => ({
-      ...msg,
-      userName: userMap[msg.userId] || msg.userName || "Unknown",
-    }));
-
-    return res.status(200).json({
-      success: true,
-      data: formatted,
-    });
-  } catch (error) {
-    console.error("getAllChatsMessageFromVideo error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
   }
-}
 
 }
 

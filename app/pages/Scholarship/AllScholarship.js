@@ -97,15 +97,15 @@ export default function AllScholarship() {
           {/* Registration Info */}
           <View style={styles.registrationInfo}>
             <Text style={styles.registrationText}>
-              <Text style={styles.scholarshipLabel}>Scholarship Programme</Text>
-              <Text style={styles.normalText}> का लाभ लेने के लिये,</Text>
+              <Text style={styles.scholarshipLabel}>At Dikshant IAS, we believe that quality education and UPSC preparation </Text>
+              <Text style={styles.normalText}>should be accessible to all, regardless of economic or social background.</Text>
             </Text>
             <Text style={styles.registrationText}>
-              <Text style={styles.normalText}>नीचे दिये गये बटन पर क्लिक करें और </Text>
-              <Text style={styles.registrationLabel}>Registration</Text>
+              <Text style={styles.normalText}>To support deserving and hardworking aspirants, we proudly offer need-based and category-based scholarships.</Text>
+              <Text style={styles.registrationLabel}>Dikshant Scholarship Program, is a welfare program run by Dikshant IAS under which free coaching is </Text>
             </Text>
             <Text style={styles.registrationTextLast}>
-              <Text style={styles.normalText}>की प्रक्रिया पूरी करें</Text>
+              <Text style={styles.normalText}>provided to socially and economically weaker students living in India. This program is funded by NGOs.</Text>
             </Text>
           </View>
           {/* === NEW PROFESSIONAL & MINIMAL CARDS === */}
