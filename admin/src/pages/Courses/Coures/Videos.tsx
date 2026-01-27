@@ -17,6 +17,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  Upload,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
@@ -131,12 +132,12 @@ export default function CourseVideos() {
 
   // Search and pagination
   const filtered = videos.filter((v) =>
-    v.title.toLowerCase().includes(search.toLowerCase())
+    v.title.toLowerCase().includes(search.toLowerCase()),
   );
   const total = Math.ceil(filtered.length / ITEMS_PER_PAGE);
   const paginated = filtered.slice(
     (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE
+    page * ITEMS_PER_PAGE,
   );
 
   useEffect(() => {
@@ -193,8 +194,8 @@ export default function CourseVideos() {
       await axios.put(`${API_URL}/${v.id}`, { status: newStatus });
       setVideos((prev) =>
         prev.map((item) =>
-          item.id === v.id ? { ...item, status: newStatus } : item
-        )
+          item.id === v.id ? { ...item, status: newStatus } : item,
+        ),
       );
     } catch (err) {
       console.error(err);
@@ -206,8 +207,8 @@ export default function CourseVideos() {
       await axios.put(`${API_URL}/${v.id}`, { isLiveEnded: true });
       setVideos((prev) =>
         prev.map((item) =>
-          item.id === v.id ? { ...item, isLiveEnded: true } : item
-        )
+          item.id === v.id ? { ...item, isLiveEnded: true } : item,
+        ),
       );
     } catch (err) {
       console.error(err);
@@ -273,7 +274,7 @@ export default function CourseVideos() {
   // YouTube embed
   const getYTEmbed = (url: string) => {
     const match = url.match(
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
     );
     return match ? `https://www.youtube.com/embed/${match[1]}` : null;
   };
@@ -381,6 +382,9 @@ export default function CourseVideos() {
                       Status
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
+                      Upload Pdf
+                    </th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
                       Actions
                     </th>
                   </tr>
@@ -410,48 +414,48 @@ export default function CourseVideos() {
                             className="w-12 h-7 object-cover rounded"
                           />
                         </td>
-                  <td className="px-3 py-2">
-  <div>
-    <p className="font-medium text-gray-900 dark:text-white line-clamp-1">
-      {v.title}
-    </p>
+                        <td className="px-3 py-2">
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white line-clamp-1">
+                              {v.title}
+                            </p>
 
-    <div className="flex gap-1 mt-0.5 flex-wrap">
-      {v.isDemo && (
-        <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-          Demo
-        </span>
-      )}
+                            <div className="flex gap-1 mt-0.5 flex-wrap">
+                              {v.isDemo && (
+                                <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
+                                  Demo
+                                </span>
+                              )}
 
-      {v.isDownloadable && (
-        <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-          DL
-        </span>
-      )}
+                              {v.isDownloadable && (
+                                <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                                  DL
+                                </span>
+                              )}
 
-      {v.isLive && (
-        <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
-          <span className="w-1 h-1 bg-purple-600 rounded-full animate-pulse"></span>
-          Live
-        </span>
-      )}
+                              {v.isLive && (
+                                <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
+                                  <span className="w-1 h-1 bg-purple-600 rounded-full animate-pulse"></span>
+                                  Live
+                                </span>
+                              )}
 
-      {v.isLiveEnded && (
-        <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded flex items-center gap-0.5">
-          <span className="w-1 h-1 bg-red-600 rounded-full"></span>
-          Live Ended
-        </span>
-      )}
+                              {v.isLiveEnded && (
+                                <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded flex items-center gap-0.5">
+                                  <span className="w-1 h-1 bg-red-600 rounded-full"></span>
+                                  Live Ended
+                                </span>
+                              )}
 
-      {/* ✅ DEFAULT: Recorded */}
-      {!v.isLive && !v.isLiveEnded && !v.isDemo && (
-        <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
-          Recorded
-        </span>
-      )}
-    </div>
-  </div>
-</td>
+                              {/* ✅ DEFAULT: Recorded */}
+                              {!v.isLive && !v.isLiveEnded && !v.isDemo && (
+                                <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
+                                  Recorded
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
                         <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
                           {subjects.find((s) => s.id === v.subjectId)?.name ||
@@ -486,7 +490,7 @@ export default function CourseVideos() {
                               </div>
                             </div>
                           ) : (
-                           <div className="text-xs">
+                            <div className="text-xs">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
                                 {v.dateOfClass.replace(/-/g, "/")}
@@ -510,6 +514,24 @@ export default function CourseVideos() {
                               v.status.slice(1)}
                           </span>
                         </td>
+
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() =>
+                              navigate(
+                                `/upload-pdf?batch=${batchId}&video=${v.id}&title=${v.title
+                                  .trim()
+                                  .toLowerCase()
+                                  .replace(/\s+/g, "-")}`,
+                              )
+                            }
+                            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded transition"
+                            title="Upload Pdf"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          </button>
+                        </td>
+
                         <td className="px-3 py-2">
                           <div className="flex justify-center gap-1">
                             <button
@@ -862,8 +884,8 @@ export default function CourseVideos() {
                 </label>
               </div>
 
-                    {!form.isLive && (
-                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+              {!form.isLive && (
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                   {/* DATE */}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -888,7 +910,6 @@ export default function CourseVideos() {
                     <input
                       type="time"
                       value={form.TimeOfClass}
-                     
                       onChange={(e) =>
                         setForm({ ...form, TimeOfClass: e.target.value })
                       }
@@ -897,7 +918,7 @@ export default function CourseVideos() {
                     />
                   </div>
                 </div>
-                    )}
+              )}
               {/* Live Date/Time */}
               {form.isLive && (
                 <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
@@ -925,7 +946,6 @@ export default function CourseVideos() {
                     <input
                       type="time"
                       value={form.TimeOfLIve}
-                     
                       onChange={(e) =>
                         setForm({ ...form, TimeOfLIve: e.target.value })
                       }

@@ -170,8 +170,8 @@ export default function ApplyScholarship() {
         Alert.alert("Failed", res.data.message || "Submission failed");
       }
     } catch (error) {
-      console.error("Submit error:", error.response?.data || error);
-      Alert.alert("Error", "Something went wrong. Try again.");
+      console.error("Submit error:", error.response?.data?.message || error);
+      Alert.alert("Info",  error.response?.data?.message);
     } finally {
       setSubmitting(false);
     }

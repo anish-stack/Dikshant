@@ -42,6 +42,14 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    name: "Quizzes & Test Series",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "All Quizzes", path: "/all-quizzes", pro: false },
+      { name: "All Test Series", path: "/all-test-series", pro: false },
+    ],
+  },
+  {
     icon: <Speaker />,
     name: "Announcements",
     path: "/announcements",
@@ -106,7 +114,6 @@ const othersItems: NavItem[] = [
   //     { name: "Videos", path: "/videos", pro: false },
   //   ],
   // },
- 
 ];
 
 const AppSidebar: React.FC = () => {
@@ -118,14 +125,14 @@ const AppSidebar: React.FC = () => {
     index: number;
   } | null>(null);
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
-    {}
+    {},
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // const isActive = (path: string) => location.pathname === path;
   const isActive = useCallback(
     (path: string) => location.pathname === path,
-    [location.pathname]
+    [location.pathname],
   );
 
   useEffect(() => {
@@ -307,8 +314,8 @@ const AppSidebar: React.FC = () => {
           isExpanded || isMobileOpen
             ? "w-[290px]"
             : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
+              ? "w-[290px]"
+              : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}

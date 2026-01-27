@@ -15,5 +15,6 @@ router.delete("/:orderId", auth, ctrl.deleteOrder);
 router.post('/admin/assign-course', auth, role(["admin"]), ctrl.adminAssignCourse);
 router.post('/admin/reverse-assign-course', auth, role(["admin"]), ctrl.adminReverseAssignCourse);
 
+router.get("/quiz-orders/:userId",  ctrl.getUserQuizOrders);
 
 module.exports = router;

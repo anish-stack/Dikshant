@@ -55,6 +55,18 @@ import { colors } from "./constant/color";
 import AnnouncementDetails from "./components/AnnouncementDetails";
 import ViewAllVideos from "./pages/CourseComponets/ViewAllVideos";
 import PlayerScreen from "./screens/PlayerScreen/PlayerScreen";
+import IntroQuiz from "./pages/Quiz/IntroQuiz";
+import AllQuizes from "./pages/Quiz/AllQuizes";
+import QuizDetails from "./pages/Quiz/QuizDetails";
+import QuizPlay from "./pages/QuizPlay";
+import QuizResult from "./pages/QuizPlay/components/QuizResult";
+import MyCourses from "./pages/Profile/MyCourses";
+import MyAllQuiz from "./pages/Profile/MyAllQuiz";
+import AllAtemptsQuiz from "./pages/Profile/AllAtemptsQuiz";
+import PdfNotesScreen from "./pages/CourseComponets/PdfNotesScreen";
+import IntroTestSeries from "./pages/TestSeries/IntroTestSeries";
+import TestSeriesView from "./pages/TestSeries/TestSeriesView";
+import ResultScreen from "./pages/TestSeries/ResultScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -71,7 +83,7 @@ ExpoNotifications.setNotificationHandler({
 setupBackgroundNotifications();
 
 export default function App() {
-  usePreventScreenCapture();
+  // usePreventScreenCapture();
   const fontsLoaded = useFontStyle();
   const [fcmToken, setFcmToken] = useState(null);
   const [notificationData, setNotificationData] = useState(null);
@@ -406,6 +418,15 @@ export default function App() {
           <Stack.Screen name="Courses" component={CoursePage} />
           <Stack.Screen name="enroll-course" component={EnrollCourse} />
           <Stack.Screen name="my-course" component={MyEnrollCourse} />
+          <Stack.Screen name="all-my-course" component={MyCourses} />
+          <Stack.Screen name="all-my-quiz" component={MyAllQuiz} />
+          <Stack.Screen name="ResultScreen" component={ResultScreen} />
+
+          <Stack.Screen name="AllQuizAttempts" component={AllAtemptsQuiz} />
+          <Stack.Screen name="PdfNotes" component={PdfNotesScreen} />
+
+          {/* AllAtemptsQuiz */}
+
           <Stack.Screen name="annouce-details" component={AnnouncementDetails} />
           <Stack.Screen name="EBooks" component={EBooks} />
           <Stack.Screen name="Quiz" component={TestScreen} />
@@ -421,6 +442,24 @@ export default function App() {
           <Stack.Screen name="Permissions" component={PermissionsScreen} />
           <Stack.Screen name="apply-sch" component={Scholarship} />
           <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
+
+
+
+          <Stack.Screen name="IntroTestSeries" component={IntroTestSeries} />
+          <Stack.Screen name="testseries-view" component={TestSeriesView} />
+
+          {/* Quiz Screens */}
+          <Stack.Screen name="Quiz-Intro" component={IntroQuiz} />
+          {/*  */}
+          <Stack.Screen name="AllQuizes" component={AllQuizes} />
+          <Stack.Screen name="QuizDetails" component={QuizDetails} />
+          <Stack.Screen name="QuizPlay" component={QuizPlay} />
+          <Stack.Screen name="QuizResult" component={QuizResult} />
+
+
+
+
+
         </Stack.Navigator>
       </NavigationContainer>
 

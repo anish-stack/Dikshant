@@ -38,8 +38,8 @@ export default function BottomBar() {
     {
       label: "Quiz",
       icon: "file-text",
-      screen: "Quiz",
-      comingSoon: true,
+      screen: "Quiz-Intro",
+      comingSoon: false,
       title: "Interactive Quizzes",
       description:
         "Test your knowledge with AI-powered quizzes, instant feedback, and detailed explanations.",
@@ -54,8 +54,8 @@ export default function BottomBar() {
     {
       label: "Test Series",
       icon: "book",
-      screen: "TestSeries",
-      comingSoon: true,
+      screen: "IntroTestSeries",
+      comingSoon: false,
       title: "Professional Test Series",
       description:
         "Prepare like a pro with full-length mock tests designed by experts.",

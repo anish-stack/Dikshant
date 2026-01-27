@@ -6,7 +6,7 @@ module.exports = (sequelize, DataTypes) => {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
     userId: DataTypes.INTEGER,
-    type: DataTypes.ENUM("batch", "test"),
+    type: DataTypes.ENUM("batch", "test", "quiz"),
     itemId: DataTypes.INTEGER,
 
     amount: DataTypes.FLOAT,
@@ -21,6 +21,8 @@ module.exports = (sequelize, DataTypes) => {
     status: DataTypes.ENUM("pending", "success", "failed"),
     paymentDate: DataTypes.DATE,
     accessValidityDays: DataTypes.INTEGER,
+    quiz_limit: DataTypes.INTEGER,
+    quiz_attempts_used: DataTypes.INTEGER,
     enrollmentStatus: DataTypes.ENUM("active", "expired", "cancelled"),
     couponId: DataTypes.INTEGER,
     couponCode: DataTypes.STRING,
@@ -33,14 +35,19 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Order.associate = function (models) {
-    Order.belongsTo(models.Batch, { 
-      foreignKey: 'itemId', 
+    Order.belongsTo(models.Batch, {
+      foreignKey: 'itemId',
       as: 'batch',
       constraints: false
     });
-    Order.belongsTo(models.User, { 
-      foreignKey: 'userId', 
-      as: 'user' 
+    Order.belongsTo(models.Quizzes, {
+      foreignKey: 'itemId',
+      as: 'Quizzes',
+      constraints: false
+    });
+    Order.belongsTo(models.User, {
+      foreignKey: 'userId',
+      as: 'user'
     });
   };
 

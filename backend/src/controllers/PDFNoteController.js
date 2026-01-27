@@ -1,13 +1,13 @@
 'use strict';
 
-const { PDFNote } = require('../models');
+const { PDFNote ,PdfCategory } = require('../models');
 const redis = require('../config/redis');
 const uploadToS3 = require('../utils/s3Upload');
 const deleteFromS3 = require('../utils/s3Delete');
 
 class PDFNoteController {
 
-  // CREATE
+  /* ================= CREATE ================= */
   static async create(req, res) {
     try {
       let fileUrl = null;
@@ -19,72 +19,120 @@ class PDFNoteController {
       const payload = {
         title: req.body.title,
         fileUrl,
-        programId: req.body.programId,
-        batchId: req.body.batchId,
-        subjectId: req.body.subjectId,
-        status: req.body.status || "active"
+        programId: req.body.programId || null,
+        batchId: req.body.batchId || null,
+        subjectId: req.body.subjectId || null,
+        videoId: req.body.videoId || null,          // ✅ ADDED
+        pdfCategory: req.body.pdfCategory,           // ✅ ADDED (REQUIRED)
+        status: req.body.status || "active",
       };
+
+      if (!payload.pdfCategory) {
+        return res.status(400).json({
+          message: "pdfCategory is required",
+        });
+      }
 
       const item = await PDFNote.create(payload);
 
       await redis.del("pdfnotes");
 
-      return res.status(201).json(item);
+      return res.status(201).json({
+        success: true,
+        data: item,
+      });
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: "Error creating PDF note", error });
+      return res.status(500).json({
+        message: "Error creating PDF note",
+        error,
+      });
     }
   }
 
+/* ================= GET ALL (WITH FILTERS) ================= */
+static async findAll(req, res) {
+  try {
+    const {
+      videoId,
+      batchId,
+      programId,
+      subjectId,
+      pdfCategory,
+      status,
+    } = req.query;
 
+    const where = {};
 
-  // GET ALL
-  static async findAll(req, res) {
-    try {
-      // const cache = await redis.get("pdfnotes");
-      // if (cache) return res.json(JSON.parse(cache));
+    if (videoId) where.videoId = videoId;
+    if (batchId) where.batchId = batchId;
+    if (programId) where.programId = programId;
+    if (subjectId) where.subjectId = subjectId;
+    if (pdfCategory) where.pdfCategory = pdfCategory;
+    if (status) where.status = status;
 
-      const items = await PDFNote.findAll();
+    const items = await PDFNote.findAll({
+      where,
+      order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: PdfCategory, // 👈 important
+          as: "category",
+          attributes: ["id", "name", "status"],   // only needed fields
+        },
+      ],
+    });
 
-      // await redis.set("pdfnotes", JSON.stringify(items), "EX", 60);
+    return res.json({
+      success: true,
+      count: items.length,
+      data: items,
+    });
 
-      return res.json(items);
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Error fetching PDF notes", error });
-    }
+  } catch (error) {
+    console.error("Get PDF Notes Error:", error);
+    return res.status(500).json({
+      message: "Error fetching PDF notes",
+      error,
+    });
   }
+}
 
 
-
-  // GET ONE
+  /* ================= GET ONE ================= */
   static async findOne(req, res) {
     try {
-      // const cache = await redis.get(`pdfnote:${req.params.id}`);
-      // if (cache) return res.json(JSON.parse(cache));
-
       const item = await PDFNote.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: "PDF note not found" });
+      if (!item) {
+        return res.status(404).json({
+          message: "PDF note not found",
+        });
+      }
 
-      // await redis.set(`pdfnote:${req.params.id}`, JSON.stringify(item), "EX", 300);
-
-      return res.json(item);
+      return res.json({
+        success: true,
+        data: item,
+      });
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: "Error fetching PDF note", error });
+      return res.status(500).json({
+        message: "Error fetching PDF note",
+        error,
+      });
     }
   }
 
-
-
-  // UPDATE
+  /* ================= UPDATE ================= */
   static async update(req, res) {
     try {
       const item = await PDFNote.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: "PDF note not found" });
+      if (!item) {
+        return res.status(404).json({
+          message: "PDF note not found",
+        });
+      }
 
       let fileUrl = item.fileUrl;
 
@@ -94,32 +142,42 @@ class PDFNoteController {
       }
 
       await item.update({
-        title: req.body.title || item.title,
+        title: req.body.title ?? item.title,
         fileUrl,
-        programId: req.body.programId || item.programId,
-        batchId: req.body.batchId || item.batchId,
-        subjectId: req.body.subjectId || item.subjectId,
-        status: req.body.status || item.status
+        programId: req.body.programId ?? item.programId,
+        batchId: req.body.batchId ?? item.batchId,
+        subjectId: req.body.subjectId ?? item.subjectId,
+        videoId: req.body.videoId ?? item.videoId,      // ✅ ADDED
+        pdfCategory: req.body.pdfCategory ?? item.pdfCategory, // ✅ ADDED
+        status: req.body.status ?? item.status,
       });
 
       await redis.del("pdfnotes");
       await redis.del(`pdfnote:${req.params.id}`);
 
-      return res.json(item);
+      return res.json({
+        success: true,
+        data: item,
+      });
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: "Error updating PDF note", error });
+      return res.status(500).json({
+        message: "Error updating PDF note",
+        error,
+      });
     }
   }
 
-
-
-  // DELETE
+  /* ================= DELETE ================= */
   static async delete(req, res) {
     try {
       const item = await PDFNote.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: "PDF note not found" });
+      if (!item) {
+        return res.status(404).json({
+          message: "PDF note not found",
+        });
+      }
 
       if (item.fileUrl) await deleteFromS3(item.fileUrl);
 
@@ -128,11 +186,17 @@ class PDFNoteController {
       await redis.del("pdfnotes");
       await redis.del(`pdfnote:${req.params.id}`);
 
-      return res.json({ message: "PDF note deleted" });
+      return res.json({
+        success: true,
+        message: "PDF note deleted",
+      });
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: "Error deleting PDF note", error });
+      return res.status(500).json({
+        message: "Error deleting PDF note",
+        error,
+      });
     }
   }
 }

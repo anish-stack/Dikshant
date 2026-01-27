@@ -1,18 +1,18 @@
 {
   "development": {
-    "username": "u748895167_test_dikhshant",
-    "password": "Test_dikhshant1234",
-    "database": "u748895167_test_dikhshant",
-    "host": "srv674.hstgr.io",
+    "username": "root",
+    "password": "",
+    "database": "db_dikshant",
+    "host": "127.0.0.1",
     "port": 3306,
     "dialect": "mysql",
     "timezone": "+05:30",
     "logging": false
   },
   "test": {
-    "username": "u748895167_test_dikhshant",
-    "password": "Test_dikhshant1234",
-    "database": "u748895167_test_dikhshant",
+    "username": "u748895167_dikshant",
+    "password": "dikshant@1234Admin",
+    "database": "u748895167_dikshant",
     "host": "srv674.hstgr.io",
     "port": 3306,
     "dialect": "mysql",
@@ -20,9 +20,9 @@
     "logging": false
   },
   "production": {
-    "username": "u748895167_test_dikhshant",
-    "password": "Test_dikhshant1234",
-    "database": "u748895167_test_dikhshant",
+    "username": "u748895167_dikshant",
+    "password": "dikshant@1234Admin",
+    "database": "u748895167_dikshant",
     "host": "srv674.hstgr.io",
     "port": 3306,
     "dialect": "mysql",

@@ -35,6 +35,22 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true
       },
+      videoId: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+
+      pdfCategory: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        references: {
+          model: 'pdfCategories',
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT', 
+      },
+
 
       subjectId: {
         type: Sequelize.INTEGER,

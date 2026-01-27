@@ -35,6 +35,8 @@ router.use('/app-ratings',require("./ratting"))
 router.use('/support',require("./support.routes"))
 router.use('/doubt',require("./doubt.routes"))
 
-
+// quiz
+router.use('/quiz', require('./quiz'));
+router.use('/quiz/:quizId/questions', require('./quiz.questions'));
 
 module.exports = router;

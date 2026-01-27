@@ -37,7 +37,6 @@ module.exports = (sequelize, DataTypes) => {
   Program.associate = function (models) {
     Program.hasMany(models.Batch, { foreignKey: 'programId', as: 'batches' });
     Program.hasMany(models.PDFNote, { foreignKey: 'programId', as: 'pdfNotes' });
-    Program.hasMany(models.TestSeries, { foreignKey: 'programId', as: 'testSeries' });
   };
 
   return Program;

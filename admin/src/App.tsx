@@ -40,6 +40,19 @@ import SendNotification from "./pages/Notifications/SendNotification";
 import Settings from "./pages/settings/Settings";
 import ScholarshipApply from "./pages/scholarship/ScholarshipApply";
 import Scholarship from "./pages/scholarship/Scholarship";
+import CreateQuiz from "./pages/Quiz/CreateQuiz";
+import AllQuizzesPage from "./pages/Quiz/AllQuiz";
+import CreateQuestions from "./pages/Quiz/CreateQuestions";
+import Uploadpdf from "./pages/UploadPdf/Upload.pdf";
+import AllTestSeries from "./pages/TestSeries/AllTestSeries";
+import ViewTestSeries from "./pages/TestSeries/ViewTestSeries";
+import EditTestSeries from "./pages/TestSeries/EditTestSeries";
+import CreateTestSeries from "./pages/TestSeries/CreateTestSeries";
+import ViewSubmission from "./pages/TestSeries/ViewSubmission";
+import ViewPurchase from "./pages/TestSeries/ViewPurchase";
+import Result from "./pages/TestSeries/Result";
+import AllAtempts from "./pages/Quiz/AllAtempts";
+import ResultQuiz from "./pages/Quiz/ResultQuiz";
 
 export default function App() {
   return (
@@ -63,8 +76,6 @@ export default function App() {
 
               {/* Tables */}
               <Route path="/basic-tables" element={<BasicTables />} />
-
-
 
               {/* UI */}
               <Route path="/alerts" element={<Alerts />} />
@@ -106,10 +117,39 @@ export default function App() {
 
               {/* Banners */}
               <Route path="/app-baners" element={<Banner />} />
-{/* settings */}
+              {/* settings */}
               <Route path="/setting" element={<Settings />} />
 
+              {/* Pdf */}
+              <Route path="/upload-pdf" element={<Uploadpdf />} />
 
+              {/* Test Series */}
+              <Route path="/all-test-series" element={<AllTestSeries />} />
+              <Route path="/testseries/:id" element={<ViewTestSeries />} />
+              <Route
+                path="/admin/testseries/edit/:id"
+                element={<EditTestSeries />}
+              />
+              <Route
+                path="/admin/testseries/new"
+                element={<CreateTestSeries />}
+              />
+
+              <Route path="admin/testseries/submissions/:id" element={<ViewSubmission/>} />
+              <Route path="admin/testseries/purchases/:id" element={<ViewPurchase/>} />
+              <Route path="admin/testseries/result/:id" element={<Result/>} />
+
+              <Route path="/all-attemps" element={<AllAtempts/>} />
+              <Route path="/admin/quiz-attempts/:id/result" element={<ResultQuiz/>} />
+
+    {/* admin/testseries/purchases */}
+              {/* Quizes */}
+              <Route path="/all-quizzes" element={<AllQuizzesPage />} />
+              <Route path="/create-quizzes" element={<CreateQuiz />} />
+              <Route
+                path="/create-questions/:quizId"
+                element={<CreateQuestions />}
+              />
               <Route
                 path="/view-studnets-joined/:id"
                 element={<StudnetsJoined />}

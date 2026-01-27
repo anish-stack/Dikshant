@@ -1,18 +1,26 @@
+ const { Sequelize } = require("sequelize");
+
+const env = process.env.NODE_ENV || "development";
+const config = require("../../config/config.json")[env];
+
 const sequelize = new Sequelize(
-  'u748895167_test_dikhshant', // database
-  'u748895167_test_dikhshant', // username
-  'Test_dikhshant1234',         // password
+  config.database,
+  config.username,
+  config.password,
   {
-    host: '217.21.84.103',      // DB server IP
-    port: 3307,                  // check this matches your DB
-    dialect: 'mysql',
-    logging: console.log,        // optional
-    define: { underscored: true, timestamps: true },
-    timezone: "+05:30",
+    host: config.host,
+    port: config.port,
+    dialect: config.dialect,
+    logging: config.logging,
+    timezone: config.timezone,
+    define: {
+      underscored: true,
+      timestamps: true,
+    },
     dialectOptions: {
       useUTC: false,
       dateStrings: true,
-      typeCast: function (field, next) {
+      typeCast(field, next) {
         if (field.type === "DATETIME") return field.string();
         return next();
       },
@@ -21,3 +29,5 @@ const sequelize = new Sequelize(
 );
 
 module.exports = sequelize;
+    
+

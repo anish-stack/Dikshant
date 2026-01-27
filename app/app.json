@@ -81,7 +81,7 @@
         }
       ],
       "edgeToEdgeEnabled": true,
-    "notification": {
+      "notification": {
         "icon": "./assets/small.png",
         "color": "#FB2B37",
         "priority": "max",

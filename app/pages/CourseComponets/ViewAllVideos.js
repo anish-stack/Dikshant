@@ -10,12 +10,15 @@ import {
     Linking,
     Alert,
 } from 'react-native';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { fetcher } from '../../constant/fetcher';
 import { useAuthStore } from '../../stores/auth.store';
+import * as FileSystem from "expo-file-system/legacy";
+import axios from 'axios';
+import { API_URL_LOCAL_ENDPOINT } from '../../constant/api';
 
 export default function ViewAllVideos({ route, navigation }) {
     const { id, } = route.params || {};
@@ -31,72 +34,59 @@ export default function ViewAllVideos({ route, navigation }) {
 
     const videos = videosData?.success ? videosData.data : [];
 
-const parseDateTime = (dateStr, timeStr) => {
-  if (!dateStr || !timeStr) return null;
 
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+    const getVideoStatus = (video) => {
+        const now = new Date();
 
-  // लोकल टाइमज़ोन में डेट बनाओ
-  const date = new Date(year, month - 1, day, hours, minutes, seconds || 0);
+        let classDateTime = null;
+        if (video.dateOfClass && video.TimeOfClass) {
+            const [year, month, day] = video.dateOfClass.split('-').map(Number);
+            const [hours, minutes, seconds = 0] = video.TimeOfClass.split(':').map(Number);
+            classDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
+        }
 
-  if (isNaN(date.getTime())) return null;
+        // Explicit live from backend
+        if (video.isLive && !video.isLiveEnded) {
+            return {
+                status: 'live',
+                label: 'LIVE NOW',
+                color: '#dc2626',
+                icon: 'circle',
+                iconLibrary: 'materialCommunity',
+            };
+        }
 
-  return date;
-};
+        // Class time passed → Available
+        if (classDateTime && now >= classDateTime) {
+            return {
+                status: 'completed',
+                label: 'Available',
+                color: '#16a34a',
+                icon: 'lock-open',
+                iconLibrary: 'materialCommunity',
+            };
+        }
 
-const getVideoStatus = (video) => {
-  const now = new Date();
+        // Future → Upcoming
+        if (classDateTime && now < classDateTime) {
+            return {
+                status: 'upcoming',
+                label: 'Upcoming',
+                color: '#d97706',
+                icon: 'lock',
+                iconLibrary: 'materialCommunity',
+            };
+        }
 
-  let classDateTime = null;
-  if (video.dateOfClass && video.TimeOfClass) {
-    const [year, month, day] = video.dateOfClass.split('-').map(Number);
-    const [hours, minutes, seconds = 0] = video.TimeOfClass.split(':').map(Number);
-    classDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
-  }
-
-  // Explicit live from backend
-  if (video.isLive && !video.isLiveEnded) {
-    return {
-      status: 'live',
-      label: 'LIVE NOW',
-      color: '#dc2626',
-      icon: 'circle',
-      iconLibrary: 'materialCommunity',
+        // Default
+        return {
+            status: 'completed',
+            label: 'Available',
+            color: '#16a34a',
+            icon: 'lock-open',
+            iconLibrary: 'materialCommunity',
+        };
     };
-  }
-
-  // Class time passed → Available
-  if (classDateTime && now >= classDateTime) {
-    return {
-      status: 'completed',
-      label: 'Available',
-      color: '#16a34a',
-      icon: 'lock-open',
-      iconLibrary: 'materialCommunity',
-    };
-  }
-
-  // Future → Upcoming
-  if (classDateTime && now < classDateTime) {
-    return {
-      status: 'upcoming',
-      label: 'Upcoming',
-      color: '#d97706',
-      icon: 'lock',
-      iconLibrary: 'materialCommunity',
-    };
-  }
-
-  // Default
-  return {
-    status: 'completed',
-    label: 'Available',
-    color: '#16a34a',
-    icon: 'lock-open',
-    iconLibrary: 'materialCommunity',
-  };
-};
     const filteredVideos = useMemo(() => {
         let list = videos;
 
@@ -117,6 +107,19 @@ const getVideoStatus = (video) => {
             return order[statusA] - order[statusB];
         });
     }, [videos, searchQuery, filterType]);
+
+    const fetchPdfNotesViaVideoId = async () => {
+        try {
+            const res = await axios.get(`${API_URL_LOCAL_ENDPOINT}/pdfnotes?videoId=50`)
+            console.log(res.data)
+        } catch (error) {
+            console.log(error)
+        }
+    }
+
+    useEffect(() => {
+        fetchPdfNotesViaVideoId()
+    }, [])
 
     const openVideo = async (video) => {
         try {
@@ -233,7 +236,7 @@ const getVideoStatus = (video) => {
 
             {/* Filter Tabs */}
             <View style={styles.filterContainer}>
-                {['all', 'live', 'upcoming', 'completed'].map((type) => (
+                {['alls', 'live', 'upcoming', 'completed'].map((type) => (
                     <TouchableOpacity
                         key={type}
                         onPress={() => setFilterType(type)}
@@ -342,7 +345,7 @@ const getVideoStatus = (video) => {
                                                 /* NORMAL / RECORDED */
                                                 <>
                                                     <Text style={styles.dateText}>
-                                                       {item.TimeOfClass.substring(0, 5)} {/* 16:58 दिखाने के लिए */}
+                                                        {item.TimeOfClass.substring(0, 5)} {/* 16:58 दिखाने के लिए */}
                                                     </Text>
 
                                                     <Text style={styles.dateText}>
@@ -360,7 +363,26 @@ const getVideoStatus = (video) => {
                                 </View>
 
                                 {/* Arrow Indicator */}
-                                <Ionicons name="chevron-forward" size={24} color="#d1d5db" style={styles.arrowIcon} />
+                                {/* Replace this line */}
+                                {/* <Ionicons name="chevron-forward" size={24} color="#d1d5db" style={styles.arrowIcon} /> */}
+
+                                {/* With this */}
+                                <View style={styles.iconRow}>
+                                    <TouchableOpacity
+                                        onPress={() =>
+                                            navigation.navigate('PdfNotes', {
+                                                videoId: item.id,
+                                                videoTitle: item.title,
+                                                batchId: id,
+                                            })
+                                        }
+                                        style={styles.pdfButton}
+                                    >
+                                        <MaterialCommunityIcons name="file-pdf-box" size={28} color="#dc2626" />
+                                        <Text style={styles.pdfText}>PDF</Text>
+                                    </TouchableOpacity>
+                                    <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+                                </View>
                             </View>
                         </TouchableOpacity>
                     );
