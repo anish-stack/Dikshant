@@ -34,6 +34,7 @@ router.use('/mcqresults', require('./mcqresults'));
 router.use('/app-ratings',require("./ratting"))
 router.use('/support',require("./support.routes"))
 router.use('/doubt',require("./doubt.routes"))
+router.use('/assets',require('./appassets'))
 
 // quiz
 router.use('/quiz', require('./quiz'));

@@ -64,6 +64,11 @@ const navItems: NavItem[] = [
     name: "App Banners",
     path: "/app-baners",
   },
+    {
+    icon: <ImageDown />,
+    name: "App Assets",
+    path: "/app-assets",
+  },
   {
     icon: <ImageDown />,
     name: "FAQs",

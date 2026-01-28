@@ -30,6 +30,7 @@
     },
     "android": {
       "package": "in.kaksya.dikshant",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"

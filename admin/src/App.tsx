@@ -53,6 +53,7 @@ import ViewPurchase from "./pages/TestSeries/ViewPurchase";
 import Result from "./pages/TestSeries/Result";
 import AllAtempts from "./pages/Quiz/AllAtempts";
 import ResultQuiz from "./pages/Quiz/ResultQuiz";
+import AppAssets from "./pages/AppAssets/AppAssets";
 
 export default function App() {
   return (
@@ -141,6 +142,11 @@ export default function App() {
 
               <Route path="/all-attemps" element={<AllAtempts/>} />
               <Route path="/admin/quiz-attempts/:id/result" element={<ResultQuiz/>} />
+
+
+    <Route path="/app-assets" element={<AppAssets/>} />
+
+
 
     {/* admin/testseries/purchases */}
               {/* Quizes */}

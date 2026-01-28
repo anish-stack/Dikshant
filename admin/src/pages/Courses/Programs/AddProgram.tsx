@@ -92,6 +92,8 @@ const AddProgram = () => {
       const data = new FormData();
       data.append("name", formData.name);
       data.append("slug", formData.slug);
+      data.append("position", formData.position);
+
       data.append("description", formData.description);
       // data.append("typeOfCourse", formData.typeOfCourse);
       data.append("imageUrl", imageFile);

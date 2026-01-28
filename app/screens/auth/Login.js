@@ -25,15 +25,17 @@ import img1 from "../../assets/images/bg.png";
 import img2 from "../../assets/images/g.png";
 import { getDeviceInfo, getFCMToken } from "../../utils/permissions";
 import { colors } from "../../constant/color";
+import axios from "axios";
+import { LOCAL_ENDPOINT } from "../../constant/api";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const images = [img2, img1];
-
+const API_URL = `${LOCAL_ENDPOINT}/assets`
 export default function Login({ navigation }) {
   const insets = useSafeAreaInsets();
   const { login, loginWithPassword } = useAuthStore();
-
-  // Login Method Selection
+  const [onboardingImages, setOnboardingImages] = useState([]); // ["url1", "url2"]
+  const [loadingImages, setLoadingImages] = useState(true);  // Login Method Selection
   const [loginMethod, setLoginMethod] = useState("otp"); // "otp" or "password"
 
   // OTP Flow
@@ -57,15 +59,62 @@ export default function Login({ navigation }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-  useEffect(() => {
+useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        setLoadingImages(true);
+        const response = await axios.get(API_URL);
+        const data = response.data?.data;
+
+        if (data) {
+        
+          const images = [];
+          if (data.onboardingImageOne) images.push(data.onboardingImageOne);
+          if (data.onboardingImageTwo) images.push(data.onboardingImageTwo);
+
+          setOnboardingImages(images.length > 0 ? images : []); 
+        }
+      } catch (err) {
+        console.error("Failed to load onboarding images:", err);
+  
+        setOnboardingImages([require("../../assets/images/bg.png"), require("../../assets/images/g.png")]);
+      } finally {
+        setLoadingImages(false);
+      }
+    };
+
+    fetchAssets();
+  }, []);
+
+
+useEffect(() => {
+    if (onboardingImages.length <= 1) return;
+
     const id = setInterval(() => {
-      const next = (activeIdx + 1) % images.length;
+      const next = (activeIdx + 1) % onboardingImages.length;
       scrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
       setActiveIdx(next);
     }, 4000);
-    return () => clearInterval(id);
-  }, [activeIdx]);
 
+    return () => clearInterval(id);
+  }, [activeIdx, onboardingImages.length]);
+
+  useEffect(() => {
+    if (showModal) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showModal]);
   useEffect(() => {
     if (showModal) {
       Animated.spring(slideAnim, {
@@ -333,7 +382,7 @@ export default function Login({ navigation }) {
                             style={[
                               styles.toggleButtonText,
                               loginMethod === "otp" &&
-                                styles.toggleButtonTextActive,
+                              styles.toggleButtonTextActive,
                             ]}
                           >
                             Login with OTP
@@ -344,7 +393,7 @@ export default function Login({ navigation }) {
                           style={[
                             styles.toggleButton,
                             loginMethod === "password" &&
-                              styles.toggleButtonActive,
+                            styles.toggleButtonActive,
                           ]}
                           onPress={() => switchLoginMethod("password")}
                         >
@@ -359,7 +408,7 @@ export default function Login({ navigation }) {
                             style={[
                               styles.toggleButtonText,
                               loginMethod === "password" &&
-                                styles.toggleButtonTextActive,
+                              styles.toggleButtonTextActive,
                             ]}
                           >
                             Login with Password
@@ -451,7 +500,7 @@ export default function Login({ navigation }) {
                               ) : null}
                             </View>
                             <Button
-                            color={"#fff"}
+                              color={"#fff"}
                               title={
                                 isLoading ? "Verifying..." : "Verify & Sign in"
                               }
