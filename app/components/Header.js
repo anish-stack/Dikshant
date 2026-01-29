@@ -10,6 +10,7 @@ import {
   Pressable,
   Platform,
   ScrollView,
+  AppState,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../stores/auth.store";
@@ -19,13 +20,16 @@ import * as Application from "expo-application";
 import { useSettings } from "../hooks/useSettings";
 import axios from "axios";
 import { API_URL_LOCAL_ENDPOINT } from "../constant/api";
+import { useAppAssets } from "../hooks/useAssets";
 
 const { width, height } = Dimensions.get("window");
 const SIDEBAR_WIDTH = width * 0.85;
 const API_BASE = API_URL_LOCAL_ENDPOINT;
 
 export default function Header() {
-  const { logout, token } = useAuthStore(); // token added
+  const { assets, refetch: assetsRefetch, isMaintenanceActive } = useAppAssets()
+
+  const { logout, token } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState("Home");
@@ -37,7 +41,7 @@ export default function Header() {
   const triggerHaptic = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Fetch unread notification count
@@ -121,16 +125,62 @@ export default function Header() {
     }
   };
 
+  useEffect(() => {
+    if (!isMaintenanceActive) {
+      assetsRefetch(); 
+      return;
+    }
+
+    const interval = setInterval(() => {
+      assetsRefetch();
+    }, 12000); 
+
+    return () => clearInterval(interval);
+  }, [isMaintenanceActive, assetsRefetch]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        assetsRefetch();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [assetsRefetch]);
+
   const sidebarTranslateX = sidebarAnim;
   const overlayOpacity = overlayAnim;
-
+  const logoSource = assets?.appLogo
+    ? { uri: assets.appLogo }
+    : require("../assets/small.png");
   return (
     <>
-      {/* HEADER */}
-      <View style={styles.header}>
-        {/* Logo */}
-        <Image source={require("../assets/small.png")} style={styles.logo} />
 
+      {isMaintenanceActive && (
+        <View style={styles.maintenanceOverlay}>
+          <View style={styles.maintenanceCard}>
+            <Feather name="alert-triangle" size={48} color="#f59e0b" />
+            <Text style={styles.maintenanceTitle}>
+              {assets?.maintenanceTitle || "Maintenance in Progress"}
+            </Text>
+            <Text style={styles.maintenanceMessage}>
+              {assets?.maintenanceMessage || "We'll be back shortly. Thank you for your patience."}
+            </Text>
+
+            {/* Optional: show time window if you want */}
+            {assets?.maintenanceStartAt && assets?.maintenanceEndAt && (
+              <Text style={styles.maintenanceTime}>
+                Until approximately {new Date(assets.maintenanceEndAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+      <View style={styles.header}>
+        <Image source={logoSource} style={styles.logo} />
         {/* Right Icons */}
         <View style={styles.rightIcons}>
           <TouchableOpacity
@@ -151,17 +201,17 @@ export default function Header() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.menuButton}
             onPress={openSidebar}
             activeOpacity={0.7}
           >
             <Feather name="menu" size={24} color="#0f172a" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
 
-      {/* OVERLAY */}
+      {/* OVERLAY
       {isOpen && (
         <Animated.View
           style={[styles.overlay, { opacity: overlayOpacity }]}
@@ -169,7 +219,7 @@ export default function Header() {
         >
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSidebar} />
         </Animated.View>
-      )}
+      )} */}
 
       {/* SIDEBAR */}
       <Animated.View
@@ -283,7 +333,7 @@ const menuItems = {
     { icon: "home", label: "Home", screen: "Home" },
     { icon: "book-open", label: "My Courses", screen: "Profile" },
     { icon: "play-circle", label: "Recorded Courses", screen: "Courses" },
-    { icon: "file-text", label: "Test Series", badge: "soon" },
+    { icon: "file-text", label: "Test Series",screen: "Courses", badge: "New" },
     { icon: "user", label: "Profile", screen: "Profile" },
   ],
 
@@ -470,5 +520,47 @@ const styles = StyleSheet.create({
   copyrightText: {
     fontSize: 11,
     color: "#cbd5e1",
+  },
+  maintenanceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 998,
+  },
+  maintenanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    width: width * 0.82,
+    maxWidth: 360,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+  },
+  maintenanceTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#92400e',
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  maintenanceMessage: {
+    fontSize: 16,
+    color: '#444',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  maintenanceTime: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 8,
   },
 });

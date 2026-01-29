@@ -1,59 +1,87 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
-import {
-  Eye,
-  Search,
-  User,
-  Clock,
-  Trophy,
-} from "lucide-react";
+import { Eye, Search, User, Clock, Trophy } from "lucide-react";
 import { API_URL } from "../../constant/constant";
 
+// ────────────────────────────────────────────────
+//  Define Types based on your API response
+// ────────────────────────────────────────────────
+interface User {
+  name: string;
+  email: string;
+  // add more fields if needed (e.g. _id, role, etc.)
+}
+
+interface QuizAttempt {
+  attemptId: string;
+  attemptNumber: number;
+  score: number;
+  passed: boolean;
+  completedAt: string; // ISO date string
+  user: User;
+  // add other fields if your API returns more (e.g. answers, timeTaken)
+}
+
+interface Quiz {
+  title: string;
+  passingMarks: number;
+  // add more quiz fields if needed
+}
+
 const AllAttempts = () => {
- const [searchParams] = useSearchParams();
-  const quizId = searchParams.get("id"); 
+  const [searchParams] = useSearchParams();
+  const quizId = searchParams.get("id");
   const navigate = useNavigate();
   const token = localStorage.getItem("accessToken");
 
-  const [attempts, setAttempts] = useState([]);
-  const [quiz, setQuiz] = useState(null);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
 
   /* ---------------- FETCH ATTEMPTS ---------------- */
   const fetchAttempts = async () => {
+    if (!quizId || !token) {
+      toast.error("Missing quiz ID or authentication");
+      return;
+    }
+
     try {
       setLoading(true);
 
-      const res = await axios.get(
-        `${API_URL}/quiz/admin/quiz/${quizId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      console.log(res.data)
+      const res = await axios.get(`${API_URL}/quiz/admin/quiz/${quizId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      console.log("API Response:", res.data);
+
       if (res.data.success) {
-        setAttempts(res.data.data);
-        setQuiz(res.data.quiz);
+        setAttempts(res.data.data || []);
+        setQuiz(res.data.quiz || null);
+      } else {
+        toast.error(res.data.message || "Failed to load attempts");
       }
-    } catch (error) {
-      toast.error("Failed to load attempts");
+    } catch (error: any) {
+      console.error("Fetch error:", error);
+      toast.error(error.response?.data?.message || "Failed to load attempts");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAttempts();
+    if (quizId) {
+      fetchAttempts();
+    }
   }, [quizId]);
 
   /* ---------------- FILTER ---------------- */
-  const filteredAttempts = attempts.filter((a) =>
-    `${a.user?.name} ${a.user?.email}`
+  const filteredAttempts = attempts.filter((attempt) =>
+    `${attempt.user?.name || ""} ${attempt.user?.email || ""}`
       .toLowerCase()
       .includes(search.toLowerCase())
   );
@@ -63,9 +91,7 @@ const AllAttempts = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Quiz Attempts
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Quiz Attempts</h1>
           {quiz && (
             <p className="text-sm text-gray-500">
               {quiz.title} • Passing Marks: {quiz.passingMarks}
@@ -78,7 +104,7 @@ const AllAttempts = () => {
           <input
             type="text"
             placeholder="Search student..."
-            className="pl-9 pr-3 py-2 w-full border rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+            className="pl-9 pr-3 py-2 w-full border rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -102,14 +128,16 @@ const AllAttempts = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="6" className="text-center py-10">
+                <td colSpan={6} className="text-center py-10 text-gray-500">
                   Loading attempts...
                 </td>
               </tr>
             ) : filteredAttempts.length === 0 ? (
               <tr>
-                <td colSpan="6" className="text-center py-10 text-gray-500">
-                  No attempts found
+                <td colSpan={6} className="text-center py-10 text-gray-500">
+                  {search
+                    ? "No matching attempts found"
+                    : "No attempts recorded yet"}
                 </td>
               </tr>
             ) : (
@@ -124,10 +152,10 @@ const AllAttempts = () => {
                       <User className="w-4 h-4 text-gray-400" />
                       <div>
                         <p className="font-medium text-gray-900">
-                          {attempt.user?.name}
+                          {attempt.user?.name || "Unknown"}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {attempt.user?.email}
+                          {attempt.user?.email || "-"}
                         </p>
                       </div>
                     </div>
@@ -173,7 +201,7 @@ const AllAttempts = () => {
                           `/admin/quiz-attempts/${attempt.attemptId}/result`
                         )
                       }
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-700"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                     >
                       <Eye className="w-4 h-4" />
                       View Result

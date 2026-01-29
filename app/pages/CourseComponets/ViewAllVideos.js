@@ -7,7 +7,6 @@ import {
     TextInput,
     Image,
     StyleSheet,
-    Linking,
     Alert,
 } from 'react-native';
 import React, { useState, useMemo, useEffect } from 'react';
@@ -16,13 +15,13 @@ import useSWR from 'swr';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { fetcher } from '../../constant/fetcher';
 import { useAuthStore } from '../../stores/auth.store';
-import * as FileSystem from "expo-file-system/legacy";
 import axios from 'axios';
 import { API_URL_LOCAL_ENDPOINT } from '../../constant/api';
 
 export default function ViewAllVideos({ route, navigation }) {
-    const { id, } = route.params || {};
-    const { token, user } = useAuthStore()
+    const { id } = route.params || {};
+    const { token, user } = useAuthStore();
+    
     const { data: videosData, isLoading, error } = useSWR(
         id ? `/videocourses/batch/${id}` : null,
         fetcher,
@@ -31,9 +30,40 @@ export default function ViewAllVideos({ route, navigation }) {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('all');
+    const [pdfCounts, setPdfCounts] = useState({});
 
     const videos = videosData?.success ? videosData.data : [];
 
+    // Fetch PDF counts for all videos
+    const fetchPdfCounts = async () => {
+        try {
+            const uniqueVideoIds = [...new Set(videos.map(v => v.id))];
+            const counts = {};
+
+            await Promise.all(
+                uniqueVideoIds.map(async (videoId) => {
+                    try {
+                        const res = await axios.get(
+                            `${API_URL_LOCAL_ENDPOINT}/pdfnotes?videoId=${videoId}`
+                        );
+                        counts[videoId] = res.data?.count || 0;
+                    } catch (err) {
+                        counts[videoId] = 0;
+                    }
+                })
+            );
+
+            setPdfCounts(counts);
+        } catch (error) {
+            console.log('Error fetching PDF counts:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (videos.length > 0) {
+            fetchPdfCounts();
+        }
+    }, [videos]);
 
     const getVideoStatus = (video) => {
         const now = new Date();
@@ -49,10 +79,10 @@ export default function ViewAllVideos({ route, navigation }) {
         if (video.isLive && !video.isLiveEnded) {
             return {
                 status: 'live',
-                label: 'LIVE NOW',
+                label: 'Live Now',
                 color: '#dc2626',
-                icon: 'circle',
-                iconLibrary: 'materialCommunity',
+                bgColor: '#fef2f2',
+                icon: 'radio-button-on',
             };
         }
 
@@ -62,8 +92,8 @@ export default function ViewAllVideos({ route, navigation }) {
                 status: 'completed',
                 label: 'Available',
                 color: '#16a34a',
-                icon: 'lock-open',
-                iconLibrary: 'materialCommunity',
+                bgColor: '#f0fdf4',
+                icon: 'checkmark-circle',
             };
         }
 
@@ -73,8 +103,8 @@ export default function ViewAllVideos({ route, navigation }) {
                 status: 'upcoming',
                 label: 'Upcoming',
                 color: '#d97706',
-                icon: 'lock',
-                iconLibrary: 'materialCommunity',
+                bgColor: '#fffbeb',
+                icon: 'time',
             };
         }
 
@@ -83,10 +113,11 @@ export default function ViewAllVideos({ route, navigation }) {
             status: 'completed',
             label: 'Available',
             color: '#16a34a',
-            icon: 'lock-open',
-            iconLibrary: 'materialCommunity',
+            bgColor: '#f0fdf4',
+            icon: 'checkmark-circle',
         };
     };
+
     const filteredVideos = useMemo(() => {
         let list = videos;
 
@@ -108,98 +139,41 @@ export default function ViewAllVideos({ route, navigation }) {
         });
     }, [videos, searchQuery, filterType]);
 
-    const fetchPdfNotesViaVideoId = async () => {
-        try {
-            const res = await axios.get(`${API_URL_LOCAL_ENDPOINT}/pdfnotes?videoId=50`)
-            console.log(res.data)
-        } catch (error) {
-            console.log(error)
-        }
-    }
-
-    useEffect(() => {
-        fetchPdfNotesViaVideoId()
-    }, [])
-
     const openVideo = async (video) => {
         try {
-            // ❌ video missing
-            if (!video) {
-                Alert.alert("Error", "Video data not found");
-                return;
-            }
-
-            // ❌ user missing
-            if (!user?.id) {
-                Alert.alert("Error", "User not authenticated");
-                return;
-            }
-
-            // ❌ token missing
-            if (!token) {
-                Alert.alert("Error", "Session expired. Please login again.");
-                return;
-            }
-
-            // ❌ courseId missing
-            if (!id) {
-                Alert.alert("Error", "Course information missing");
-                return;
-            }
-
-            // ❌ secure token missing
-            if (!video.secureToken) {
-                Alert.alert("Error", "Video access token missing");
+            if (!video || !user?.id || !token || !id || !video.secureToken) {
+                Alert.alert('Error', 'Unable to open video. Please try again.');
                 return;
             }
 
             const status = getVideoStatus?.(video);
 
-            if (status?.status === "upcoming") {
+            if (status?.status === 'upcoming') {
                 Alert.alert(
-                    "Locked",
-                    "This video will be available after the class starts."
+                    'Class Not Started',
+                    'This class will be available after the scheduled start time.'
                 );
                 return;
             }
 
-            // ✅ Safe params
-            const params = new URLSearchParams({
-                video: String(video.secureToken),
-                batchId: String(video.batchId ?? ""),
-                userId: String(user.id),
-                token: String(token),
-                courseId: String(id),
-            }).toString();
-
-            navigation.navigate("PlayerScreen", {
+            navigation.navigate('PlayerScreen', {
                 video: video.secureToken,
-                batchId: video?.batchId ?? "",
+                batchId: video?.batchId ?? '',
                 userId: String(user.id),
                 token,
                 courseId: String(id),
-            })
-            // const url = `https://www.player.dikshantias.com/?${params}`;
-
-            // const supported = await Linking.canOpenURL(url);
-            // if (!supported) {
-            //     Alert.alert("Error", "Cannot open this URL");
-            //     return;
-            // }
-
-            // await Linking.openURL(url);
+            });
         } catch (error) {
-            console.error("openVideo error:", error);
-            Alert.alert("Error", "Failed to open video");
+            console.error('openVideo error:', error);
+            Alert.alert('Error', 'Failed to open video');
         }
     };
-
 
     if (isLoading) {
         return (
             <SafeAreaView style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#3b82f6" />
-                <Text style={styles.loadingText}>Loading videos...</Text>
+                <Text style={styles.loadingText}>Loading classes...</Text>
             </SafeAreaView>
         );
     }
@@ -207,8 +181,11 @@ export default function ViewAllVideos({ route, navigation }) {
     if (error || !videosData?.success) {
         return (
             <SafeAreaView style={styles.centerContainer}>
-                <Ionicons name="alert-circle" size={48} color="#dc2626" />
-                <Text style={styles.errorText}>Failed to load videos</Text>
+                <Ionicons name="alert-circle" size={64} color="#dc2626" />
+                <Text style={styles.errorTitle}>Unable to Load Classes</Text>
+                <Text style={styles.errorSubtitle}>
+                    Please check your connection and try again
+                </Text>
             </SafeAreaView>
         );
     }
@@ -216,42 +193,51 @@ export default function ViewAllVideos({ route, navigation }) {
     return (
         <SafeAreaView style={styles.container}>
             {/* Search Bar */}
-            <View style={styles.searchContainer}>
-                <View style={styles.searchInputWrapper}>
-                    <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
+            <View style={styles.searchSection}>
+                <View style={styles.searchBar}>
+                    <Ionicons name="search" size={20} color="#6b7280" />
                     <TextInput
-                        placeholder="Search videos..."
+                        placeholder="Search classes, topics..."
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         style={styles.searchInput}
-                        placeholderTextColor="#d1d5db"
+                        placeholderTextColor="#9ca3af"
                     />
                     {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={18} color="#9ca3af" />
+                        <TouchableOpacity
+                            onPress={() => setSearchQuery('')}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Ionicons name="close-circle" size={20} color="#9ca3af" />
                         </TouchableOpacity>
                     )}
                 </View>
             </View>
 
             {/* Filter Tabs */}
-            <View style={styles.filterContainer}>
-                {['alls', 'live', 'upcoming', 'completed'].map((type) => (
+            <View style={styles.filterSection}>
+                {[
+                    { key: 'all', label: 'All' },
+                    { key: 'live', label: 'Live' },
+                    { key: 'upcoming', label: 'Upcoming' },
+                    { key: 'completed', label: 'Available' },
+                ].map((filter) => (
                     <TouchableOpacity
-                        key={type}
-                        onPress={() => setFilterType(type)}
+                        key={filter.key}
+                        onPress={() => setFilterType(filter.key)}
                         style={[
                             styles.filterTab,
-                            filterType === type && styles.filterTabActive,
+                            filterType === filter.key && styles.filterTabActive,
                         ]}
+                        activeOpacity={0.7}
                     >
                         <Text
                             style={[
                                 styles.filterText,
-                                filterType === type && styles.filterTextActive,
+                                filterType === filter.key && styles.filterTextActive,
                             ]}
                         >
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                            {filter.label}
                         </Text>
                     </TouchableOpacity>
                 ))}
@@ -262,126 +248,176 @@ export default function ViewAllVideos({ route, navigation }) {
                 data={filteredVideos}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
-                        <MaterialCommunityIcons name="video-off" size={64} color="#d1d5db" />
-                        <Text style={styles.emptyText}>No videos found</Text>
+                        <MaterialCommunityIcons
+                            name="video-off-outline"
+                            size={72}
+                            color="#d1d5db"
+                        />
+                        <Text style={styles.emptyTitle}>No Classes Found</Text>
+                        <Text style={styles.emptySubtitle}>
+                            {searchQuery.trim()
+                                ? 'Try a different search term'
+                                : 'New classes will appear here'}
+                        </Text>
                     </View>
                 }
                 renderItem={({ item }) => {
-                    console.log(item)
                     const status = getVideoStatus(item);
-                    const IconComponent = status.iconLibrary === 'materialCommunity' ? MaterialCommunityIcons : Ionicons;
+                    const pdfCount = pdfCounts[item.id] || 0;
+                    const isLive = status.status === 'live';
+                    const isUpcoming = status.status === 'upcoming';
 
                     return (
                         <TouchableOpacity
                             onPress={() => openVideo(item)}
-                            style={styles.videoCard}
+                            style={[
+                                styles.videoCard,
+                                isLive && styles.liveCard,
+                                isUpcoming && styles.upcomingCard,
+                            ]}
                             activeOpacity={0.7}
+                            disabled={isUpcoming}
                         >
-                            <View style={styles.videoRow}>
+                            {/* Live Indicator */}
+                            {isLive && (
+                                <View style={styles.liveTopBar}>
+                                    <View style={styles.livePulse} />
+                                    <Text style={styles.liveTopText}>LIVE NOW</Text>
+                                </View>
+                            )}
+
+                            <View style={styles.cardContent}>
                                 {/* Thumbnail */}
-                                {item?.imageUrl ? (
-                                    <Image
-                                        source={{ uri: item.imageUrl }}
-                                        style={styles.thumbnail}
-                                        resizeMode="cover"
-                                    />
-                                ) : (
-                                    <View style={[styles.thumbnail, styles.fallback]}>
-                                        <MaterialCommunityIcons
-                                            name="play-circle"
-                                            size={48}
-                                            color="#ffffff"
+                                <View style={styles.thumbnailContainer}>
+                                    {item?.imageUrl ? (
+                                        <Image
+                                            source={{ uri: item.imageUrl }}
+                                            style={styles.thumbnail}
+                                            resizeMode="cover"
                                         />
-                                    </View>
-                                )}
-
-
-                                {/* Content */}
-                                <View style={styles.videoContent}>
-                                    <View>
-                                        <Text style={styles.videoTitle} numberOfLines={2}>
-                                            {item.title}
-                                        </Text>
-
-                                        {/* Status Badge */}
-                                        <View style={styles.statusBadge}>
-                                            <IconComponent
-                                                name={status.icon}
-                                                size={14}
-                                                color={status.color}
-                                                style={styles.statusIcon}
+                                    ) : (
+                                        <View style={[styles.thumbnail, styles.placeholderThumb]}>
+                                            <MaterialCommunityIcons
+                                                name="play-circle-outline"
+                                                size={40}
+                                                color="#ffffff"
                                             />
-                                            <Text style={[styles.statusLabel, { color: status.color }]}>
-                                                {status.label}
+                                        </View>
+                                    )}
+
+                                    {/* Duration badge on thumbnail */}
+                                    {item.duration && (
+                                        <View style={styles.durationBadge}>
+                                            <Text style={styles.durationText}>
+                                                {item.duration}
                                             </Text>
                                         </View>
-                                    </View>
-
-                                    {/* Date Info */}
-                                    {item?.dateOfClass && (
-                                        <>
-                                            {/* LIVE & NOT ENDED */}
-                                            {item?.isLive && !item?.isLiveEnded ? (
-                                                <>
-                                                    <Text style={styles.liveBadge}>🔴 LIVE</Text>
-
-                                                    <Text style={styles.dateText}>
-                                                        {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
-                                                            year: "numeric",
-                                                            month: "short",
-                                                            day: "numeric",
-                                                        })}
-                                                    </Text>
-
-                                                    {item?.TimeOfLIve && (
-                                                        <Text style={styles.timeText}>
-                                                            {item.TimeOfLIve}
-                                                        </Text>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                /* NORMAL / RECORDED */
-                                                <>
-                                                    <Text style={styles.dateText}>
-                                                        {item.TimeOfClass.substring(0, 5)} {/* 16:58 दिखाने के लिए */}
-                                                    </Text>
-
-                                                    <Text style={styles.dateText}>
-                                                        {new Date(item.dateOfClass).toLocaleDateString("en-IN", {
-                                                            year: "numeric",
-                                                            month: "short",
-                                                            day: "numeric",
-                                                        })}
-                                                    </Text>
-                                                </>
-
-                                            )}
-                                        </>
                                     )}
                                 </View>
 
-                                {/* Arrow Indicator */}
-                                {/* Replace this line */}
-                                {/* <Ionicons name="chevron-forward" size={24} color="#d1d5db" style={styles.arrowIcon} /> */}
+                                {/* Content Section */}
+                                <View style={styles.infoSection}>
+                                    {/* Title */}
+                                    <Text style={styles.videoTitle} numberOfLines={2}>
+                                        {item.title}
+                                    </Text>
 
-                                {/* With this */}
-                                <View style={styles.iconRow}>
-                                    <TouchableOpacity
-                                        onPress={() =>
-                                            navigation.navigate('PdfNotes', {
-                                                videoId: item.id,
-                                                videoTitle: item.title,
-                                                batchId: id,
-                                            })
-                                        }
-                                        style={styles.pdfButton}
+                                    {/* Status Badge */}
+                                    <View
+                                        style={[
+                                            styles.statusBadge,
+                                            { backgroundColor: status.bgColor },
+                                        ]}
                                     >
-                                        <MaterialCommunityIcons name="file-pdf-box" size={28} color="#dc2626" />
-                                        <Text style={styles.pdfText}>PDF</Text>
-                                    </TouchableOpacity>
-                                    <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+                                        <Ionicons
+                                            name={status.icon}
+                                            size={14}
+                                            color={status.color}
+                                        />
+                                        <Text style={[styles.statusText, { color: status.color }]}>
+                                            {status.label}
+                                        </Text>
+                                    </View>
+
+                                    {/* Date & Time */}
+                                    {item?.dateOfClass && (
+                                        <View style={styles.dateTimeRow}>
+                                            <Ionicons
+                                                name="calendar-outline"
+                                                size={14}
+                                                color="#6b7280"
+                                            />
+                                            <Text style={styles.dateText}>
+                                                {new Date(item.dateOfClass).toLocaleDateString(
+                                                    'en-IN',
+                                                    {
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                        year: 'numeric',
+                                                    }
+                                                )}
+                                            </Text>
+
+                                            {item?.TimeOfClass && !isLive && (
+                                                <>
+                                                    <Text style={styles.dateDivider}>•</Text>
+                                                    <Ionicons
+                                                        name="time-outline"
+                                                        size={14}
+                                                        color="#6b7280"
+                                                    />
+                                                    <Text style={styles.dateText}>
+                                                        {item.TimeOfClass.substring(0, 5)}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Right Actions */}
+                                <View style={styles.actionsColumn}>
+                                    {/* PDF Button - Only show if PDFs exist */}
+                                    {pdfCount > 0 && (
+                                        <TouchableOpacity
+                                            onPress={(e) => {
+                                                e.stopPropagation();
+                                                navigation.navigate('PdfNotes', {
+                                                    videoId: item.id,
+                                                    videoTitle: item.title,
+                                                    batchId: id,
+                                                });
+                                            }}
+                                            style={styles.pdfButton}
+                                            activeOpacity={0.7}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name="file-pdf-box"
+                                                size={24}
+                                                color="#dc2626"
+                                            />
+                                            {pdfCount > 1 && (
+                                                <View style={styles.pdfCountBadge}>
+                                                    <Text style={styles.pdfCountText}>
+                                                        {pdfCount}
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {/* Chevron */}
+                                    {!isUpcoming && (
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={24}
+                                            color="#9ca3af"
+                                            style={styles.chevron}
+                                        />
+                                    )}
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -402,148 +438,264 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#ffffff',
+        paddingHorizontal: 32,
     },
     loadingText: {
-        marginTop: 12,
-        color: '#4b5563',
+        marginTop: 16,
+        color: '#6b7280',
         fontSize: 16,
         fontWeight: '500',
     },
-    errorText: {
-        fontSize: 18,
-        color: '#dc2626',
-        marginTop: 12,
-        fontWeight: '600',
+    errorTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1f2937',
+        marginTop: 16,
+        textAlign: 'center',
+    },
+    errorSubtitle: {
+        fontSize: 14,
+        color: '#6b7280',
+        marginTop: 8,
+        textAlign: 'center',
     },
 
-    // Search Bar
-    searchContainer: {
+    // Search Section
+    searchSection: {
         backgroundColor: '#ffffff',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
     },
-    searchInputWrapper: {
+    searchBar: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#f3f4f6',
-        borderRadius: 10,
-        paddingHorizontal: 12,
-        height: 44,
-    },
-    searchIcon: {
-        marginRight: 8,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        height: 48,
+        gap: 10,
     },
     searchInput: {
         flex: 1,
-        fontSize: 16,
+        fontSize: 15,
         color: '#1f2937',
+        fontWeight: '500',
     },
 
-    // Filter Tabs
-    filterContainer: {
+    // Filter Section
+    filterSection: {
         flexDirection: 'row',
         backgroundColor: '#ffffff',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#e5e7eb',
+        gap: 8,
     },
     filterTab: {
         flex: 1,
-        paddingVertical: 12,
+        paddingVertical: 7,
+        paddingHorizontal: 2,
+        borderRadius: 10,
+        backgroundColor: '#f3f4f6',
         alignItems: 'center',
-        justifyContent: 'center',
     },
     filterTabActive: {
-        borderBottomWidth: 3,
-        borderBottomColor: '#3b82f6',
+        backgroundColor: '#3b82f6',
     },
     filterText: {
-        fontSize: 13,
-        fontWeight: '500',
+        fontSize: 11,
+        fontWeight: '600',
         color: '#6b7280',
     },
     filterTextActive: {
-        color: '#3b82f6',
-        fontWeight: '600',
+        color: '#ffffff',
     },
 
     // Video List
     listContent: {
         padding: 12,
+        paddingBottom: 24,
     },
     emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 60,
+        justifyContent: 'center',
+        paddingVertical: 80,
+        paddingHorizontal: 32,
     },
-    emptyText: {
-        color: '#9ca3af',
-        fontSize: 16,
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#374151',
         marginTop: 16,
-        fontWeight: '500',
+    },
+    emptySubtitle: {
+        fontSize: 14,
+        color: '#6b7280',
+        marginTop: 8,
+        textAlign: 'center',
     },
 
     // Video Card
     videoCard: {
         backgroundColor: '#ffffff',
-        borderRadius: 12,
+        borderRadius: 16,
         marginBottom: 12,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        elevation: 2,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    videoRow: {
+    liveCard: {
+        borderColor: '#dc2626',
+        borderWidth: 2,
+        shadowColor: '#dc2626',
+        shadowOpacity: 0.15,
+    },
+    upcomingCard: {
+        opacity: 0.7,
+    },
+    liveTopBar: {
+        backgroundColor: '#dc2626',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    livePulse: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ffffff',
+        // Animation would be added with Animated API in production
+    },
+    liveTopText: {
+        color: '#ffffff',
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    cardContent: {
         flexDirection: 'row',
         padding: 12,
-        alignItems: 'center',
+        gap: 12,
+    },
+
+    // Thumbnail
+    thumbnailContainer: {
+        position: 'relative',
     },
     thumbnail: {
-        width: 80,
-        height: 80,
+        width: 100,
+        height: 100,
+        borderRadius: 12,
         backgroundColor: '#3b82f6',
-        borderRadius: 8,
+    },
+    placeholderThumb: {
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        backgroundColor: '#3b82f6',
     },
-    videoContent: {
+    durationBadge: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    durationText: {
+        color: '#ffffff',
+        fontSize: 10,
+        fontWeight: '600',
+    },
+
+    // Info Section
+    infoSection: {
         flex: 1,
         justifyContent: 'space-between',
-        minHeight: 80,
     },
     videoTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1f2937',
+        lineHeight: 21,
         marginBottom: 8,
-        lineHeight: 22,
     },
     statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 5,
         marginBottom: 8,
     },
-    statusIcon: {
-        marginRight: 6,
-    },
-    statusLabel: {
+    statusText: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
+    },
+    dateTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        flexWrap: 'wrap',
     },
     dateText: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: '#6b7280',
         fontWeight: '500',
     },
-    arrowIcon: {
-        marginLeft: 8,
+    dateDivider: {
+        fontSize: 12,
+        color: '#d1d5db',
+        marginHorizontal: 2,
     },
 
+    // Actions Column
+    actionsColumn: {
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 4,
+    },
+    pdfButton: {
+        position: 'relative',
+        padding: 8,
+        borderRadius: 10,
+        backgroundColor: '#fef2f2',
+        borderWidth: 1,
+        borderColor: '#fecaca',
+    },
+    pdfCountBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: '#dc2626',
+        borderRadius: 10,
+        minWidth: 18,
+        height: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#ffffff',
+    },
+    pdfCountText: {
+        color: '#ffffff',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    chevron: {
+        marginTop: 8,
+    },
 });

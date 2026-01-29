@@ -51,22 +51,22 @@ export default function BottomBar() {
       ],
       gradient: ["#667eea", "#764ba2"],
     },
-    {
-      label: "Test Series",
-      icon: "book",
-      screen: "IntroTestSeries",
-      comingSoon: false,
-      title: "Professional Test Series",
-      description:
-        "Prepare like a pro with full-length mock tests designed by experts.",
-      features: [
-        "📝 Comprehensive mock tests",
-        "🎓 Expert-crafted questions",
-        "📈 Detailed performance reports",
-        "⏱️ Real exam simulation",
-      ],
-      gradient: ["#f093fb", "#f5576c"],
-    },
+    // {
+    //   label: "Test Series",
+    //   icon: "book",
+    //   screen: "IntroTestSeries",
+    //   comingSoon: false,
+    //   title: "Professional Test Series",
+    //   description:
+    //     "Prepare like a pro with full-length mock tests designed by experts.",
+    //   features: [
+    //     "📝 Comprehensive mock tests",
+    //     "🎓 Expert-crafted questions",
+    //     "📈 Detailed performance reports",
+    //     "⏱️ Real exam simulation",
+    //   ],
+    //   gradient: ["#f093fb", "#f5576c"],
+    // },
     { label: "Profile", icon: "user", screen: "Profile", comingSoon: false },
   ];
 

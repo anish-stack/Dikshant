@@ -128,7 +128,7 @@ export default function QuizDetails({ route, navigation }) {
   };
 
   const createOrderAndPay = async () => {
-    if (paying || isPurchased || quiz.isFree|| quiz?.is_free) return;
+    if (paying || isPurchased || quiz.isFree || quiz?.is_free) return;
 
     try {
       setPaying(true);
@@ -201,7 +201,7 @@ export default function QuizDetails({ route, navigation }) {
       setPaying(false);
       setPaymentStatus("success");
       successPlayer.play();
-      checkPurchaseStatus(fetchedQuiz)
+
       fetchQuizAndPurchaseStatus()
       setPaymentStatus(null);
       setTimeout(() => {
@@ -266,7 +266,7 @@ export default function QuizDetails({ route, navigation }) {
               </TouchableOpacity>
 
               <View style={styles.heroContent}>
-                {!quiz.isFree || !quiz.is_free  && (
+                {!quiz.isFree || !quiz.is_free && (
                   <View style={styles.premiumBadge}>
                     <Ionicons name="star" size={16} color="#FCD34D" />
                     <Text style={styles.premiumText}>PREMIUM</Text>
@@ -415,7 +415,7 @@ export default function QuizDetails({ route, navigation }) {
         <TouchableOpacity
           style={[
             styles.ctaButton,
-            ( quiz.isFree ||  quiz.is_free || isPurchased) ? styles.freeButton : styles.premiumButton,
+            (quiz.isFree || quiz.is_free || isPurchased) ? styles.freeButton : styles.premiumButton,
           ]}
           onPress={handleStartQuizPress}
           disabled={paying || (!canAttempt && isPurchased)}

@@ -67,6 +67,7 @@ import PdfNotesScreen from "./pages/CourseComponets/PdfNotesScreen";
 import IntroTestSeries from "./pages/TestSeries/IntroTestSeries";
 import TestSeriesView from "./pages/TestSeries/TestSeriesView";
 import ResultScreen from "./pages/TestSeries/ResultScreen";
+import follow from "./pages/Profile/follow";
 
 const Stack = createNativeStackNavigator();
 
@@ -444,6 +445,7 @@ export default function App() {
           <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
 
 
+          <Stack.Screen name="follow" component={follow} />
 
           <Stack.Screen name="IntroTestSeries" component={IntroTestSeries} />
           <Stack.Screen name="testseries-view" component={TestSeriesView} />

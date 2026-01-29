@@ -1,15 +1,17 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios, { isAxiosError } from "axios";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import toast, { Toaster } from "react-hot-toast";
-import { Loader2, Upload, Info } from "lucide-react";
+import toast from "react-hot-toast";
+import { Loader2, Upload, Info, HelpCircle } from "lucide-react";
 import { API_URL } from "../../constant/constant";
+import Swal from "sweetalert2";
 
 type Mode = "create" | "edit";
 
 interface FormData {
   title: string;
   description: string;
+  displayIn: "Quiz" | "TestSeries";
   totalQuestions: string;
   time_per_question: string;
   durationMinutes: string;
@@ -41,6 +43,7 @@ const CreateQuiz: React.FC = () => {
   const [form, setForm] = useState<FormData>({
     title: "",
     description: "",
+    displayIn: "Quiz",
     totalQuestions: "",
     time_per_question: "",
     durationMinutes: "",
@@ -59,24 +62,24 @@ const CreateQuiz: React.FC = () => {
   });
 
   const calculatedDuration = useMemo(() => {
-    const questions = parseInt(form.totalQuestions) || 0;
-    const timePerQ = parseInt(form.time_per_question) || 0;
-    return questions > 0 && timePerQ > 0 ? Math.round((questions * timePerQ) / 60) : 0;
+    const q = Number(form.totalQuestions) || 0;
+    const t = Number(form.time_per_question) || 0;
+    return q > 0 && t > 0 ? Math.round((q * t) / 60) : 0;
   }, [form.totalQuestions, form.time_per_question]);
 
   useEffect(() => {
-    setForm((prev) => ({ ...prev, durationMinutes: String(calculatedDuration) }));
+    setForm((prev) => ({
+      ...prev,
+      durationMinutes: String(calculatedDuration),
+    }));
   }, [calculatedDuration]);
 
-  /* Detect Mode & Fetch */
   useEffect(() => {
     const id = searchParams.get("id");
     if (id) {
       setMode("edit");
       setQuizId(id);
       fetchQuiz(id);
-    } else {
-      setMode("create");
     }
   }, [searchParams]);
 
@@ -88,30 +91,26 @@ const CreateQuiz: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const q = res.data?.data;
-      if (!q) {
-        toast.error("Quiz not found");
-        return;
-      }
-
+      const q = res.data?.data ?? {};
       setForm({
         title: q.title || "",
         description: q.description || "",
+        displayIn: q.displayIn || "Quiz", // assuming backend supports it
         totalQuestions: String(q.totalQuestions || ""),
         time_per_question: String(q.timePerQuestion || ""),
         durationMinutes: String(q.durationMinutes || ""),
         total_marks: String(q.totalMarks || ""),
         passing_marks: String(q.passingMarks || ""),
-        negative_marking: q.negativeMarking || false,
+        negative_marking: !!q.negativeMarking,
         negative_marks_per_question: String(q.negativeMarksPerQuestion || ""),
         is_free: q.isFree ?? true,
         price: String(q.price || ""),
         attempt_limit: String(q.attemptLimit || "1"),
         status: q.status || "draft",
-        show_hints: q.showHints || false,
-        show_explanations: q.showExplanations || true,
-        shuffle_questions: q.shuffleQuestions || true,
-        shuffle_options: q.shuffleOptions || true,
+        show_hints: !!q.showHints,
+        show_explanations: q.showExplanations ?? true,
+        shuffle_questions: q.shuffleQuestions ?? true,
+        shuffle_options: q.shuffleOptions ?? true,
       });
 
       if (q.image) setImagePreview(q.image);
@@ -125,9 +124,8 @@ const CreateQuiz: React.FC = () => {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file");
+    if (!file?.type.startsWith("image/")) {
+      toast.error("Please select a valid image");
       return;
     }
     setImageFile(file);
@@ -135,44 +133,34 @@ const CreateQuiz: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!form.title.trim()) {
-      toast.error("Quiz title is required");
-      return;
-    }
-
-    if (parseInt(form.totalQuestions) <= 0) {
-      toast.error("Total questions must be greater than 0");
-      return;
-    }
+    if (!form.title.trim())
+      return Swal.fire({
+        title: "Problem With Creating New Quiz",
+        text: "Title is Required Feilds",
+        timer: 2000,
+      });
 
     try {
       setLoading(true);
       const token = localStorage.getItem("accessToken");
       const formData = new FormData();
 
-      // Append all fields
-      (Object.keys(form) as (keyof FormData)[]).forEach((key) => {
-        const value = form[key];
-        if (typeof value === "boolean") {
-          formData.append(key, value ? "true" : "false");
-        } else {
-          formData.append(key, value);
-        }
+      Object.entries(form).forEach(([key, value]) => {
+        formData.append(
+          key,
+          value === true ? "true" : value === false ? "false" : String(value),
+        );
       });
 
-      if (imageFile) {
-        formData.append("image", imageFile);
-      }
+      if (imageFile) formData.append("image", imageFile);
 
       const url =
         mode === "create"
           ? `${API_URL}/quiz/quizzes`
           : `${API_URL}/quiz/quizzes/${quizId}`;
 
-      const method = mode === "create" ? "post" : "put";
-
       await axios({
-        method,
+        method: mode === "create" ? "post" : "put",
         url,
         data: formData,
         headers: {
@@ -181,12 +169,18 @@ const CreateQuiz: React.FC = () => {
         },
       });
 
-      toast.success(`Quiz ${mode === "create" ? "created" : "updated"} successfully!`);
-      setTimeout(() => navigate("/all-quizzes"), 1500);
+      toast.success(`Quiz ${mode === "create" ? "created" : "updated"}!`);
+      setTimeout(() => navigate("/all-quizzes"), 1400);
     } catch (err) {
       const msg = isAxiosError(err)
-        ? err.response?.data?.message || "Operation failed"
+        ? err.response?.data?.message || "Failed"
         : "Network error";
+
+      Swal.fire({
+        title: "Problem With Creating New Quiz",
+        text: msg,
+        timer: 2000,
+      });
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -195,49 +189,48 @@ const CreateQuiz: React.FC = () => {
 
   return (
     <>
-      <Toaster position="top-right" />
-
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-5xl mx-auto">
+      <div className="min-h-screen bg-gray-50/70 py-6 px-4 sm:px-6">
+        <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="bg-white rounded-t-2xl shadow-md p-8 border-b">
-            <h1 className="text-3xl font-bold text-gray-800">
-              {mode === "create" ? "Create New Quiz" : "Edit Quiz"}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-200">
+            <h1 className="text-2xl font-bold text-gray-800">
+              {mode === "create"
+                ? "Create Quiz / Test Series"
+                : "Edit Quiz / Test Series"}
             </h1>
-            <p className="text-gray-600 mt-2">
-              Configure quiz settings, timing, marking scheme, and visibility
+            <p className="text-sm text-gray-600 mt-1.5">
+              Fill essential details • Save as draft or publish directly
             </p>
           </div>
 
-          <div className="bg-white rounded-b-2xl shadow-lg p-8 space-y-10">
-            {/* Quiz Cover Image */}
-            <div className="text-center">
-              <label className="block text-lg font-semibold text-gray-800 mb-4">
-                Quiz Cover Image
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-8">
+            {/* Cover Image - Compact */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                Cover Image{" "}
+                <HelpCircle
+                  className="w-4 h-4 text-gray-400"
+                  title="Recommended: 1200×628 px, < 500 KB"
+                />
               </label>
-              <div className="inline-block">
-                {imagePreview ? (
-                  <div className="relative group">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                <div className="relative w-44 h-44 flex-shrink-0">
+                  {imagePreview ? (
                     <img
                       src={imagePreview}
-                      alt="Quiz cover"
-                      className="w-80 h-80 object-cover rounded-2xl shadow-xl border-4 border-gray-100"
+                      alt="Preview"
+                      className="w-full h-full object-cover rounded-lg shadow-sm border"
                     />
-                    <div className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                      <p className="text-white font-medium">Click below to change</p>
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <Upload className="w-10 h-10 text-gray-400" />
                     </div>
-                  </div>
-                ) : (
-                  <div className="w-80 h-80 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl border-4 border-dashed border-gray-300 flex items-center justify-center">
-                    <Upload className="w-20 h-20 text-gray-400" />
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              <div className="mt-6">
-                <label className="cursor-pointer inline-flex items-center gap-3 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition shadow-md">
-                  <Upload className="w-5 h-5" />
-                  {imagePreview ? "Change Image" : "Upload Image"}
+                <label className="cursor-pointer px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition flex items-center gap-2 shadow-sm">
+                  <Upload className="w-4 h-4" />
+                  {imagePreview ? "Change" : "Upload"}
                   <input
                     type="file"
                     accept="image/*"
@@ -248,178 +241,207 @@ const CreateQuiz: React.FC = () => {
               </div>
             </div>
 
-            <div className="border-t pt-8" />
+            {/* Core Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="e.g. SSC CGL 2026 – Full Mock Test"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  autoFocus
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Keep it clear & attractive for students
+                </p>
+              </div>
 
-            {/* Basic Info */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Basic Information</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quiz Title <span className="text-red-500">*</span>
-                  </label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Display As
+                </label>
+                <select
+                  value={form.displayIn}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      displayIn: e.target.value as "Quiz" | "TestSeries",
+                    })
+                  }
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                >
+                  <option value="Quiz">Standalone Quiz</option>
+                  <option value="TestSeries">Part of Test Series</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Choose how this appears in student dashboard
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Total Questions <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.totalQuestions}
+                  onChange={(e) =>
+                    setForm({ ...form, totalQuestions: e.target.value })
+                  }
+                  placeholder="e.g. 100"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
+                  Time per Question (sec)
+                  <HelpCircle
+                    className="w-4 h-4 text-gray-400"
+                    title="Typical: 45–90 sec"
+                  />
+                </label>
+                <input
+                  type="number"
+                  min="10"
+                  value={form.time_per_question}
+                  onChange={(e) =>
+                    setForm({ ...form, time_per_question: e.target.value })
+                  }
+                  placeholder="e.g. 60"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
+                  Duration (minutes)
+                  <Info
+                    className="w-4 h-4 text-blue-500"
+                    title="Auto-calculated"
+                  />
+                </label>
+                <div className="relative">
                   <input
                     type="text"
-                    value={form.title}
-                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                    placeholder="e.g. Bank PO Prelims 2026"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Questions
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.totalQuestions}
-                    onChange={(e) => setForm({ ...form, totalQuestions: e.target.value })}
-                    placeholder="e.g. 100"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Time per Question (seconds)
-                  </label>
-                  <input
-                    type="number"
-                    min="10"
-                    value={form.time_per_question}
-                    onChange={(e) => setForm({ ...form, time_per_question: e.target.value })}
-                    placeholder="e.g. 60"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Duration (minutes)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={calculatedDuration || "-"}
-                      disabled
-                      className="w-full px-5 py-3 border border-gray-300 rounded-xl bg-gray-50 text-gray-700 font-semibold"
-                    />
-                    <Info className="absolute right-3 top-3.5 w-5 h-5 text-blue-500" title="Auto-calculated from questions × time per question" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Scoring */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Scoring & Attempts</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Marks
-                  </label>
-                  <input
-                    type="number"
-                    value={form.total_marks}
-                    onChange={(e) => setForm({ ...form, total_marks: e.target.value })}
-                    placeholder="e.g. 200"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Passing Marks
-                  </label>
-                  <input
-                    type="number"
-                    value={form.passing_marks}
-                    onChange={(e) => setForm({ ...form, passing_marks: e.target.value })}
-                    placeholder="e.g. 120"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Attempt Limit
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={form.attempt_limit}
-                    onChange={(e) => setForm({ ...form, attempt_limit: e.target.value })}
-                    placeholder="e.g. 3"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    value={calculatedDuration || "—"}
+                    disabled
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-medium cursor-not-allowed"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-lg font-semibold text-gray-800 mb-3">
-                Description
-              </label>
-              <textarea
-                rows={5}
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="Describe what this quiz covers, its difficulty level, target audience, etc."
-                className="w-full px-5 py-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
-              />
+            {/* Scoring & Attempts – Compact row */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Total Marks
+                </label>
+                <input
+                  type="number"
+                  value={form.total_marks}
+                  onChange={(e) =>
+                    setForm({ ...form, total_marks: e.target.value })
+                  }
+                  placeholder="e.g. 200"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Passing Marks
+                </label>
+                <input
+                  type="number"
+                  value={form.passing_marks}
+                  onChange={(e) =>
+                    setForm({ ...form, passing_marks: e.target.value })
+                  }
+                  placeholder="e.g. 120"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Attempt Limit
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.attempt_limit}
+                  onChange={(e) =>
+                    setForm({ ...form, attempt_limit: e.target.value })
+                  }
+                  placeholder="e.g. 3"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
 
-            {/* Options */}
+            {/* Toggles – Compact grid */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Quiz Options</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Quiz Behaviour
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
                 {[
-                  { key: "is_free", label: "Free Quiz" },
-                  { key: "negative_marking", label: "Enable Negative Marking" },
-                  { key: "show_hints", label: "Show Hints During Quiz" },
-                  { key: "show_explanations", label: "Show Explanations After Submit" },
-                  { key: "shuffle_questions", label: "Shuffle Question Order" },
-                  { key: "shuffle_options", label: "Shuffle Answer Options" },
+                  { key: "is_free", label: "Free Access" },
+                  { key: "negative_marking", label: "Negative Marking" },
+                  { key: "show_hints", label: "Show Hints" },
+                  { key: "show_explanations", label: "Show Explanations" },
+                  { key: "shuffle_questions", label: "Shuffle Questions" },
+                  { key: "shuffle_options", label: "Shuffle Options" },
                 ].map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-4 cursor-pointer">
+                  <label
+                    key={key}
+                    className="flex items-center gap-3 cursor-pointer group"
+                  >
                     <input
                       type="checkbox"
                       checked={(form as any)[key]}
-                      onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
-                      className="w-6 h-6 text-blue-600 rounded focus:ring-blue-500"
+                      onChange={(e) =>
+                        setForm({ ...form, [key]: e.target.checked })
+                      }
+                      className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                     />
-                    <span className="text-gray-700 font-medium">{label}</span>
+                    <span className="text-sm text-gray-700 group-hover:text-gray-900 transition">
+                      {label}
+                    </span>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* Conditional Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Conditional fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {!form.is_free && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Price (₹)
                   </label>
                   <input
                     type="number"
                     min="0"
                     value={form.price}
-                    onChange={(e) => setForm({ ...form, price: e.target.value })}
-                    placeholder="e.g. 299"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    onChange={(e) =>
+                      setForm({ ...form, price: e.target.value })
+                    }
+                    placeholder="e.g. 249"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               )}
 
               {form.negative_marking && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Negative Marks per Wrong Answer
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Negative Marks per Wrong
                   </label>
                   <input
                     type="number"
@@ -427,43 +449,63 @@ const CreateQuiz: React.FC = () => {
                     min="0"
                     value={form.negative_marks_per_question}
                     onChange={(e) =>
-                      setForm({ ...form, negative_marks_per_question: e.target.value })
+                      setForm({
+                        ...form,
+                        negative_marks_per_question: e.target.value,
+                      })
                     }
-                    placeholder="e.g. 0.25"
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="e.g. 0.33 or 1"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               )}
             </div>
 
-            {/* Status */}
+            {/* Description – smaller */}
             <div>
-              <label className="block text-lg font-semibold text-gray-800 mb-3">
-                Publication Status
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Description
               </label>
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                className="w-full max-w-xs px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="draft">Draft (Hidden from students)</option>
-                <option value="published">Published (Live)</option>
-              </select>
+              <textarea
+                rows={3}
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="Target audience, topics covered, difficulty level..."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              />
             </div>
 
-            {/* Submit */}
-            <div className="flex justify-end pt-8 border-t">
+            {/* Status & Submit */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-6 border-t">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Status
+                </label>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm({ ...form, status: e.target.value as any })
+                  }
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[220px]"
+                >
+                  <option value="draft">Draft – Not visible</option>
+                  <option value="published">Published – Live now</option>
+                </select>
+              </div>
+
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="px-10 py-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-lg rounded-xl shadow-lg transition flex items-center gap-3"
+                className="px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md transition flex items-center gap-2 min-w-[180px] justify-center"
               >
-                {loading && <Loader2 className="w-6 h-6 animate-spin" />}
+                {loading && <Loader2 className="w-5 h-5 animate-spin" />}
                 {loading
                   ? "Saving..."
                   : mode === "create"
-                  ? "Create Quiz"
-                  : "Update Quiz"}
+                    ? "Create"
+                    : "Update"}
               </button>
             </div>
           </div>

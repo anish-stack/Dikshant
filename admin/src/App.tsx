@@ -54,6 +54,7 @@ import Result from "./pages/TestSeries/Result";
 import AllAtempts from "./pages/Quiz/AllAtempts";
 import ResultQuiz from "./pages/Quiz/ResultQuiz";
 import AppAssets from "./pages/AppAssets/AppAssets";
+import AllCategories from "./pages/app_categories/AllCategories";
 
 export default function App() {
   return (
@@ -146,7 +147,7 @@ export default function App() {
 
     <Route path="/app-assets" element={<AppAssets/>} />
 
-
+    <Route path="/app-Categories" element={<AllCategories/>} />
 
     {/* admin/testseries/purchases */}
               {/* Quizes */}

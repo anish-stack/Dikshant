@@ -25,73 +25,63 @@ const colors = {
 };
 
 const quickActions = [
-  { 
-    label: "My Courses", 
-    icon: "book-open", 
-    bg: "#E0E7FF", 
-    color: "#6366F1", 
-    screen: "all-my-course" 
+  {
+    label: "My Courses",
+    icon: "book-open",
+    bg: "#E0E7FF",
+    color: "#6366F1",
+    screen: "all-my-course"
   },
-  { 
-    label: "Quizzes", 
-    icon: "help-circle-outline", 
-    bg: "#DCFCE7", 
-    color: "#22C55E", 
-    screen: "all-my-quiz" // ya jo bhi tera quiz list screen hai
+  {
+    label: "Quizzes",
+    icon: "help-circle",
+    bg: "#DCFCE7",
+    color: "#22C55E",
+    screen: "all-my-quiz"
   },
-  { 
-    label: "Test Series", 
-    icon: "file-text", 
-    bg: "#FEF3C7", 
-    color: "#F59E0B", 
+  {
+    label: "Test Series",
+    icon: "file-text",
+    bg: "#FEF3C7",
+    color: "#F59E0B",
     screen: "TestSeries" // tera test series screen name daal dena
   },
-  { 
-    label: "Settings", 
-    icon: "settings", 
-    bg: "#DBEAFE", 
-    color: "#3B82F6", 
-    screen: "Settings" 
+  {
+    label: "Settings",
+    icon: "settings",
+    bg: "#DBEAFE",
+    color: "#3B82F6",
+    screen: "Settings"
   },
-  { 
-    label: "Share App", 
-    icon: "share-2", 
-    bg: "#E0E7FF", 
-    color: "#6366F1", 
-    action: "share" 
+
+  {
+    label: "Rate Us",
+    icon: "star",
+    bg: "#FEF3C7",
+    color: "#F59E0B",
+    action: "rate"
   },
-  { 
-    label: "Rate Us", 
-    icon: "star", 
-    bg: "#FEF3C7", 
-    color: "#F59E0B", 
-    action: "rate" 
+  {
+    label: "Scholarships",
+    icon: "award",
+    bg: "#DCFCE7",
+    color: "#22C55E",
+    screen: "apply-sch"
   },
-  { 
-    label: "Scholarships", 
-    icon: "award", 
-    bg: "#DCFCE7", 
-    color: "#22C55E", 
-    screen: "apply-sch" 
-  },
-  { 
-    label: "Offers", 
-    icon: "gift", 
-    bg: "#FEE2E2", 
-    color: "#EF4444", 
-    screen: "Offers" 
-  },
-  { 
-    label: "Help & Support", 
-    icon: "help-circle", 
-    bg: "#FCE7F3", 
-    color: "#EC4899", 
-    screen: "HelpSupport" 
+
+  {
+    label: "Help & Support",
+    icon: "help-circle",
+    bg: "#FCE7F3",
+    color: "#EC4899",
+    screen: "HelpSupport"
   },
 ];
 const menuOptions = [
   { label: "Notifications", icon: "bell", screen: "Notifications" },
   { label: "Terms & Conditions", icon: "file-text", urlKey: "termsUrl" },
+  { label: "Join us", icon: "link",screen:"follow" },
+
   { label: "Privacy Policy", icon: "shield", urlKey: "privacyPolicyUrl" },
 ];
 
@@ -107,7 +97,7 @@ export default function Profile() {
   const { settings } = useSettings();
 
   const triggerHaptic = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
   };
 
   const handleLogout = async () => {
@@ -121,6 +111,8 @@ export default function Profile() {
     } else if (item.action === "share") {
       // Add share logic later
     } else if (item.action === "rate") {
+      console.log(settings)
+      Linking.openURL(settings?.playStoreUrl)
       // Add rate logic later
     }
   };
@@ -128,7 +120,7 @@ export default function Profile() {
   const handleMenuPress = (item) => {
     triggerHaptic();
     if (item.urlKey && settings[item.urlKey]) {
-      Linking.openURL(settings[item.urlKey]).catch(() => {});
+      Linking.openURL(settings[item.urlKey]).catch(() => { });
     } else if (item.screen) {
       navigation.navigate(item.screen);
     }
@@ -178,7 +170,7 @@ export default function Profile() {
                 activeOpacity={0.8}
               >
                 <View style={[styles.actionIcon, { backgroundColor: item.bg }]}>
-                  <Feather name={item.icon} size={20} color={item.color} />
+                  <Feather name={item.icon} size={18} color={item.color} />
                 </View>
                 <Text style={styles.actionText}>{item.label}</Text>
               </TouchableOpacity>
@@ -306,7 +298,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   actionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.text,
     textAlign: 'center',

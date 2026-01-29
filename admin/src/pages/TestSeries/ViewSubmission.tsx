@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Download,
   Clock,
-  User,
   AlertCircle,
   CheckCircle,
   FileText,
@@ -15,7 +14,6 @@ import {
   Filter,
   X,
   Calendar,
-  ExternalLink,
   Users,
 } from "lucide-react";
 import { API_URL } from "../../constant/constant";

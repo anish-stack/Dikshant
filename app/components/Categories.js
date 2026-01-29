@@ -1,87 +1,25 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
-const { width } = Dimensions.get("window");
+import axios from "axios";
+import { LOCAL_ENDPOINT } from "../constant/api";
 
+const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 3;
 
-const categories = [
-  {
-    id: 1,
-    title: "Live Classes",
-    subtitle: "Interactive learning",
-    icon: "video",
-    screen: "Courses",
-    filter: "online",
-    gradient: ["#8b5cf6", "#6d28d9"],
-    students: "50K+",
-    comingSoon: false,
-  },
-  {
-    id: 2,
-    title: "Recorded Courses",
-    subtitle: "Learn at your pace",
-    icon: "play",
-    screen: "Courses",
-    filter: "recorded",
-    gradient: ["#ec4899", "#be185d"],
-    students: "1M+",
-    comingSoon: false,
-  },
-  {
-    id: 3,
-    title: "Offline Classes",
-    subtitle: "Classroom experience",
-    icon: "map-pin",
-    screen: "Courses",
-    filter: "offline",
-    gradient: ["#06b6d4", "#0891b2"],
-    students: "25K+",
-    comingSoon: false,
-  },
-  {
-    id: 4,
-    title: "Study Materials",
-    subtitle: "Notes & PDFs",
-    icon: "book-open",
-    screen: "ComingSoon",
-    gradient: ["#f59e0b", "#d97706"],
-    students: "Coming Soon",
-    comingSoon: true,
-  },
-  {
-    id: 5,
-    title: "Mock Tests",
-    subtitle: "Practice & improve",
-    icon: "edit-3",
-    screen: "ComingSoon",
-    gradient: ["#f97316", "#ea580c"],
-    students: "Coming Soon",
-    comingSoon: true,
-  },
-  {
-    id: 6,
-    title: "Doubt Solving",
-    subtitle: "Get instant help",
-    icon: "help-circle",
-    screen: "ComingSoon",
-    gradient: ["#a855f7", "#7c3aed"],
-    students: "Coming Soon",
-    comingSoon: true,
-  },
-];
-
+/* ---------------- CATEGORY CARD ---------------- */
 const CategoryCard = ({ item }) => {
   const navigation = useNavigation();
+
   const handlePress = () => {
     if (item.comingSoon) return;
 
@@ -91,6 +29,7 @@ const CategoryCard = ({ item }) => {
       navigation.navigate(item.screen);
     }
   };
+
   return (
     <TouchableOpacity
       style={[styles.categoryCard, { width: CARD_WIDTH }]}
@@ -122,21 +61,51 @@ const CategoryCard = ({ item }) => {
   );
 };
 
+/* ---------------- MAIN COMPONENT ---------------- */
 export default function Categories() {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCategories = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`${LOCAL_ENDPOINT}/assets/category`);
+
+      if (res.data?.success) {
+        setCategories(res.data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to load categories", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="small" color="#6d28d9" />
+      </View>
+    );
+  }
+
+  // Split into rows of 3
   const firstRow = categories.slice(0, 3);
   const secondRow = categories.slice(3, 6);
 
   return (
     <View style={styles.container}>
       <View style={styles.categoriesSection}>
-        {/* First Row */}
         <View style={styles.row}>
           {firstRow.map((item) => (
             <CategoryCard key={item.id} item={item} />
           ))}
         </View>
 
-        {/* Second Row */}
         <View style={styles.row}>
           {secondRow.map((item) => (
             <CategoryCard key={item.id} item={item} />
@@ -147,6 +116,7 @@ export default function Categories() {
   );
 }
 
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -168,10 +138,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     elevation: 3,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
@@ -213,5 +180,10 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     textAlign: "center",
     lineHeight: 16,
+  },
+  loader: {
+    height: 110,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

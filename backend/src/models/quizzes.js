@@ -11,6 +11,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      displayIn: {
+        type: DataTypes.ENUM("Quiz", "TestSeries"),
+        default: "Quiz",
+        allowNull: false,
+      },
       title: {
         type: DataTypes.STRING,
         allowNull: false,

@@ -189,40 +189,6 @@ const Settings: React.FC = () => {
               </div>
             </section>
 
-            {/* Feature Toggles */}
-            <section>
-              <h2 className="text-xl font-bold text-gray-800 mb-6 pb-4 border-b-2 border-gray-200">Feature Controls</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-                {([
-                  'enableQuiz',
-                  'enableTestSeries',
-                  'enableScholarship',
-                  'enableOffers',
-                  'pushNotificationsEnabled',
-                  'paymentsEnabled',
-                  'maintenanceMode',
-                  'forceUpdate',
-                ] as const).map(field => (
-                  <label key={field} className="flex items-center gap-4 cursor-pointer p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
-                    <input
-                      type="checkbox"
-                      checked={settings[field]}
-                      onChange={(e) => {
-                        const newVal = e.target.checked;
-                        setSettings(prev => prev ? { ...prev, [field]: newVal } : null);
-                        saveField(field, newVal);
-                      }}
-                      disabled={savingFields[field]}
-                      className="w-6 h-6 text-indigo-600 rounded focus:ring-indigo-500"
-                    />
-                    <span className="font-medium text-gray-800">
-                      {field.replace(/enable|Mode|Update/g, '').trim() || field}
-                    </span>
-                    {savingFields[field] && <Loader2 className="w-5 h-5 animate-spin text-indigo-600 ml-auto" />}
-                  </label>
-                ))}
-              </div>
-            </section>
 
             {/* Links & Support */}
             <section>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,34 +9,60 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  FlatList,
+  TextInput,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Layout from '../../components/layout';
 import * as Haptics from 'expo-haptics';
 import axios from 'axios';
-import { LOCAL_ENDPOINT } from "../../constant/api";
+import { LOCAL_ENDPOINT } from '../../constant/api';
 import { useAuthStore } from '../../stores/auth.store';
+import Layout from '../../components/layout';
+import QuizCard from '../Quiz/QuizCard';
+
 
 const { width } = Dimensions.get('window');
+const ITEMS_PER_PAGE = 10;
 
 export default function TestSeries({ navigation }) {
-  const [activeTab, setActiveTab] = useState('available');
+  // ─── States ────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState('all'); // 'all' | 'objective' | 'my'
+
+  // Test Series (packages)
   const [testSeries, setTestSeries] = useState([]);
+  const [purchasedMap, setPurchasedMap] = useState({});
+
+  // Objective Quizzes (paginated)
+  const [quizes, setQuizes] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isPurchased, setIsPurchased] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // UI states
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [purchasedMap, setPurchasedMap] = useState({});
-  const [checkingPurchase, setCheckingPurchase] = useState(false);
-  const { user, token } = useAuthStore();
 
+  const { token } = useAuthStore();
 
-  const fetchTestSeries = async (isRefresh = false) => {
+  // ─── Haptics Helper ────────────────────────────────────────────────────────
+  const triggerHaptic = useCallback(() => {
     try {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch { }
+  }, []);
 
-      const response = await axios.get(`${LOCAL_ENDPOINT}/testseriess`, {
+  // ─── Fetch Test Series Packages ────────────────────────────────────────────
+  const fetchTestSeries = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    setRefreshing(isRefresh);
+    setError(null);
+
+    try {
+      const res = await axios.get(`${LOCAL_ENDPOINT}/testseriess`, {
         params: {
           limit: 120,
           sortBy: 'displayOrder',
@@ -44,85 +70,137 @@ export default function TestSeries({ navigation }) {
         },
       });
 
-      if (response.data.success) {
-        setTestSeries(response.data.data);
-        checkPurchasedTestSeries(response.data.data);
-      } else {
-        setError('Failed to load test series');
-      }
+      if (!res.data?.success) throw new Error('Failed to load');
+
+      const data = Array.isArray(res.data.data) ? res.data.data : [];
+      setTestSeries(data);
+
+      if (token) await checkPurchased(data);
     } catch (err) {
-      console.error('Error fetching test series:', err);
-      setError('Network error. Please try again.');
+      setError('Failed to load test series. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => {
-    fetchTestSeries();
+  const checkPurchased = useCallback(async (seriesList) => {
+    if (!token || !seriesList.length) return;
+
+    const map = {};
+    await Promise.all(
+      seriesList.map(async (series) => {
+        try {
+          const res = await axios.get(
+            `${LOCAL_ENDPOINT}/orders/already-purchased`,
+            {
+              params: { itemId: series.id, type: 'test' },
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          map[series.id] = !!res.data?.purchased;
+        } catch {
+          map[series.id] = false;
+        }
+      })
+    );
+    setPurchasedMap(map);
+  }, [token]);
+
+  // ─── Fetch Objective Quizzes (paginated) ───────────────────────────────────
+  const fetchQuizes = useCallback(async (page = 1, search = '', append = false) => {
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const params = { page, limit: ITEMS_PER_PAGE };
+      if (search.trim()) params.search = search.trim();
+
+      const res = await axios.get(`${LOCAL_ENDPOINT}/quiz/quizzes?displayIn=TestSeries`, { params });
+
+      const newQuizes = res.data.data || [];
+      const total = res.data.totalPages || 1;
+
+      setQuizes(append ? (prev) => [...prev, ...newQuizes] : newQuizes);
+      setTotalPages(total);
+      setCurrentPage(page);
+    } catch (err) {
+      console.error('Quizzes fetch error:', err);
+      if (!append) setError('Failed to load objective tests');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
   }, []);
 
-  const triggerHaptic = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) { }
-  };
+  // ─── Effects ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchTestSeries();
+  }, [fetchTestSeries]);
 
+  useEffect(() => {
+    if (activeTab === 'objective') {
+      setQuizes([]);           // reset list when tab/search changes
+      setCurrentPage(1);
+      fetchQuizes(1, searchQuery, false);
+    }
+  }, [activeTab, searchQuery, fetchQuizes]);
+
+  // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleTabChange = (tab) => {
     triggerHaptic();
     setActiveTab(tab);
   };
 
-  const checkPurchasedTestSeries = async (seriesList = []) => {
-    if (!Array.isArray(seriesList) || seriesList.length === 0) return;
-
-    try {
-      setCheckingPurchase(true);
-
-      const results = {};
-
-      await Promise.all(
-        seriesList.map(async (series) => {
-          try {
-            const res = await axios.get(
-              `${LOCAL_ENDPOINT}/orders/already-purchased`,
-              {
-                params: {
-                  itemId: series.id,   // ✅ renamed item → series
-                  type: "test",
-                },
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            );
-
-            results[series.id] = res.data?.purchased === true;
-          } catch (err) {
-            results[series.id] = false;
-          }
-        })
-      );
-
-      setPurchasedMap(results);
-    } catch (err) {
-      console.error("Purchase check failed:", err);
-    } finally {
-      setCheckingPurchase(false);
-    }
+  const handleViewTestSeries = (id) => {
+    triggerHaptic();
+    navigation.navigate('testseries-view', {
+      id,
+      isPurchased: !!purchasedMap[id],
+    });
   };
 
 
-  const handleView = (id, isPurchased) => {
-    triggerHaptic()
-    navigation.navigate("testseries-view", { id, isPurchased: isPurchased })
-  }
-  const myTestSeries = Array.isArray(testSeries)
-    ? testSeries.filter((item) => purchasedMap?.[item?.id])
-    : [];
 
-  // console.log(myTestSeries)
+  const handleQuizPress = useCallback(
+      (quiz) => {
+        navigation.navigate("QuizDetails", {
+          quizId: quiz.id,
+          isPurchased,
+        });
+      },
+      [navigation, isPurchased]
+    );
+  const handleLoadMore = () => {
+    if (loadingMore || currentPage >= totalPages) return;
+    fetchQuizes(currentPage + 1, searchQuery, true);
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (activeTab === 'objective') {
+      fetchQuizes(1, searchQuery, false);
+    } else {
+      fetchTestSeries(true);
+    }
+  };
+
+  // ─── Computed / Filtered Data ──────────────────────────────────────────────
+  const filteredTestSeries = useMemo(() => {
+    if (!Array.isArray(testSeries)) return [];
+
+    switch (activeTab) {
+      case 'objective':
+        return testSeries.filter((item) => item.displayIn === 'Quiz');
+      case 'my':
+        return testSeries.filter((item) => purchasedMap[item.id]);
+      case 'all':
+      default:
+        return testSeries;
+    }
+  }, [activeTab, testSeries, purchasedMap]);
+
+  // ─── Badge / Format Helpers ────────────────────────────────────────────────
   const getStatusBadge = (status) => {
     switch (status) {
       case 'featured': return { text: 'Featured', color: '#a78bfa' };
@@ -136,10 +214,142 @@ export default function TestSeries({ navigation }) {
     return new Date(dateString).toLocaleDateString('en-IN', {
       day: 'numeric',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
     });
   };
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
+  const renderQuizList = () => (
+    <FlatList
+      data={quizes}
+      keyExtractor={(item) => item.id.toString()}
+      renderItem={({ item }) => (
+        <QuizCard
+          item={item}
+          onPress={() => handleQuizPress(item)}
+          setIsPurchased={setIsPurchased}
+          isRefresh={refreshing}
+        />
+      )}
+      showsVerticalScrollIndicator={false}
+      ListEmptyComponent={() => (
+        <View style={styles.emptyState}>
+          <Feather name="file-text" size={48} color="#cbd5e1" />
+          <Text style={styles.emptyTitle}>
+            {searchQuery ? 'No matching quizzes' : 'No Objective Tests'}
+          </Text>
+          <Text style={styles.emptyText}>
+            {searchQuery ? 'Try different keywords' : 'Check back soon!'}
+          </Text>
+        </View>
+      )}
+      ListFooterComponent={
+        loadingMore ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <ActivityIndicator color="#DC3545" />
+          </View>
+        ) : null
+      }
+      onEndReached={handleLoadMore}
+      onEndReachedThreshold={0.5}
+    />
+  );
+
+  const renderTestSeriesList = () => (
+    <View style={styles.section}>
+      {filteredTestSeries.map((item) => {
+        const isPurchased = !!purchasedMap[item.id];
+        const statusInfo = getStatusBadge(item.status);
+
+        return (
+          <TouchableOpacity
+            key={item.id}
+            style={styles.testCard}
+            activeOpacity={0.8}
+            onPress={() => handleViewTestSeries(item.id)}
+          >
+            <View style={styles.testImageContainer}>
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.testImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageOverlay}>
+                <View style={[styles.levelBadge, { backgroundColor: statusInfo.color }]}>
+                  <Text style={styles.levelText}>{statusInfo.text}</Text>
+                </View>
+                {isPurchased && (
+                  <View style={styles.purchasedBadge}>
+                    <Text style={styles.purchasedText}>Purchased</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.testContent}>
+              <Text style={styles.testTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.testDescription} numberOfLines={2}>
+                {item.description}
+              </Text>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Feather name="clock" size={14} color="#64748b" />
+                  <Text style={styles.statText}>{item.timeDurationForTest} mins</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Feather name="file-text" size={14} color="#64748b" />
+                  <Text style={styles.statText}>Full Length</Text>
+                </View>
+              </View>
+
+              <View style={styles.metaRow}>
+                <View style={styles.typeContainer}>
+                  <Text style={styles.typeText}>
+                    {item.type?.charAt(0).toUpperCase() + item.type?.slice(1) || 'Test'}
+                  </Text>
+                </View>
+                <Text style={styles.expiryText}>
+                  Expires: {formatDate(item.expirSeries)}
+                </Text>
+              </View>
+
+              <View style={styles.priceRow}>
+                <View>
+                  {item.discountPrice < item.price && (
+                    <Text style={styles.originalPrice}>₹{item.price}</Text>
+                  )}
+                  <Text style={styles.price}>
+                    ₹{item.discountPrice || item.price || 'Free'}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.enrollButton,
+                    isPurchased && styles.enrollButtonPurchased,
+                  ]}
+                  onPress={() => handleViewTestSeries(item.id)}
+                >
+                  <Text style={styles.enrollButtonText}>
+                    {isPurchased ? 'View Series' : 'Enroll Now'}
+                  </Text>
+                  <Feather
+                    name={isPurchased ? 'arrow-right-circle' : 'arrow-right'}
+                    size={16}
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+      <View style={{ height: 40 }} />
+    </View>
+  );
 
   return (
     <Layout>
@@ -158,254 +368,93 @@ export default function TestSeries({ navigation }) {
         {/* Tabs */}
         <View style={styles.tabsContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'available' && styles.activeTab]}
-            onPress={() => handleTabChange('available')}
+            style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+            onPress={() => handleTabChange('all')}
           >
-            <Feather
-              name="grid"
-              size={18}
-              color={activeTab === 'available' ? '#DC3545' : '#64748b'}
-            />
-            <Text style={[styles.tabText, activeTab === 'available' && styles.activeTabText]}>
-              All Test Series
+            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+              📚 All
             </Text>
-            <View style={[styles.badge, activeTab === 'available' && styles.activeBadge]}>
-              <Text style={[styles.badgeText, activeTab === 'available' && styles.activeBadgeText]}>
-                {testSeries.length}
-              </Text>
-            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'my-tests' && styles.activeTab]}
-            onPress={() => handleTabChange('my-tests')}
+            style={[styles.tab, activeTab === 'objective' && styles.activeTab]}
+            onPress={() => handleTabChange('objective')}
           >
-            <Feather
-              name="bookmark"
-              size={18}
-              color={activeTab === 'my-tests' ? '#DC3545' : '#64748b'}
-            />
-            <Text style={[styles.tabText, activeTab === 'my-tests' && styles.activeTabText]}>
-              My Test Series
+            <Text style={[styles.tabText, activeTab === 'objective' && styles.activeTabText]}>
+              📝 Objective
             </Text>
-            <View style={[styles.badge, activeTab === 'my-tests' && styles.activeBadge]}>
-              <Text style={[styles.badgeText, activeTab === 'my-tests' && styles.activeBadgeText]}>
-                {myTestSeries.length}
-              </Text>
+          </TouchableOpacity>
 
-            </View>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'my' && styles.activeTab]}
+            onPress={() => handleTabChange('my')}
+          >
+            <Text style={[styles.tabText, activeTab === 'my' && styles.activeTabText]}>
+              ⭐ My Tests
+            </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Search bar for objective tab */}
+        {activeTab === 'objective' && (
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search objective tests..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              returnKeyType="search"
+              placeholderTextColor="#94a3b8"
+            />
+          </View>
+        )}
+
         <ScrollView
           style={styles.content}
-          showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchTestSeries(true)}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
           }
         >
-          {/* 1️⃣ Loading */}
-          {loading ? (
+          {loading && ((!quizes.length && activeTab === 'objective') || activeTab !== 'objective') ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#DC3545" />
-              <Text style={styles.loadingText}>Loading test series...</Text>
+              <Text style={styles.loadingText}>
+                {activeTab === 'objective' ? 'Loading quizzes...' : 'Loading test series...'}
+              </Text>
             </View>
-
-            /* 2️⃣ Error */
           ) : error ? (
             <View style={styles.errorContainer}>
               <Feather name="alert-circle" size={48} color="#ef4444" />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity
-                style={styles.retryButton}
-                onPress={() => fetchTestSeries()}
-              >
+              <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </View>
-
-            /* 3️⃣ Empty: Available */
-          ) : activeTab === "available" && testSeries.length === 0 ? (
+          ) : activeTab === 'objective' ? (
+            renderQuizList()
+          ) : filteredTestSeries.length === 0 ? (
             <View style={styles.emptyState}>
-              <Feather name="clipboard" size={48} color="#cbd5e1" />
-              <Text style={styles.emptyTitle}>No Test Series Available</Text>
+              <Feather name="bookmark" size={48} color="#cbd5e1" />
+              <Text style={styles.emptyTitle}>
+                {activeTab === 'my' ? 'No Enrolled Tests' : 'No Test Series Found'}
+              </Text>
               <Text style={styles.emptyText}>
-                Check back later for new series
+                {activeTab === 'my'
+                  ? 'Enroll in a series to track progress'
+                  : 'New series coming soon!'}
               </Text>
             </View>
-
-            /* 4️⃣ Empty: My Test Series */
-          ) : activeTab === "my-tests" && myTestSeries.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={styles.emptyIcon}>
-                <Feather name="bookmark" size={48} color="#cbd5e1" />
-              </View>
-              <Text style={styles.emptyTitle}>No Enrolled Test Series</Text>
-              <Text style={styles.emptyText}>
-                Enroll in a test series to track your progress
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => handleTabChange("available")}
-              >
-                <Text style={styles.emptyButtonText}>
-                  Browse Available Series
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            /* 5️⃣ MAIN LIST (Available OR My Test Series) */
           ) : (
-            <View style={styles.section}>
-              {(activeTab === "available" ? testSeries : myTestSeries).map((item) => {
-                const isPurchased = purchasedMap[item.id];
-                const statusInfo = getStatusBadge(item.status);
-
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.testCard}
-                    activeOpacity={0.8}
-                    onPress={() => handleView(item.id, isPurchased)}
-                  >
-                    {/* IMAGE */}
-                    <View style={styles.testImageContainer}>
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        style={styles.testImage}
-                        resizeMode="cover"
-                      />
-
-                      <View style={styles.imageOverlay}>
-                        <View
-                          style={[
-                            styles.levelBadge,
-                            { backgroundColor: statusInfo.color },
-                          ]}
-                        >
-                          <Text style={styles.levelText}>
-                            {statusInfo.text}
-                          </Text>
-                        </View>
-
-                        {isPurchased && (
-                          <View
-                            style={{
-                              position: "absolute",
-                              top: 12,
-                              right: 12,
-                              backgroundColor: "#16a34a",
-                              paddingHorizontal: 8,
-                              paddingVertical: 4,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                color: "#fff",
-                                fontSize: 11,
-                                fontWeight: "700",
-                              }}
-                            >
-                              Purchased
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* CONTENT */}
-                    <View style={styles.testContent}>
-                      <Text style={styles.testTitle} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-
-                      <Text
-                        style={styles.testDescription}
-                        numberOfLines={2}
-                      >
-                        {item.description}
-                      </Text>
-
-                      <View style={styles.statsRow}>
-                        <View style={styles.statItem}>
-                          <Feather name="clock" size={14} color="#64748b" />
-                          <Text style={styles.statText}>
-                            {item.timeDurationForTest} mins
-                          </Text>
-                        </View>
-                        <View style={styles.statItem}>
-                          <Feather name="file-text" size={14} color="#64748b" />
-                          <Text style={styles.statText}>
-                            Full Length
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.metaRow}>
-                        <View style={styles.typeContainer}>
-                          <Text style={styles.typeText}>
-                            {item.type?.charAt(0).toUpperCase() +
-                              item.type?.slice(1)}
-                          </Text>
-                        </View>
-                        <Text style={styles.expiryText}>
-                          Expires: {formatDate(item.expirSeries)}
-                        </Text>
-                      </View>
-
-                      <View style={styles.priceRow}>
-                        <View>
-                          {item.discountPrice < item.price && (
-                            <Text style={styles.originalPrice}>
-                              ₹{item.price}
-                            </Text>
-                          )}
-                          <Text style={styles.price}>
-                            ₹{item.discountPrice || item.price}
-                          </Text>
-                        </View>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.enrollButton,
-                            isPurchased && { backgroundColor: "#16a34a" },
-                          ]}
-                          onPress={() => handleView(item.id, isPurchased)}
-                        >
-                          <Text style={styles.enrollButtonText}>
-                            {isPurchased ? "View Series" : "Enroll Now"}
-                          </Text>
-                          <Feather
-                            name={
-                              isPurchased
-                                ? "arrow-right-circle"
-                                : "arrow-right"
-                            }
-                            size={16}
-                            color="#fff"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            renderTestSeriesList()
           )}
-
-          <View style={{ height: 40 }} />
         </ScrollView>
-
       </View>
     </Layout>
   );
 }
 
-// Keep all your existing styles (unchanged)
+// ─── Styles (mostly unchanged, minor cleanups) ───────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   header: {
@@ -418,7 +467,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#0f172a', marginBottom: 2 },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
   headerSubtitle: { fontSize: 14, color: '#64748b' },
   searchButton: {
     width: 44,
@@ -430,40 +479,37 @@ const styles = StyleSheet.create({
   },
   tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    padding: 10,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: '#e5e7eb',
+    gap: 8,
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
     backgroundColor: '#f8fafc',
-  },
-  activeTab: { backgroundColor: '#eef2ff' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  activeTabText: { color: '#DC3545' },
-  badge: {
-    backgroundColor: '#e2e8f0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    minWidth: 24,
     alignItems: 'center',
   },
-  activeBadge: { backgroundColor: '#DC3545' },
-  badgeText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  activeBadgeText: { color: '#fff' },
+  activeTab: { backgroundColor: '#fff1f2' },
+  tabText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+  activeTabText: { color: '#DC3545' },
+
+  searchContainer: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#fff' },
+  searchInput: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
   content: { flex: 1 },
-  section: { paddingHorizontal: 16, gap: 16, paddingTop: 16 },
+  section: { padding: 16, gap: 16 },
+  listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40 },
+
   testCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -473,22 +519,14 @@ const styles = StyleSheet.create({
   },
   testImageContainer: {
     width: '100%',
-    aspectRatio: 16 / 9, // Perfect 16:9 ratio
-    position: 'relative',
+    aspectRatio: 16 / 9,
     backgroundColor: '#f1f5f9',
-
   },
-  testImage: {
-    width: '100%',
-    height: '100%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
+  testImage: { width: '100%', height: '100%' },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.11)',
+    backgroundColor: 'rgba(0,0,0,0.12)',
     padding: 12,
-    justifyContent: 'flex-end',
   },
   levelBadge: {
     alignSelf: 'flex-start',
@@ -496,28 +534,27 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
-  levelText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  levelText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  purchasedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  purchasedText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+
   testContent: { padding: 16 },
-  testTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0f172a',
-    marginBottom: 6,
-    lineHeight: 24,
-  },
-  testDescription: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 12 },
+  testTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 6 },
+  testDescription: { fontSize: 14, color: '#64748b', marginBottom: 12 },
+  statsRow: { flexDirection: 'row', gap: 20, marginBottom: 12 },
   statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
     paddingTop: 12,
     borderTopWidth: 1,
@@ -540,9 +577,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#94a3b8',
     textDecorationLine: 'line-through',
-    marginBottom: 2,
   },
-  price: { fontSize: 24, fontWeight: '900', color: '#0f172a' },
+  price: { fontSize: 22, fontWeight: '900', color: '#0f172a' },
   enrollButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -552,7 +588,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
   },
+  enrollButtonPurchased: { backgroundColor: '#16a34a' },
   enrollButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -560,40 +598,21 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   loadingText: { marginTop: 12, fontSize: 16, color: '#64748b' },
-  errorContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
+  errorContainer: { alignItems: 'center', paddingVertical: 80 },
   errorText: { marginTop: 12, fontSize: 16, color: '#ef4444', textAlign: 'center' },
   retryButton: {
-    marginTop: 16,
+    marginTop: 20,
     backgroundColor: '#DC3545',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 12,
   },
-  retryText: { color: '#fff', fontWeight: '700' },
+  retryText: { color: '#fff', fontWeight: '700', fontSize: 16 },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 80,
     paddingHorizontal: 32,
   },
-  emptyIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#f1f5f9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a', marginBottom: 8 },
-  emptyText: { fontSize: 14, color: '#64748b', textAlign: 'center', marginBottom: 24 },
-  emptyButton: {
-    backgroundColor: '#DC3545',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  emptyButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a', marginTop: 16 },
+  emptyText: { fontSize: 14, color: '#64748b', textAlign: 'center', marginTop: 8 },
 });

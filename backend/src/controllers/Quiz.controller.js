@@ -5,7 +5,7 @@ const {
   deleteQuizCache,
 } = require("../cache/Quiz.Cache");
 
-const { Quizzes, Sequelize, Order ,sequelize } = require("../models");
+const { Quizzes, Sequelize, Order, sequelize } = require("../models");
 const { Op } = Sequelize;
 
 const uploadToS3 = require("../utils/s3Upload");
@@ -53,7 +53,7 @@ class QuizController {
           : null,
 
         status: req.body.status || "draft",
-
+        displayIn: req.body.displayIn || "Quiz",
         showHints: req.body.show_hints === "true",
         showExplanations: req.body.show_explanations === "true",
         shuffleQuestions: req.body.shuffle_questions === "true",
@@ -74,7 +74,7 @@ class QuizController {
         imageUrl = await uploadToS3(file, "quizzes");
       }
 
-      body.image = imageUrl ? imageUrl : "https://i.ibb.co/yJKhCyd/Screenshot-2026-01-27-at-4-59-46-PM.png"
+      body.image = imageUrl ? imageUrl : "https://i.ibb.co/5WvN9fMJ/image.png"
 
       /* =========================
          CREATE
@@ -173,6 +173,7 @@ class QuizController {
             : quiz.attemptLimit,
 
         status: req.body.status ?? quiz.status,
+        displayIn: req.body.displayIn ?? quiz.displayIn,
 
         showHints:
           req.body.show_hints !== undefined
@@ -207,6 +208,7 @@ class QuizController {
         imageUrl = await uploadToS3(file, "quizzes");
       }
 
+      
       body.image = imageUrl;
 
       /* =========================
@@ -272,39 +274,42 @@ class QuizController {
   /* =========================
      GET ALL QUIZZES
   ========================== */
-static async getAllQuizzes(req, res) {
-  try {
-    const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.max(parseInt(req.query.limit) || 10, 1);
-    const offset = (page - 1) * limit;
-    const search = req.query.search || "";
+  static async getAllQuizzes(req, res) {
+    try {
+      const page = Math.max(parseInt(req.query.page) || 1, 1);
+      const limit = Math.max(parseInt(req.query.limit) || 10, 1);
+      const offset = (page - 1) * limit;
+      const search = req.query.search || "";
 
-    // 👮 Admin check
-    const isAdmin = req.query.is_admin === "true";
+      // 👮 Admin check
+      const displayIn = req.query.displayIn || "Quiz"
+      const isAdmin = req.query.is_admin === "true";
 
-    /* ================= WHERE CONDITION ================= */
-    const where = {};
+      /* ================= WHERE CONDITION ================= */
+      const where = {};
 
-    // 🔐 Non-admin → only published
-    if (!isAdmin) {
-      where.status = "published";
-    }
+      // 🔐 Non-admin → only published
+      if (!isAdmin) {
+        where.status = "published";
+        where.displayIn = displayIn
+      }
 
-    // 🔍 Search
-    if (search) {
-      where[Op.or] = [
-        { title: { [Op.like]: `%${search}%` } },
-        { description: { [Op.like]: `%${search}%` } },
-      ];
-    }
 
-    const { rows, count } = await Quizzes.findAndCountAll({
-      where,
-      attributes: {
-        include: [
-          // 🧾 TOTAL PURCHASE COUNT FOR QUIZ
-          [
-            Sequelize.literal(`(
+      // 🔍 Search
+      if (search) {
+        where[Op.or] = [
+          { title: { [Op.like]: `%${search}%` } },
+          { description: { [Op.like]: `%${search}%` } },
+        ];
+      }
+
+      const { rows, count } = await Quizzes.findAndCountAll({
+        where,
+        attributes: {
+          include: [
+            // 🧾 TOTAL PURCHASE COUNT FOR QUIZ
+            [
+              Sequelize.literal(`(
               SELECT COUNT(*)
               FROM orders AS o
               WHERE 
@@ -312,33 +317,33 @@ static async getAllQuizzes(req, res) {
                 AND o.type = 'quiz'
                 AND o.status = 'success'
             )`),
-            "totalPurchases",
+              "totalPurchases",
+            ],
           ],
-        ],
-      },
-      limit,
-      offset,
-      order: [["createdAt", "DESC"]],
-    });
-
-    return res.json({
-      success: true,
-      data: rows,
-      pagination: {
-        total: count,
-        page,
+        },
         limit,
-        totalPages: Math.ceil(count / limit),
-      },
-    });
-  } catch (error) {
-    console.error("Get All Quizzes Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+        offset,
+        order: [["createdAt", "DESC"]],
+      });
+
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Get All Quizzes Error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+      });
+    }
   }
-}
 
   /* =========================
      GET SINGLE QUIZ

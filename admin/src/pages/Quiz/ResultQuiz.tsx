@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 import Chart from "react-apexcharts";
+import { ApexOptions } from "apexcharts";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
@@ -9,8 +10,7 @@ import {
   XCircle,
   Trophy,
   Loader2,
-  User,
-  Calendar,
+  User
 } from "lucide-react";
 import { API_URL } from "../../constant/constant";
 
@@ -108,41 +108,55 @@ const ResultQuiz = () => {
     );
   }
 
-  // Helper to get option text by ID
-  const getOptionText = (options: Option[], optionId: number | null) => {
-    if (!optionId) return <span className="text-gray-500">Not Answered</span>;
-    const opt = options.find((o) => o.id === optionId);
-    return opt ? opt.option_text : "Unknown";
-  };
+
 
   const correctCount = result.questions.filter((q) => q.isCorrect).length;
   const incorrectCount = result.questions.length - correctCount;
 
   /* ---------- Radial Chart Config ---------- */
-  const chartOptions = {
-    chart: { type: "radialBar" as const },
-    labels: ["Score"],
-    colors: [result.passed ? "#22c55e" : "#ef4444"],
-    plotOptions: {
-      radialBar: {
-        startAngle: -90,
-        endAngle: 270,
-        hollow: { size: "70%" },
-        track: { background: "#e5e7eb", strokeWidth: "100%" },
-        dataLabels: {
-          name: { show: false },
-          value: {
-            offsetY: 8,
-            fontSize: "32px",
-            fontWeight: 800,
-            color: result.passed ? "#22c55e" : "#ef4444",
-            formatter: () => `${result.percentage}%`,
-          },
+const chartOptions: ApexOptions = {
+  chart: {
+    type: "radialBar",
+  },
+
+  labels: ["Score"],
+
+  colors: [result.passed ? "#22c55e" : "#ef4444"],
+
+  plotOptions: {
+    radialBar: {
+      startAngle: -90,
+      endAngle: 270,
+
+      hollow: {
+        size: "70%",
+      },
+
+      track: {
+        background: "#e5e7eb",
+        strokeWidth: "100", // ✅ number only
+      },
+
+      dataLabels: {
+        name: {
+          show: false,
+        },
+        value: {
+          offsetY: 8,
+          fontSize: "32px",
+          fontWeight: "800", // ✅ safest for TS
+          color: result.passed ? "#22c55e" : "#ef4444",
+          formatter: () => `${result.percentage}%`,
         },
       },
     },
-    stroke: { lineCap: "round" },
-  };
+  },
+
+  stroke: {
+    lineCap: "round", // ✅ union-safe
+  },
+};
+
 
   const chartSeries = [result.percentage];
 

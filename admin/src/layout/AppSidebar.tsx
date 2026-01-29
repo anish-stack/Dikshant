@@ -11,7 +11,7 @@ import {
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-import { Bell, ImageDown, School2, Speaker } from "lucide-react";
+import { Bell, ImageDown, ProjectorIcon, School2, Speaker } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -68,6 +68,11 @@ const navItems: NavItem[] = [
     icon: <ImageDown />,
     name: "App Assets",
     path: "/app-assets",
+  },
+   {
+    icon: <ProjectorIcon />,
+    name: "App Categories",
+    path: "/app-Categories",
   },
   {
     icon: <ImageDown />,

@@ -3,7 +3,6 @@ import axios, { isAxiosError } from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
 import {
-  Edit,
   Trash2,
   Eye,
   Search,
@@ -12,7 +11,6 @@ import {
   Trophy,
   IndianRupee,
   CheckCircle,
-  XCircle,
 } from "lucide-react";
 import { API_URL } from "../../constant/constant";
 
@@ -23,6 +21,7 @@ interface Quiz {
   description: string;
   totalQuestions: number;
   durationMinutes: number;
+  totalPurchases:number
   totalMarks: number;
   passingMarks: number;
   isFree: boolean;
@@ -46,37 +45,40 @@ const AllQuizzesPage: React.FC = () => {
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
     page: 1,
+    is_admin:true,
     limit: 10,
     totalPages: 1,
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+const fetchQuizzes = async (page: number = 1, search: string = "") => {
+  try {
+    setLoading(true);
 
-  const fetchQuizzes = async (page: number = 1, search: string = "") => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        page: String(page),
-        is_admin: true,
-        limit: "10",
-        ...(search && { search }),
-      });
+    const params = new URLSearchParams({
+      page: String(page),
+      is_admin: "true",   // ✅ must be string
+      limit: "10",
+      ...(search ? { search } : {}),
+    });
 
-      const res = await axios.get(
-        `${API_URL}/quiz/quizzes?${params.toString()}`,
-      );
-      const { data, pagination: pag } = res.data;
+    const res = await axios.get(
+      `${API_URL}/quiz/quizzes?${params.toString()}`
+    );
 
-      setQuizzes(data || []);
-      setPagination(pag || { total: 0, page: 1, limit: 10, totalPages: 1 });
-      setCurrentPage(page);
-    } catch (err) {
-      toast.error("Failed to load quizzes");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const { data, pagination: pag } = res.data;
+
+    setQuizzes(data || []);
+    setPagination(pag || { total: 0, page: 1, limit: 10, totalPages: 1 });
+    setCurrentPage(page);
+  } catch (err) {
+    toast.error("Failed to load quizzes");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchQuizzes(currentPage, searchTerm);
