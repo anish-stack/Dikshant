@@ -71,78 +71,93 @@ class QuizQuestionsController {
     await QuizQuestionOptions.bulkCreate(newOptions);
   }
 
-  // ADD SINGLE QUESTION + OPTIONS
-  static async addSingleQuestion(req, res) {
-    const transaction = await QuizQuestions.sequelize.transaction();
-    try {
-      const { quizId } = req.params;
+static async addSingleQuestion(req, res) {
+  try {
+    const { quizId } = req.params;
 
-      const quiz = await Quizzes.findByPk(quizId);
-      if (!quiz) {
-        return res.status(404).json({ success: false, message: "Quiz not found" });
-      }
-
-      const error = validateQuestion(req.body);
-      if (error) {
-        return res.status(400).json({ success: false, message: error });
-      }
-
-      let questionImage = null;
-      if (req.file) {
-        questionImage = await QuizQuestionsController.handleQuestionImage(req.file);
-      }
-
-      const question = await QuizQuestions.create(
-        {
-          quiz_id: quizId,
-          question_text: req.body.question_text.trim(),
-          question_type: req.body.question_type || "multiple_choice",
-          explanation: req.body.explanation?.trim() || null,
-          hint: req.body.hint?.trim() || null,
-          marks: toNum(req.body.marks),
-          time_limit: toNum(req.body.time_limit),
-          order_num:
-            toNum(req.body.order_num) ||
-            (await QuizQuestions.count({ where: { quiz_id: quizId } })) + 1,
-          is_question_have_image: !!questionImage,
-          question_image: questionImage,
-        },
-        { transaction }
-      );
-
-      // Handle options if provided
-      if (req.body.options) {
-        let options = req.body.options;
-        if (typeof options === "string") {
-          try {
-            options = JSON.parse(options);
-          } catch {
-            await transaction.rollback();
-            return res.status(400).json({
-              success: false,
-              message: "Invalid JSON in options field",
-            });
-          }
-        }
-        await QuizQuestionsController.manageOptions(question.id, options, req.files);
-      }
-
-      await transaction.commit();
-
-      return res.status(201).json({
-        success: true,
-        message: "Question and options added successfully",
-        data: question,
-      });
-    } catch (error) {
-      await transaction.rollback();
-      console.error("Add Question Error:", error);
-      return res.status(500).json({
+    // 1️⃣ Check quiz
+    const quiz = await Quizzes.findByPk(quizId);
+    if (!quiz) {
+      return res.status(404).json({
         success: false,
-        message: error.message || "Internal server error",
+        message: "Quiz not found",
       });
     }
+
+    // 2️⃣ Validate input
+    const error = validateQuestion(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: error,
+      });
+    }
+
+    // 3️⃣ Handle image
+    let questionImage = null;
+    if (req.file) {
+      questionImage = await QuizQuestionsController.handleQuestionImage(
+        req.file
+      );
+    }
+
+    // 4️⃣ Calculate order
+    const orderNum =
+      toNum(req.body.order_num) ||
+      (await QuizQuestions.count({
+        where: { quiz_id: quizId },
+      })) + 1;
+
+    // 5️⃣ Create question
+    const question = await QuizQuestions.create({
+      quiz_id: quizId,
+      question_text: req.body.question_text.trim(),
+      question_type: req.body.question_type || "multiple_choice",
+      explanation: req.body.explanation?.trim() || null,
+      hint: req.body.hint?.trim() || null,
+      marks: toNum(req.body.marks),
+      time_limit: toNum(req.body.time_limit),
+      order_num: orderNum,
+      is_question_have_image: !!questionImage,
+      question_image: questionImage,
+    });
+
+    // 6️⃣ Handle options (NO TRANSACTION)
+    if (req.body.options) {
+      let options = req.body.options;
+
+      if (typeof options === "string") {
+        try {
+          options = JSON.parse(options);
+        } catch {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid JSON in options field",
+          });
+        }
+      }
+
+      await QuizQuestionsController.manageOptions(
+        question.id,
+        options,
+        req.files
+      );
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Question and options added successfully",
+      data: question,
+    });
+  } catch (error) {
+    console.error("Add Question Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
   }
+}
+
 
   // UPDATE QUESTION + OPTIONS
   static async updateQuestion(req, res) {

@@ -36,6 +36,14 @@ type AppAssetsType = {
   alert_is_blocking?: boolean;
 };
 
+type SocialLinkField =
+  | "facebookLink"
+  | "instagramLink"
+  | "youtubeLink"
+  | "telegramLink"
+  | "twitterLink"
+  | "linkedinLink";
+
 const AppAssetsAdmin = () => {
   const [assets, setAssets] = useState<AppAssetsType | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,17 +68,17 @@ const AppAssetsAdmin = () => {
   // Form state (text, boolean, date)
   const [form, setForm] = useState<Partial<AppAssetsType>>({});
 
-  const toDateTimeLocal = (value) => {
- if (!value) return "";
+  const toDateTimeLocal = (value: string | number | Date | undefined) => {
+    if (!value) return "";
 
-  const date = new Date(value);
+    const date = new Date(value);
 
-  // convert UTC → IST (+5:30)
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istDate = new Date(date.getTime() + istOffset);
+    // convert UTC → IST (+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + istOffset);
 
-  return istDate.toISOString().slice(0, 16);
-};
+    return istDate.toISOString().slice(0, 16);
+  };
 
   // ─── FETCH ───────────────────────────────────────────────────────
   const fetchAssets = async () => {
@@ -194,6 +202,15 @@ const AppAssetsAdmin = () => {
     }
   };
 
+  const socialFields: SocialLinkField[] = [
+    "facebookLink",
+    "instagramLink",
+    "youtubeLink",
+    "telegramLink",
+    "twitterLink",
+    "linkedinLink",
+  ];
+
   // ─── RENDER ──────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -283,21 +300,14 @@ const AppAssetsAdmin = () => {
             Social Media Links
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              "facebookLink",
-              "instagramLink",
-              "youtubeLink",
-              "telegramLink",
-              "twitterLink",
-              "linkedinLink",
-            ].map((field) => (
+            {socialFields.map((field) => (
               <div key={field}>
                 <label className="capitalize">
                   {field.replace("Link", "")}
                 </label>
                 <input
                   name={field}
-                  value={(form as any)[field] || ""}
+                  value={form[field] ?? ""}
                   onChange={handleInputChange}
                   placeholder={`https://${field.replace("Link", "")}.com/...`}
                   className="w-full border rounded-lg px-4 py-2"
@@ -345,35 +355,33 @@ const AppAssetsAdmin = () => {
                     className="w-full border rounded-lg px-4 py-2"
                   />
                 </div>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <div>
-    <label>Start At</label>
-    <input
-      type="datetime-local"
-      name="maintenanceStartAt"
-      value={toDateTimeLocal(form.maintenanceStartAt)}
-      onChange={handleInputChange}
-      className="w-full border rounded-lg px-4 py-2"
-    />
-  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label>Start At</label>
+                    <input
+                      type="datetime-local"
+                      name="maintenanceStartAt"
+                      value={toDateTimeLocal(form.maintenanceStartAt)}
+                      onChange={handleInputChange}
+                      className="w-full border rounded-lg px-4 py-2"
+                    />
+                  </div>
 
-  <div>
-    <label>End At</label>
-    <input
-      type="datetime-local"
-      name="maintenanceEndAt"
-      value={toDateTimeLocal(form.maintenanceEndAt)}
-      onChange={handleInputChange}
-      className="w-full border rounded-lg px-4 py-2"
-    />
-  </div>
-</div>
-
+                  <div>
+                    <label>End At</label>
+                    <input
+                      type="datetime-local"
+                      name="maintenanceEndAt"
+                      value={toDateTimeLocal(form.maintenanceEndAt)}
+                      onChange={handleInputChange}
+                      className="w-full border rounded-lg px-4 py-2"
+                    />
+                  </div>
+                </div>
               </>
             )}
           </div>
         </section>
-
 
         {/* 6. Media / Intro Assets */}
         <section className="border-t pt-8">

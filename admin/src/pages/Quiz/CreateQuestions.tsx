@@ -183,48 +183,88 @@ const CreateQuestions: React.FC = () => {
     }
   };
 
-  const handleAddSingle = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleAddSingle = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    if (!questionText.trim()) return toast.error("Question text required");
-    if (options.some((o) => !o.trim()))
-      return toast.error("All options required");
-    if (correctOption === -1) return toast.error("Select correct answer");
+  console.log("▶️ Add Question submit triggered");
 
-    const formData = new FormData();
-    formData.append("question_text", questionText);
-    formData.append("marks", marks || "1");
-    if (timeLimit) formData.append("time_limit", timeLimit);
-    if (explanation) formData.append("explanation", explanation);
-    if (hint) formData.append("hint", hint);
+  if (!questionText.trim()) {
+    console.warn("⚠️ Question text missing");
+    return toast.error("Question text required");
+  }
 
-    const optionsPayload = options.map((text, i) => ({
-      optionText: text,
-      isCorrect: i === correctOption,
-      orderNum: i + 1,
-    }));
-    formData.append("options", JSON.stringify(optionsPayload));
+  if (options.some((o) => !o.trim())) {
+    console.warn("⚠️ One or more options missing", options);
+    return toast.error("All options required");
+  }
 
-    try {
-      setLoading(true);
-      await axios.post(`${API_URL}/quiz/${quizId}/questions`, formData);
-      toast.success("Question added!");
-      setQuestionText("");
-      setMarks("");
-      setTimeLimit("");
-      setExplanation("");
-      setHint("");
-      setOptions(["", "", "", ""]);
-      setCorrectOption(-1);
-      fetchQuestions();
-      setTab("view");
-    } catch (err) {
-      const error = err as any;
-      toast.error(error.response?.data?.message || "Failed to add");
-    } finally {
-      setLoading(false);
+  if (correctOption === -1) {
+    console.warn("⚠️ Correct option not selected");
+    return toast.error("Select correct answer");
+  }
+
+  const formData = new FormData();
+  formData.append("question_text", questionText);
+  formData.append("marks", marks || "1");
+  if (timeLimit) formData.append("time_limit", timeLimit);
+  if (explanation) formData.append("explanation", explanation);
+  if (hint) formData.append("hint", hint);
+
+  const optionsPayload = options.map((text, i) => ({
+    optionText: text,
+    isCorrect: i === correctOption,
+    orderNum: i + 1,
+  }));
+
+  console.log("🧩 Options payload:", optionsPayload);
+
+  formData.append("options", JSON.stringify(optionsPayload));
+
+  try {
+    setLoading(true);
+
+    console.log("🚀 Sending request to:", `${API_URL}/quiz/${quizId}/questions`);
+    console.log("📦 FormData preview:");
+
+    for (const [key, value] of formData.entries()) {
+      console.log(`   ${key}:`, value);
     }
-  };
+
+    const res = await axios.post(
+      `${API_URL}/quiz/${quizId}/questions`,
+      formData
+    );
+
+    console.log("✅ Question added successfully:", res.data);
+
+    toast.success("Question added!");
+
+    // reset form
+    setQuestionText("");
+    setMarks("");
+    setTimeLimit("");
+    setExplanation("");
+    setHint("");
+    setOptions(["", "", "", ""]);
+    setCorrectOption(-1);
+
+    fetchQuestions();
+    setTab("view");
+  } catch (err: any) {
+    console.error("❌ Add Question failed:", err);
+
+    if (err.response) {
+      console.error("📡 API error response:", err.response.data);
+      console.error("📡 Status:", err.response.status);
+    }
+
+    toast.error(err.response?.data?.message || "Failed to add");
+  } finally {
+    setLoading(false);
+    console.log("⏹ Add Question request finished");
+  }
+};
+
 
   const handleBulkSubmit = async () => {
     try {

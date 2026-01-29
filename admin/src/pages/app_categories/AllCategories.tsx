@@ -1,10 +1,38 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import React, { useEffect, useState, useCallback } from "react";
+import axios, { AxiosError, isAxiosError } from "axios";
 import Swal from "sweetalert2";
 
 const API_URL = "https://www.dikapi.olyox.in/api/assets";
 
-const initialForm = {
+// ─── Types ────────────────────────────────────────────────────────────────
+interface Category {
+  id: number;
+  title: string;
+  subtitle?: string;
+  icon?: string;
+  screen?: string;
+  filter?: string;
+  gradient?: [string, string];
+  students?: string;
+  display_order: number;
+  coming_soon?: boolean;
+  comingSoon?: boolean; // sometimes API returns this field name
+}
+
+interface FormData {
+  title: string;
+  subtitle: string;
+  icon: string;
+  screen: string;
+  filter_key: string;
+  gradient_start: string;
+  gradient_end: string;
+  coming_soon: boolean;
+  students_label: string;
+  display_order: number;
+}
+
+const initialForm: FormData = {
   title: "",
   subtitle: "",
   icon: "",
@@ -17,86 +45,139 @@ const initialForm = {
   display_order: 0,
 };
 
-const AllCategories = () => {
-  const [categories, setCategories] = useState([]);
-  const [form, setForm] = useState(initialForm);
-  const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+const AllCategories: React.FC = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [form, setForm] = useState<FormData>(initialForm);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showModal, setShowModal] = useState<boolean>(false);
 
-  // ─── Fetch all categories ────────────────────────────────────────
-  const fetchCategories = async () => {
+  // ─── Fetch Categories ─────────────────────────────────────────────────────
+  const fetchCategories = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API_URL}/category`);
+      const res = await axios.get<{ success: boolean; data: Category[] }>(
+        `${API_URL}/category`,
+      );
 
-      setCategories(res.data.data || []);
-    } catch (err) {
-      Swal.fire("Error", "Failed to load categories", "error");
+      if (res.data.success) {
+        setCategories(res.data.data || []);
+      } else {
+        throw new Error("API returned unsuccessful response");
+      }
+    } catch (err: unknown) {
+      let message = "Failed to load categories";
+
+      if (isAxiosError(err)) {
+        const axiosErr = err as AxiosError<{ message?: string }>;
+        message =
+          axiosErr.response?.data?.message || axiosErr.message || message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
-  // ─── Form handlers ───────────────────────────────────────────────
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  // ─── Form Handlers ────────────────────────────────────────────────────────
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value, type } = e.target;
+
+    if (type === "checkbox" || type === "radio") {
+      const checked = (e.target as HTMLInputElement).checked;
+      setForm((prev) => ({ ...prev, [name]: checked }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setForm(initialForm);
     setEditingId(null);
     setShowModal(false);
-  };
+  }, []);
 
-  // ─── Create / Update ─────────────────────────────────────────────
-  const handleSubmit = async (e) => {
+  // ─── Submit (Create / Update) ─────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!form.title.trim()) {
+      Swal.fire("Validation Error", "Title is required", "warning");
+      return;
+    }
+
     try {
       setLoading(true);
 
+      const payload = {
+        ...form,
+        filter: form.filter_key, // API expects 'filter'
+        students: form.students_label, // API expects 'students'
+        gradient: [form.gradient_start, form.gradient_end].filter(Boolean),
+      };
+
       if (editingId) {
-        await axios.put(`${API_URL}/category/${editingId}`, form);
+        await axios.put(`${API_URL}/category/${editingId}`, payload);
         Swal.fire("Success", "Category updated!", "success");
       } else {
-        await axios.post(`${API_URL}/category`, form);
+        await axios.post(`${API_URL}/category`, payload);
         Swal.fire("Success", "Category created!", "success");
       }
 
       resetForm();
       fetchCategories();
-    } catch (err) {
-      Swal.fire("Error", "Action failed. Please try again.", "error");
+    } catch (err: unknown) {
+      let message = "Action failed. Please try again.";
+
+      if (isAxiosError(err)) {
+        const axiosErr = err as AxiosError<{ message?: string }>;
+        message =
+          axiosErr.response?.data?.message || axiosErr.message || message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      Swal.fire("Error", message, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Edit ────────────────────────────────────────────────────────
-  const handleEdit = (cat) => {
-    console.log(cat);
+  // ─── Edit Category ────────────────────────────────────────────────────────
+  const handleEdit = (cat: Category) => {
     setEditingId(cat.id);
     setForm({
       title: cat.title || "",
       subtitle: cat.subtitle || "",
       icon: cat.icon || "",
-      coming_soon: cat.coming_soon || false,
       screen: cat.screen || "",
       filter_key: cat.filter || "",
       gradient_start: cat.gradient?.[0] || "",
       gradient_end: cat.gradient?.[1] || "",
+      coming_soon: cat.coming_soon ?? cat.comingSoon ?? false,
       students_label: cat.students || "",
       display_order: cat.display_order || 0,
     });
     setShowModal(true);
   };
 
-  // ─── Soft Disable ────────────────────────────────────────────────
-  const handleDisable = async (id) => {
+  // ─── Disable (Soft Delete) ────────────────────────────────────────────────
+  const handleDisable = async (id: number) => {
     const result = await Swal.fire({
       title: "Disable Category?",
       text: "It will be hidden from users but kept in database.",
@@ -107,15 +188,23 @@ const AllCategories = () => {
       confirmButtonText: "Yes, disable",
     });
 
-    if (result.isConfirmed) {
+    if (!result.isConfirmed) return;
+
+    try {
       await axios.put(`${API_URL}/category/disable/${id}`);
       fetchCategories();
       Swal.fire("Disabled!", "Category has been disabled.", "success");
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.message ?? "Failed to disable category")
+        : "Failed to disable category";
+
+      Swal.fire("Error", message, "error");
     }
   };
 
-  // ─── Hard Delete ─────────────────────────────────────────────────
-  const handleDelete = async (id) => {
+  // ─── Hard Delete ──────────────────────────────────────────────────────────
+  const handleDelete = async (id: number) => {
     const result = await Swal.fire({
       title: "Delete permanently?",
       text: "This action cannot be undone!",
@@ -126,7 +215,9 @@ const AllCategories = () => {
       confirmButtonText: "Yes, delete it",
     });
 
-    if (result.isConfirmed) {
+    if (!result.isConfirmed) return;
+
+    try {
       await axios.delete(`${API_URL}/category/${id}`);
       fetchCategories();
       Swal.fire(
@@ -134,11 +225,19 @@ const AllCategories = () => {
         "Category has been permanently deleted.",
         "success",
       );
+    } catch (err: unknown) {
+    const message = axios.isAxiosError(err)
+  ? err.response?.data?.message ?? "Failed to delete category"
+  : "Failed to delete category";
+
+Swal.fire("Error", message, "error");
     }
   };
 
-  // ─── Reorder (save current order) ────────────────────────────────
+  // ─── Reorder Categories ───────────────────────────────────────────────────
   const updateOrder = async () => {
+    if (categories.length === 0) return;
+
     const payload = categories.map((c, i) => ({
       id: c.id,
       display_order: i + 1,
@@ -147,35 +246,55 @@ const AllCategories = () => {
     try {
       await axios.put(`${API_URL}/category/reorder/all`, { orders: payload });
       Swal.fire("Success", "Display order updated!", "success");
-    } catch (err) {
-      Swal.fire("Error", "Failed to update order", "error");
+      fetchCategories();
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+  ? err.response?.data?.message ?? "Failed to update order"
+  : "Failed to update order";
+
+Swal.fire("Error", message, "error");
+
     }
+  };
+
+  // ─── Auto-calculate next display order for new category ───────────────────
+  const getNextDisplayOrder = useCallback(() => {
+    if (categories.length === 0) return 1;
+    return Math.max(...categories.map((c) => c.display_order || 0)) + 1;
+  }, [categories]);
+
+  // When opening create modal → auto set display_order
+  const openCreateModal = () => {
+    setForm({
+      ...initialForm,
+      display_order: getNextDisplayOrder(),
+    });
+    setEditingId(null);
+    setShowModal(true);
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800">
           Category Management
         </h1>
         <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
+          onClick={openCreateModal}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg shadow-md transition"
         >
           + Add New Category
         </button>
       </div>
 
-      {/* ─── TABLE ──────────────────────────────────────────────────────── */}
+      {/* Table / Loading */}
       {loading && categories.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           Loading categories...
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-white rounded-xl shadow overflow-hidden mb-8">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-700">
               <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
@@ -194,8 +313,8 @@ const AllCategories = () => {
                   <tr key={cat.id} className="border-b hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium">{index + 1}</td>
                     <td className="px-6 py-4">{cat.title}</td>
-                    <td className="px-6 py-4 font-mono">{cat.icon}</td>
-                    <td className="px-6 py-4">{cat.screen}</td>
+                    <td className="px-6 py-4 font-mono">{cat.icon || "-"}</td>
+                    <td className="px-6 py-4">{cat.screen || "-"}</td>
                     <td className="px-6 py-4">
                       {cat.gradient?.[0] && cat.gradient?.[1] ? (
                         <span
@@ -209,7 +328,7 @@ const AllCategories = () => {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      {cat.comingSoon ? (
+                      {cat.coming_soon || cat.comingSoon ? (
                         <span className="text-orange-600 font-medium">
                           Coming Soon
                         </span>
@@ -247,28 +366,28 @@ const AllCategories = () => {
         </div>
       )}
 
-      {/* ─── Save Order Button ──────────────────────────────────────────────── */}
+      {/* Save Order */}
       <div className="mt-8 flex justify-end">
         <button
           onClick={updateOrder}
-          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition"
+          disabled={loading || categories.length === 0}
+          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg shadow-md transition disabled:opacity-50"
         >
           Save Display Order
         </button>
       </div>
 
       {/* ─── MODAL ──────────────────────────────────────────────────────────── */}
-      {/* ─── MODAL ──────────────────────────────────────────────────────────── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[999999] p-1">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b flex justify-between items-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
               <h2 className="text-2xl font-bold text-gray-800">
                 {editingId ? "Edit Category" : "Create New Category"}
               </h2>
               <button
                 onClick={resetForm}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-500 hover:text-gray-700 text-3xl leading-none"
               >
                 ×
               </button>
@@ -276,11 +395,11 @@ const AllCategories = () => {
 
             <form
               onSubmit={handleSubmit}
-              className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5"
+              className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6"
             >
               {/* Title */}
-              <div className="flex flex-col col-span-2">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -289,13 +408,13 @@ const AllCategories = () => {
                   value={form.title}
                   onChange={handleChange}
                   required
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
 
               {/* Subtitle */}
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Subtitle
                 </label>
                 <input
@@ -303,13 +422,13 @@ const AllCategories = () => {
                   name="subtitle"
                   value={form.subtitle}
                   onChange={handleChange}
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {/* Icon */}
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Icon (Feather name)
                 </label>
                 <input
@@ -317,14 +436,14 @@ const AllCategories = () => {
                   name="icon"
                   value={form.icon}
                   onChange={handleChange}
-                  placeholder="e.g. book-open, award, zap"
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                  placeholder="book-open, award, zap..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              {/* Screen / Route */}
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              {/* Screen */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Screen / Route
                 </label>
                 <input
@@ -332,14 +451,14 @@ const AllCategories = () => {
                   name="screen"
                   value={form.screen}
                   onChange={handleChange}
-                  placeholder="e.g. /quizzes, /test-series"
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                  placeholder="/quizzes, /test-series..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               {/* Filter Key */}
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Filter Key
                 </label>
                 <input
@@ -347,27 +466,27 @@ const AllCategories = () => {
                   name="filter_key"
                   value={form.filter_key}
                   onChange={handleChange}
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
-              {/* Gradient Picker + Preview */}
-              <div className="flex flex-col col-span-2">
-                <label className="text-sm font-medium text-gray-700 mb-2">
-                  Gradient Preview
+              {/* Gradient */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gradient
                 </label>
                 <div
-                  className="w-full h-20 rounded-lg shadow-inner mb-3 border border-gray-200"
+                  className="w-full h-20 rounded-lg shadow-inner mb-4 border border-gray-200"
                   style={{
                     background: `linear-gradient(90deg, ${form.gradient_start || "#a78bfa"}, ${form.gradient_end || "#ec4899"})`,
                   }}
                 />
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                    <label className="block text-sm text-gray-700 mb-1">
                       Start Color
                     </label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex gap-3">
                       <input
                         type="color"
                         name="gradient_start"
@@ -381,16 +500,15 @@ const AllCategories = () => {
                         value={form.gradient_start}
                         onChange={handleChange}
                         placeholder="#a78bfa"
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        className="flex-1 border rounded-lg px-3 py-2 text-sm"
                       />
                     </div>
                   </div>
-
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                    <label className="block text-sm text-gray-700 mb-1">
                       End Color
                     </label>
-                    <div className="flex items-center gap-3">
+                    <div className="flex gap-3">
                       <input
                         type="color"
                         name="gradient_end"
@@ -404,16 +522,49 @@ const AllCategories = () => {
                         value={form.gradient_end}
                         onChange={handleChange}
                         placeholder="#ec4899"
-                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        className="flex-1 border rounded-lg px-3 py-2 text-sm"
                       />
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Students Label */}
+              {/* Coming Soon */}
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-gray-700 mb-1">
+                  Coming Soon?
+                </label>
+                <div className="flex items-center gap-8 mt-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="coming_soon"
+                      checked={form.coming_soon === true}
+                      onChange={() =>
+                        setForm((p) => ({ ...p, coming_soon: true }))
+                      }
+                      className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span>Yes</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="coming_soon"
+                      checked={form.coming_soon === false}
+                      onChange={() =>
+                        setForm((p) => ({ ...p, coming_soon: false }))
+                      }
+                      className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                    />
+                    <span>No</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Students Label */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Students Label
                 </label>
                 <input
@@ -421,43 +572,14 @@ const AllCategories = () => {
                   name="students_label"
                   value={form.students_label}
                   onChange={handleChange}
-                  placeholder="e.g. 12k+ students"
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g. 12k+ students enrolled"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
-                  Is Coming Soon?
-                </label>
-                <div className="flex items-center gap-6 mt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="coming_soon"
-                      value="true"
-                      checked={form.coming_soon}
-                      onChange={() => setForm({ ...form, coming_soon: true })}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm text-gray-700">Yes</span>
-                  </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="coming_soon"
-                      value="false"
-                      checked={form.coming_soon === false}
-                      onChange={() => setForm({ ...form, coming_soon: false })}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm text-gray-700">No</span>
-                  </label>
-                </div>
-              </div>
-              {/* Display Order – auto calculated for new */}
-              <div className="flex flex-col">
-                <label className="text-sm font-medium text-gray-700 mb-1">
+              {/* Display Order */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Display Order
                 </label>
                 <input
@@ -465,19 +587,18 @@ const AllCategories = () => {
                   name="display_order"
                   value={form.display_order}
                   onChange={handleChange}
-                  min="1"
-                  className="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
-                  // You can make it readOnly={!editingId} if you want to force auto-order
+                  min={1}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
                 />
                 {!editingId && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Auto-set to next position ({categories.length + 1})
+                    Suggested: {getNextDisplayOrder()}
                   </p>
                 )}
               </div>
 
-              {/* Buttons */}
-              <div className="col-span-1 md:col-span-2 flex justify-end gap-4 mt-6">
+              {/* Form Actions */}
+              <div className="col-span-2 flex justify-end gap-4 mt-8">
                 <button
                   type="button"
                   onClick={resetForm}
@@ -488,7 +609,7 @@ const AllCategories = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`px-6 py-2.5 text-white rounded-lg transition min-w-[140px] ${
+                  className={`px-6 py-2.5 text-white rounded-lg min-w-[140px] transition ${
                     loading
                       ? "bg-indigo-400 cursor-not-allowed"
                       : "bg-indigo-600 hover:bg-indigo-700"

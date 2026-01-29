@@ -210,7 +210,7 @@ const CreateQuiz: React.FC = () => {
                 Cover Image{" "}
                 <HelpCircle
                   className="w-4 h-4 text-gray-400"
-                  title="Recommended: 1200×628 px, < 500 KB"
+                  aria-label="Recommended: 1200×628 px, < 500 KB"
                 />
               </label>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -303,7 +303,7 @@ const CreateQuiz: React.FC = () => {
                   Time per Question (sec)
                   <HelpCircle
                     className="w-4 h-4 text-gray-400"
-                    title="Typical: 45–90 sec"
+                    aria-label="Typical: 45–90 sec"
                   />
                 </label>
                 <input
@@ -323,7 +323,7 @@ const CreateQuiz: React.FC = () => {
                   Duration (minutes)
                   <Info
                     className="w-4 h-4 text-blue-500"
-                    title="Auto-calculated"
+                    aria-label="Auto-calculated"
                   />
                 </label>
                 <div className="relative">
