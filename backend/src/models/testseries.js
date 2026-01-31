@@ -46,5 +46,6 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
+
   return TestSeries;
 };

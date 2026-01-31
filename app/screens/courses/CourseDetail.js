@@ -24,6 +24,8 @@ import WebView from "react-native-webview";
 import axios from "axios";
 import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 import { useAuthStore } from "../../stores/auth.store";
+import QuizCards from "./QuizCards";
+import TestSeries from "./TestSeries";
 const { width } = Dimensions.get("window");
 
 // Updated color scheme
@@ -145,7 +147,7 @@ export default function CourseDetail() {
     data: batchData,
     error: batchError,
     isLoading: batchLoading,
-  } = useSWR(batchId ? `/batchs/${batchId}` : null, fetcher, {
+  } = useSWR(batchId ? `/batchs/student/${batchId}` : null, fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
@@ -186,13 +188,12 @@ export default function CourseDetail() {
         }
       );
 
-      console.log("✅ Purchase Check Response:", response.data);
 
       if (response.data?.purchased) {
-         setAlreadyPurchased(response.data)
+        setAlreadyPurchased(response.data)
         setIsCourseAlreadyPurchased(true);
       } else {
-                 setAlreadyPurchased(null)
+        setAlreadyPurchased(null)
 
         setIsCourseAlreadyPurchased(false);
       }
@@ -268,15 +269,15 @@ export default function CourseDetail() {
   };
 
   const handleEnrollPress = () => {
-    if (batchData?.isEmi && batchData?.emiSchedule?.length > 0) {
-      setShowPaymentModal(true);
-      triggerHaptic();
-    } else {
+    // if (batchData?.isEmi && batchData?.emiSchedule?.length > 0) {
+    //   setShowPaymentModal(true);
+    //   triggerHaptic();
+    // } else {
       navigation.navigate("enroll-course", {
         batchId: batchData?.id,
         userId: 456,
       });
-    }
+    // }
   };
 
   const handlePaymentSelect = (type) => {
@@ -634,6 +635,21 @@ export default function CourseDetail() {
               )}
           </View>
         </View>
+        {Array.isArray(batchData?.quizzes) && batchData.quizzes.length > 0 && (
+          <QuizCards
+            data={batchData.quizzes}
+            isComplementary={true}
+          />
+        )}
+
+        {Array.isArray(batchData?.testSeries) && batchData.testSeries.length > 0 && (
+          <TestSeries
+            data={batchData.testSeries}
+            isComplementary={true}
+          />
+        )}
+
+
 
         {/* Important Dates */}
         <View style={styles.section}>
@@ -690,7 +706,7 @@ export default function CourseDetail() {
             style={styles.enrollButton}
             onPress={() => navigation.navigate("my-course", {
               unlocked: isCourseAlreadyPurchased,
-              courseId:batchId || AlreadyPurchased?.orderId,
+              courseId: batchId || AlreadyPurchased?.orderId,
             })}
             activeOpacity={0.9}
           >

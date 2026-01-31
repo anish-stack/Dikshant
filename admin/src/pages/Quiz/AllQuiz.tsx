@@ -21,7 +21,7 @@ interface Quiz {
   description: string;
   totalQuestions: number;
   durationMinutes: number;
-  totalPurchases:number
+  totalPurchases: number;
   totalMarks: number;
   passingMarks: number;
   isFree: boolean;
@@ -45,40 +45,39 @@ const AllQuizzesPage: React.FC = () => {
   const [pagination, setPagination] = useState<Pagination>({
     total: 0,
     page: 1,
-    is_admin:true,
+    is_admin: true,
     limit: 10,
     totalPages: 1,
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-const fetchQuizzes = async (page: number = 1, search: string = "") => {
-  try {
-    setLoading(true);
+  const fetchQuizzes = async (page: number = 1, search: string = "") => {
+    try {
+      setLoading(true);
 
-    const params = new URLSearchParams({
-      page: String(page),
-      is_admin: "true",   // ✅ must be string
-      limit: "10",
-      ...(search ? { search } : {}),
-    });
+      const params = new URLSearchParams({
+        page: String(page),
+        is_admin: "true", // ✅ must be string
+        limit: "10",
+        ...(search ? { search } : {}),
+      });
 
-    const res = await axios.get(
-      `${API_URL}/quiz/quizzes?${params.toString()}`
-    );
+      const res = await axios.get(
+        `${API_URL}/quiz/quizzes?${params.toString()}`,
+      );
 
-    const { data, pagination: pag } = res.data;
+      const { data, pagination: pag } = res.data;
 
-    setQuizzes(data || []);
-    setPagination(pag || { total: 0, page: 1, limit: 10, totalPages: 1 });
-    setCurrentPage(page);
-  } catch (err) {
-    toast.error("Failed to load quizzes");
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setQuizzes(data || []);
+      setPagination(pag || { total: 0, page: 1, limit: 10, totalPages: 1 });
+      setCurrentPage(page);
+    } catch (err) {
+      toast.error("Failed to load quizzes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchQuizzes(currentPage, searchTerm);
@@ -226,8 +225,10 @@ const fetchQuizzes = async (page: number = 1, search: string = "") => {
                         {quiz.title}
                       </h3>
 
-                      <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1
-                 text-sm font-semibold text-indigo-800">
+                      <span
+                        className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1
+                 text-sm font-semibold text-indigo-800"
+                      >
                         🛒 Total Purchased: {quiz.totalPurchases}
                       </span>
 
@@ -267,10 +268,11 @@ const fetchQuizzes = async (page: number = 1, search: string = "") => {
                         </div>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${quiz.status === "published"
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              quiz.status === "published"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
-                              }`}
+                            }`}
                           >
                             {quiz.status === "published"
                               ? "Published"
@@ -286,18 +288,13 @@ const fetchQuizzes = async (page: number = 1, search: string = "") => {
 
                     {/* Actions */}
                     <div className="flex items-center gap-3">
-                      
-                            <button
-                        onClick={() =>
-                          navigate(`/all-attemps?id=${quiz.id}`)
-                        }
+                      <button
+                        onClick={() => navigate(`/all-attemps?id=${quiz.id}`)}
                         className="p-3 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-xl transition shadow-sm"
                         title="All Attempt"
                       >
                         Attempts
                       </button>
-
-
 
                       <button
                         onClick={() =>
@@ -352,10 +349,11 @@ const fetchQuizzes = async (page: number = 1, search: string = "") => {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`px-4 py-2 rounded-lg transition ${currentPage === i + 1
+                      className={`px-4 py-2 rounded-lg transition ${
+                        currentPage === i + 1
                           ? "bg-blue-600 text-white"
                           : "border border-gray-300 hover:bg-gray-50"
-                        }`}
+                      }`}
                     >
                       {i + 1}
                     </button>

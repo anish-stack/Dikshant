@@ -11,6 +11,8 @@ import Label from "../../../components/form/Label";
 import {
   Loader2,
   Upload,
+  Search,
+  Check,
   ArrowLeft,
   AlertCircle,
   Calculator,
@@ -18,9 +20,9 @@ import {
 } from "lucide-react";
 import JoditEditor from "jodit-react";
 
-const BATCH_API = "https://www.dikapi.olyox.in/api/batchs";
-const SUBJECTS_API = "https://www.dikapi.olyox.in/api/subjects";
-const PROGRAMS_API = "https://www.dikapi.olyox.in/api/programs";
+const BATCH_API = "http://localhost:5001/api/batchs";
+const SUBJECTS_API = "http://localhost:5001/api/subjects";
+const PROGRAMS_API = "http://localhost:5001/api/programs";
 
 interface Subject {
   id: number;
@@ -49,6 +51,8 @@ interface Batch {
   batchPrice: number;
   batchDiscountPrice: number;
   gst: number;
+  quizIds: number[];
+  testSeriesIds: number[];
   offerValidityDays: number;
   isEmi: boolean;
   emiTotal: number | null;
@@ -56,6 +60,15 @@ interface Batch {
   category: "online" | "offline" | "recorded"; // 👈 ADD
 }
 
+interface Quiz {
+  id: number;
+  title: string;
+}
+
+interface TestSeries {
+  id: number;
+  title: string;
+}
 interface Program {
   id: number;
   name: string;
@@ -76,6 +89,23 @@ const EditBatch = () => {
   const [subjectsDropdownOpen, setSubjectsDropdownOpen] = useState(false);
   const [programs, setPrograms] = useState<Program[]>([]);
 
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [testSeriesList, setTestSeriesList] = useState<TestSeries[]>([]);
+
+  const [loadingQuizzes, setLoadingQuizzes] = useState(true);
+  const [loadingTestSeries, setLoadingTestSeries] = useState(true);
+
+  const [selectedQuizIds, setSelectedQuizIds] = useState<number[]>([]);
+  const [selectedTestSeriesIds, setSelectedTestSeriesIds] = useState<number[]>(
+    [],
+  );
+
+  const [quizSearch, setQuizSearch] = useState("");
+  const [testSeriesSearch, setTestSeriesSearch] = useState("");
+
+  const [quizzesDropdownOpen, setQuizzesDropdownOpen] = useState(false);
+  const [testSeriesDropdownOpen, setTestSeriesDropdownOpen] = useState(false);
+
   const [isEmi, setIsEmi] = useState(false);
   const [emiMonths, setEmiMonths] = useState(3);
   const [emiSchedule, setEmiSchedule] = useState<
@@ -93,6 +123,8 @@ const EditBatch = () => {
     status: "active",
     shortDescription: "",
     longDescription: "",
+    quizIds: [],
+    testSeriesIds: [],
     batchPrice: 0,
     batchDiscountPrice: 0,
     gst: 18,
@@ -128,14 +160,75 @@ const EditBatch = () => {
 
   const totalEmi = emiSchedule.reduce((sum, item) => sum + item.amount, 0);
 
-    const config = useMemo(
-      () => ({
-        readonly: false, // all options from https://xdsoft.net/jodit/docs/,
-        placeholder: "Write Long Discription",
-      }),
-      []
-    );
-  
+  const config = useMemo(
+    () => ({
+      readonly: false, // all options from https://xdsoft.net/jodit/docs/,
+      placeholder: "Write Long Discription",
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const fetchQuizzes = async () => {
+      try {
+        setLoadingQuizzes(true);
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "100", // adjust or implement pagination/search
+          is_admin: "true",
+        });
+
+        const res = await axios.get(
+          `https://www.dikapi.olyox.in/api/quiz/quizzes?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        // Adjust according to your real response shape
+        setQuizzes(res.data?.data || res.data || []);
+      } catch (err) {
+        console.error("Failed to load quizzes:", err);
+        // toast.error("Could not load quizzes");
+      } finally {
+        setLoadingQuizzes(false);
+      }
+    };
+
+    fetchQuizzes();
+  }, []);
+
+  useEffect(() => {
+    const fetchTestSeries = async () => {
+      try {
+        setLoadingTestSeries(true);
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "100",
+          // sortBy, sortOrder, search, etc. if needed
+        });
+
+        const res = await axios.get(
+          `https://www.dikapi.olyox.in/api/testseriess?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        // console.log(res.data);
+        // Adjust path according to your API response
+        setTestSeriesList(res.data?.data || res.data || []);
+      } catch (err) {
+        console.error("Failed to load test series:", err);
+        // toast.error("Could not load test series");
+      } finally {
+        setLoadingTestSeries(false);
+      }
+    };
+
+    fetchTestSeries();
+  }, []);
   // Fetch batch data
   useEffect(() => {
     const fetchData = async () => {
@@ -151,63 +244,82 @@ const EditBatch = () => {
         ]);
 
         const data = batchRes.data;
-        console.log("data", data);
+
         setBatch(data);
         setAllSubjects(subjectsRes.data);
         setImagePreview(data.imageUrl || "");
 
+        /* ================= SUBJECT IDS ================= */
         let currentIds: number[] = [];
 
-        if (typeof data.subjectId === "string") {
-          try {
-            // 1️⃣ first parse -> "[10,11]"
-            const firstParse = JSON.parse(data.subjectId);
+        try {
+          if (data.subjectId) {
+            const parsed =
+              typeof data.subjectId === "string"
+                ? JSON.parse(data.subjectId)
+                : data.subjectId;
 
-            // 2️⃣ second parse -> [10,11]
-            const secondParse =
-              typeof firstParse === "string"
-                ? JSON.parse(firstParse)
-                : firstParse;
-
-            if (Array.isArray(secondParse)) {
-              currentIds = secondParse.map((id) => Number(id));
+            if (Array.isArray(parsed)) {
+              currentIds = parsed.map((id: any) => Number(id));
             }
-          } catch (e) {
-            console.error("Subject parse error:", e);
           }
+        } catch (err) {
+          console.error("Subject parse error:", err);
         }
 
-        // fallback (if backend ever fixes it)
-        if (currentIds.length === 0 && Array.isArray(data.subjects)) {
-          currentIds = data.subjects.map((s) => s.id);
-        }
-
-        console.log("FINAL SUBJECT IDS:", currentIds);
         setSelectedSubjectIds(currentIds);
 
+        /* ================= FORM DATA ================= */
         setFormData({
-          name: data.name,
-          displayOrder: data.displayOrder,
-          programId: data.programId.toString(),
-          startDate: data.startDate.split("T")[0],
-          endDate: data.endDate.split("T")[0],
-          registrationStartDate: data.registrationStartDate.split("T")[0],
-          registrationEndDate: data.registrationEndDate.split("T")[0],
-          status: data.status,
-          shortDescription: data.shortDescription,
-          longDescription: data.longDescription,
-          batchPrice: data.batchPrice,
+          name: data.name || "",
+          displayOrder: data.displayOrder || 0,
+          programId: data.programId?.toString() || "",
+
+          startDate: data.startDate ? data.startDate.split("T")[0] : "",
+          endDate: data.endDate ? data.endDate.split("T")[0] : "",
+
+          registrationStartDate: data.registrationStartDate
+            ? data.registrationStartDate.split("T")[0]
+            : "",
+          registrationEndDate: data.registrationEndDate
+            ? data.registrationEndDate.split("T")[0]
+            : "",
+
+          status: data.status || "inactive",
+
+          quizIds: Array.isArray(data.quizIds) ? data.quizIds : [],
+          testSeriesIds: Array.isArray(data.testSeriesIds)
+            ? data.testSeriesIds
+            : [],
+
+          shortDescription: data.shortDescription || "",
+          longDescription: data.longDescription || "",
+
+          batchPrice: data.batchPrice || 0,
           batchDiscountPrice: data.batchDiscountPrice || 0,
           gst: data.gst || 18,
           offerValidityDays: data.offerValidityDays || 0,
+
           category:
             typeof data.category === "string"
               ? data.category.toLowerCase()
               : "",
         });
 
-        setIsEmi(data.isEmi);
-        if (data.isEmi && data.emiSchedule && data.emiSchedule.length > 0) {
+        /* ================= SEPARATE STATES ================= */
+        // setSele(Array.isArray(data.subjects) ? data.subjects : [])
+        // setSelectedQuizIds(Array.isArray(data.quizIds) ? data.quizIds : []);
+        // setSelectedTestSeriesIds(
+        //   Array.isArray(data.testSeriesIds) ? data.testSeriesIds : [],
+        // );
+
+        setIsEmi(Boolean(data.isEmi));
+
+        if (
+          data.isEmi &&
+          Array.isArray(data.emiSchedule) &&
+          data.emiSchedule.length > 0
+        ) {
           setEmiMonths(data.emiSchedule.length);
         }
       } catch (err: unknown) {
@@ -226,6 +338,71 @@ const EditBatch = () => {
 
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    if (!batch?.quizIds) {
+      setSelectedQuizIds([]);
+      return;
+    }
+
+    try {
+      const ids = JSON.parse(batch.quizIds);
+      if (Array.isArray(ids)) {
+        setSelectedQuizIds(
+          ids.map(Number).filter((n) => Number.isInteger(n) && n > 0),
+        );
+      } else {
+        setSelectedQuizIds([]);
+      }
+    } catch {
+      setSelectedQuizIds([]);
+    }
+  }, [batch]);
+
+  useEffect(() => {
+    if (!batch?.testSeriesIds) {
+      setSelectedTestSeriesIds([]);
+      return;
+    }
+
+    try {
+      const ids = JSON.parse(batch?.testSeriesIds);
+      if (Array.isArray(ids)) {
+        setSelectedTestSeriesIds(
+          ids.map(Number).filter((n) => Number.isInteger(n) && n > 0),
+        );
+      } else {
+        setSelectedQuizIds([]);
+      }
+    } catch {
+      setSelectedQuizIds([]);
+    }
+  }, [batch]);
+
+  useEffect(() => {
+    if (!batch) return;
+
+    const idsFromObjects = Array.isArray(batch.subjects)
+      ? batch.subjects.map((s) => Number(s.id)).filter(Boolean)
+      : [];
+
+    const idsFromString = (() => {
+      if (typeof batch.subjectId !== "string") return [];
+      try {
+        const val = JSON.parse(batch.subjectId);
+        return Array.isArray(val)
+          ? val.map(Number).filter((n) => Number.isInteger(n) && n > 0)
+          : [];
+      } catch {
+        return [];
+      }
+    })();
+
+    // Prefer objects → string fallback
+    const finalIds = idsFromObjects.length > 0 ? idsFromObjects : idsFromString;
+
+    setSelectedSubjectIds(finalIds);
+  }, [batch]);
 
   useEffect(() => {
     const fetchPrograms = async () => {
@@ -288,6 +465,8 @@ const EditBatch = () => {
       data.append("subjectId", JSON.stringify(selectedSubjectIds));
       data.append("startDate", formData.startDate);
       data.append("endDate", formData.endDate);
+      data.append("quizIds", JSON.stringify(selectedQuizIds));
+      data.append("testSeriesIds", JSON.stringify(selectedTestSeriesIds));
       data.append("registrationStartDate", formData.registrationStartDate);
       data.append("registrationEndDate", formData.registrationEndDate);
       data.append("status", formData.status);
@@ -297,7 +476,7 @@ const EditBatch = () => {
       if (formData.batchDiscountPrice > 0) {
         data.append(
           "batchDiscountPrice",
-          formData.batchDiscountPrice.toString()
+          formData.batchDiscountPrice.toString(),
         );
       }
       data.append("gst", formData.gst.toString());
@@ -480,13 +659,14 @@ const EditBatch = () => {
                     selectedSubjectIds.length === 0
                       ? "Select subjects..."
                       : Array.isArray(selectedSubjectIds)
-                      ? selectedSubjectIds
-                          .map(
-                            (id) => allSubjects.find((s) => s.id === id)?.name
-                          )
-                          .filter(Boolean)
-                          .join(", ")
-                      : "Select subjects..."}
+                        ? selectedSubjectIds
+                            .map(
+                              (id) =>
+                                allSubjects.find((s) => s.id === id)?.name,
+                            )
+                            .filter(Boolean)
+                            .join(", ")
+                        : "Select subjects..."}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${
@@ -510,7 +690,7 @@ const EditBatch = () => {
                         .filter((s) =>
                           s.name
                             .toLowerCase()
-                            .includes(subjectSearch.toLowerCase())
+                            .includes(subjectSearch.toLowerCase()),
                         )
                         .map((subject) => (
                           <label
@@ -524,7 +704,7 @@ const EditBatch = () => {
                                 setSelectedSubjectIds((prev) =>
                                   prev.includes(subject.id)
                                     ? prev.filter((id) => id !== subject.id)
-                                    : [...prev, subject.id]
+                                    : [...prev, subject.id],
                                 );
                               }}
                               className="w-4 h-4 rounded border-gray-300"
@@ -532,6 +712,192 @@ const EditBatch = () => {
                             <span>{subject.name}</span>
                           </label>
                         ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <Label className="text-sm">
+                Included Quizzes{" "}
+                <span className="text-xs text-gray-500">
+                  ({selectedQuizIds.length} selected)
+                </span>
+              </Label>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setQuizzesDropdownOpen(!quizzesDropdownOpen)}
+                  className="w-full px-3 py-2 text-sm text-left border ... flex justify-between items-center"
+                >
+                  <span className="truncate">
+                    {loadingQuizzes
+                      ? "Loading quizzes..."
+                      : selectedQuizIds.length === 0
+                        ? "Select quizzes (optional)"
+                        : selectedQuizIds
+                            .map(
+                              (id) => quizzes.find((q) => q.id === id)?.title,
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${quizzesDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {quizzesDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white ... max-h-80 overflow-hidden shadow-lg z-50">
+                    <div className="p-2 sticky top-0 ...">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search quizzes..."
+                          value={quizSearch}
+                          onChange={(e) => setQuizSearch(e.target.value)}
+                          className="pl-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {quizzes
+                        .filter((q) =>
+                          q.title
+                            .toLowerCase()
+                            .includes(quizSearch.toLowerCase()),
+                        )
+                        .map((quiz) => {
+                          const isSelected = selectedQuizIds.includes(quiz.id);
+                          return (
+                            <label
+                              key={quiz.id}
+                              className="flex items-start gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300"}`}
+                              >
+                                {isSelected && (
+                                  <Check className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSelectedQuizIds((prev) =>
+                                    prev.includes(quiz.id)
+                                      ? prev.filter((id) => id !== quiz.id)
+                                      : [...prev, quiz.id],
+                                  );
+                                }}
+                              >
+                                <div className="font-medium text-sm">
+                                  {quiz.title}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <Label className="text-sm">
+                Included Test Series{" "}
+                <span className="text-xs text-gray-500">
+                  ({selectedTestSeriesIds.length} selected)
+                </span>
+              </Label>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTestSeriesDropdownOpen(!testSeriesDropdownOpen)
+                  }
+                  className="w-full px-3 py-2 text-sm text-left border ... flex justify-between items-center"
+                >
+                  <span className="truncate">
+                    {loadingTestSeries
+                      ? "Loading test series..."
+                      : selectedTestSeriesIds.length === 0
+                        ? "Select test series (optional)"
+                        : selectedTestSeriesIds
+                            .map(
+                              (id) =>
+                                testSeriesList.find((ts) => ts.id === id)
+                                  ?.title,
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${testSeriesDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {testSeriesDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white ... max-h-80 overflow-hidden shadow-lg z-50">
+                    <div className="p-2 sticky top-0 ...">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search Test Series..."
+                          value={testSeriesSearch}
+                          onChange={(e) => setTestSeriesSearch(e.target.value)}
+                          className="pl-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {testSeriesList
+                        .filter((q) =>
+                          q.title
+                            .toLowerCase()
+                            .includes(testSeriesSearch.toLowerCase()),
+                        )
+                        .map((quiz) => {
+                          const isSelected = selectedTestSeriesIds.includes(
+                            quiz.id,
+                          );
+                          return (
+                            <label
+                              key={quiz.id}
+                              className="flex items-start gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300"}`}
+                              >
+                                {isSelected && (
+                                  <Check className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSelectedTestSeriesIds((prev) =>
+                                    prev.includes(quiz.id)
+                                      ? prev.filter((id) => id !== quiz.id)
+                                      : [...prev, quiz.id],
+                                  );
+                                }}
+                              >
+                                <div className="font-medium text-sm">
+                                  {quiz.title}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
                     </div>
                   </div>
                 )}
@@ -633,8 +999,8 @@ const EditBatch = () => {
               </div>
               <div>
                 <Label className="text-sm">Long Description</Label>
-               
-                 <JoditEditor
+
+                <JoditEditor
                   ref={editor}
                   value={formData.longDescription}
                   config={config}
@@ -751,7 +1117,7 @@ const EditBatch = () => {
                         ₹
                         {emiSchedule.length > 0
                           ? Math.round(finalPrice / emiMonths).toLocaleString(
-                              "en-IN"
+                              "en-IN",
                             )
                           : 0}
                       </div>

@@ -464,18 +464,21 @@ const ViewBatch = () => {
             )}
 
             {/* Long Description */}
-            {batch.longDescription && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  Full Description
-                </h3>
-                <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
-                    {batch.longDescription}
-                  </p>
-                </div>
-              </div>
-            )}
+          {batch.longDescription && (
+  <div className="mb-6">
+    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+      Full Description
+    </h3>
+
+    <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
+      <div
+        className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap"
+        dangerouslySetInnerHTML={{ __html: batch.longDescription }}
+      />
+    </div>
+  </div>
+)}
+
 
             {/* Meta Info */}
             <div className="grid grid-cols-3 gap-4 pt-6 border-t border-gray-200 dark:border-gray-700 text-center">

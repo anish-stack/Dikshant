@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  Text,
+} from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useSWR from 'swr';
@@ -20,17 +26,18 @@ import { SocketProvider } from '../../context/SocketContext';
 export default function CourseScreen() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { courseId, unlocked = false, userId } = route.params || {};
+
+  const { courseId, unlocked = false, subjectId } = route.params || {};
   const { user } = useAuthStore();
 
-  // Video States
+  // UI / Player states
   const [currentVideo, setCurrentVideo] = useState(null);
   const [showComments, setShowComments] = useState(false);
   const [showDoubts, setShowDoubts] = useState(false);
   const [showMyDoubts, setShowMyDoubts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch course data
+  // Data fetching
   const { data: batchData, isLoading: batchLoading, mutate: mutateBatch } = useSWR(
     courseId ? `/batchs/${courseId}` : null,
     fetcher,
@@ -38,12 +45,19 @@ export default function CourseScreen() {
   );
 
   const { data: videosData, isLoading: videosLoading, mutate: mutateVideos } = useSWR(
-    unlocked ? `/videocourses/batch/${courseId}` : null,
+    unlocked && courseId ? `/videocourses/batch/${courseId}` : null,
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  const videos = videosData?.data || [];
+  const allVideos = videosData?.data || [];
+
+  // Filter videos based on subjectId (if provided)
+  const displayedVideos = subjectId
+    ? allVideos.filter(video => video.subjectId === subjectId)
+    : allVideos;
+
+  const isLoading = batchLoading || videosLoading;
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -58,33 +72,40 @@ export default function CourseScreen() {
     setShowMyDoubts(false);
   };
 
-  const handleCloseModals = () => {
-    setShowComments(false);
-    setShowDoubts(false);
-    setShowMyDoubts(false);
-  };
-
-  // Handle when live session ends - force switch to regular player
   const handleLiveEnded = () => {
-    // Force re-render by updating the video object
     if (currentVideo) {
-      setCurrentVideo({
-        ...currentVideo,
+      setCurrentVideo(prev => ({
+        ...prev,
         isLiveEnded: true,
-      });
+      }));
     }
-    
-    // Optionally refresh videos data to get updated status from server
-    mutateVideos();
+    mutateVideos(); // optional: refresh list to reflect any status change
   };
 
-  if (batchLoading || videosLoading) {
+  // ────────────────────────────────────────────────
+  //                  RENDER LOGIC
+  // ────────────────────────────────────────────────
+
+  if (isLoading) {
     return <LoadingScreen message="Loading your course..." />;
+  }
+
+  if (!courseId || !unlocked || !batchData?.id) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>Course not available</Text>
+      </View>
+    );
   }
 
   if (!unlocked) {
     return <LockedScreen />;
   }
+
+  const isSubjectView = !!subjectId;
+  const subjectName = isSubjectView
+    ? batchData?.subjects?.find(s => s.id === subjectId)?.name || 'Subject'
+    : null;
 
   return (
     <SocketProvider userId={user?.id}>
@@ -101,15 +122,17 @@ export default function CourseScreen() {
             }
             showsVerticalScrollIndicator={false}
           >
-            {/* Course Header */}
-            {currentVideo ? null : (
+            {/* Header - only when no video is selected */}
+            {!currentVideo && (
               <CourseHeader
                 batchData={batchData}
-                videosCount={videos.length || 0}
+                videosCount={displayedVideos.length}
+                // optional: pass subject name if in subject mode
+                subjectName={subjectName}
               />
             )}
 
-            {/* Smart Video Player - Automatically switches between Live and Regular */}
+            {/* Video Player */}
             {currentVideo && (
               <SmartVideoPlayer
                 video={currentVideo}
@@ -122,22 +145,34 @@ export default function CourseScreen() {
               />
             )}
 
-            {/* Video List */}
-            {currentVideo ? null : (
-              <VideoList
-                videos={videos}
-                startDate={batchData?.startDate}
-                endDate={batchData?.endDate}
-                currentVideo={currentVideo}
-                            courseId={courseId}
-
-                onVideoSelect={handleVideoSelect}
-                userId={user?.id}
-              />
+            {/* Video List or Empty state */}
+            {!currentVideo && (
+              <>
+                {displayedVideos.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>
+                      {isSubjectView
+                        ? `No videos available for ${subjectName} yet`
+                        : 'No videos available in this course yet'}
+                    </Text>
+                  </View>
+                ) : (
+                  <VideoList
+                    videos={displayedVideos}
+                    startDate={batchData?.startDate}
+                    endDate={batchData?.endDate}
+                    subjectId={subjectId ? subjectId :""}
+                    currentVideo={currentVideo}
+                    courseId={courseId}
+                    onVideoSelect={handleVideoSelect}
+                    userId={user?.id}
+                  />
+                )}
+              </>
             )}
           </ScrollView>
 
-          {/* Comments Panel */}
+          {/* Side Panels / Modals */}
           <CommentsPanel
             visible={showComments}
             onClose={() => setShowComments(false)}
@@ -145,17 +180,15 @@ export default function CourseScreen() {
             userId={user?.id}
           />
 
-          {/* Doubts Modal */}
           <DoubtsModal
             visible={showDoubts}
             onClose={() => setShowDoubts(false)}
             videoId={currentVideo?.id}
             courseId={courseId}
             userId={user?.id}
-            currentTime={0}
+            currentTime={0} // you might want to pass real current time later
           />
 
-          {/* My Doubts Modal */}
           <MyDoubtsModal
             visible={showMyDoubts}
             onClose={() => setShowMyDoubts(false)}
@@ -176,5 +209,24 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    minHeight: 300,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 24,
   },
 });

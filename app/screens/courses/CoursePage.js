@@ -230,17 +230,6 @@ export default function CoursePage() {
             {item.name}
           </Text>
 
-          <View style={styles.metaRow}>
-            <View style={styles.ratingContainer}>
-              <Feather name="star" size={10} color="#fbbf24" />
-              <Text style={styles.ratingText}>4.8</Text>
-            </View>
-            <View style={styles.studentsContainer}>
-              <Feather name="users" size={10} color="#6b7280" />
-              <Text style={styles.studentsText}>1.2k</Text>
-            </View>
-          </View>
-
           {isPurchased ? (
             <View style={styles.accessButtonSmall}>
               <Feather name="play-circle" size={12} color="#22c55e" />

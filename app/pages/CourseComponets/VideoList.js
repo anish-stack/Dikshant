@@ -23,6 +23,7 @@ export default function VideoList({
   videos,
   currentVideo,
   courseId,
+  subjectId,
   startDate,
   endDate,
   onVideoSelect,
@@ -488,7 +489,7 @@ export default function VideoList({
       <View style={styles.headerContainer}>
         <Text style={styles.mainTitle}>📚 All Lectures</Text>
 
-        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId })}>
+        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId,subjectId })}>
           <Text style={styles.viewAllText}>View All </Text>
         </TouchableOpacity>
       </View>

@@ -68,6 +68,7 @@ import IntroTestSeries from "./pages/TestSeries/IntroTestSeries";
 import TestSeriesView from "./pages/TestSeries/TestSeriesView";
 import ResultScreen from "./pages/TestSeries/ResultScreen";
 import follow from "./pages/Profile/follow";
+import CourseSubjectEnrolled from "./pages/Profile/CourseSubjectEnrolled";
 
 const Stack = createNativeStackNavigator();
 
@@ -419,6 +420,9 @@ export default function App() {
           <Stack.Screen name="Courses" component={CoursePage} />
           <Stack.Screen name="enroll-course" component={EnrollCourse} />
           <Stack.Screen name="my-course" component={MyEnrollCourse} />
+          <Stack.Screen name="my-course-subjects" component={CourseSubjectEnrolled} />
+
+
           <Stack.Screen name="all-my-course" component={MyCourses} />
           <Stack.Screen name="all-my-quiz" component={MyAllQuiz} />
           <Stack.Screen name="ResultScreen" component={ResultScreen} />

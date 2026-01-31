@@ -23,13 +23,22 @@ module.exports = (sequelize, DataTypes) => {
     status: DataTypes.ENUM('active', 'inactive'),
 
     shortDescription: DataTypes.STRING,
-  longDescription: DataTypes.TEXT,
+    longDescription: DataTypes.TEXT,
 
     batchPrice: DataTypes.FLOAT,
     batchDiscountPrice: DataTypes.FLOAT,
     gst: DataTypes.FLOAT,
     offerValidityDays: DataTypes.INTEGER,
-
+quizIds: {
+  type: DataTypes.JSON,
+  allowNull: true,
+  defaultValue: []
+},
+testSeriesIds: {
+  type: DataTypes.JSON,
+  allowNull: true,
+  defaultValue: []
+},
 
     isEmi: {
       type: DataTypes.BOOLEAN,
@@ -66,18 +75,19 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true
   });
 
-Batch.associate = function (models) {
-  Batch.belongsTo(models.Program, { foreignKey: 'programId', as: 'program' });
-  Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
-  Batch.belongsToMany(models.Subject, { through: "batch_subjects" });
-  
-  // Add this line:
-  Batch.hasMany(models.Order, { 
-    foreignKey: 'itemId', 
-    as: 'orders',
-    constraints: false
-  });
-};
+  Batch.associate = function (models) {
+    Batch.belongsTo(models.Program, { foreignKey: 'programId', as: 'program' });
+    Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
+    Batch.belongsToMany(models.Subject, { through: "batch_subjects" });
+
+
+    // Add this line:
+    Batch.hasMany(models.Order, {
+      foreignKey: 'itemId',
+      as: 'orders',
+      constraints: false
+    });
+  };
 
   return Batch;
 };

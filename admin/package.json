@@ -61,6 +61,7 @@
     "react-helmet-async": {
       "react": "^16.8.0 || ^17 || ^18 || ^19"
     },
+    "file-selector": "0.6.0",
     "@react-jvectormap/core": {
       "react": "^16.8.0 || ^17 || ^18 || ^19",
       "react-dom": "^16.8.0 || ^17 || ^18 || ^19"

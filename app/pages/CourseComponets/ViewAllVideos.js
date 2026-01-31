@@ -1,15 +1,15 @@
-import {
-    View,
-    Text,
-    FlatList,
-    TouchableOpacity,
-    ActivityIndicator,
-    TextInput,
-    Image,
-    StyleSheet,
-    Alert,
-} from 'react-native';
 import React, { useState, useMemo, useEffect } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+  Image,
+  StyleSheet,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import useSWR from 'swr';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -19,413 +19,359 @@ import axios from 'axios';
 import { API_URL_LOCAL_ENDPOINT } from '../../constant/api';
 
 export default function ViewAllVideos({ route, navigation }) {
-    const { id } = route.params || {};
-    const { token, user } = useAuthStore();
-    
-    const { data: videosData, isLoading, error } = useSWR(
-        id ? `/videocourses/batch/${id}` : null,
-        fetcher,
-        { revalidateOnFocus: true }
-    );
+  const { id: batchId, subjectId } = route.params || {};
+  const { token, user } = useAuthStore();
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState('all');
-    const [pdfCounts, setPdfCounts] = useState({});
+  const { data: videosData, isLoading, error } = useSWR(
+    batchId ? `/videocourses/batch/${batchId}` : null,
+    fetcher,
+    { revalidateOnFocus: true }
+  );
 
-    const videos = videosData?.success ? videosData.data : [];
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  const [pdfCounts, setPdfCounts] = useState({});
 
-    // Fetch PDF counts for all videos
+  const allVideos = videosData?.success ? videosData.data : [];
+
+  // ─── Subject Filter ──────────────────────────────────────────────
+  const displayedVideos = useMemo(() => {
+    if (!subjectId) return allVideos;
+    return allVideos.filter((video) => video.subjectId === subjectId);
+  }, [allVideos, subjectId]);
+
+  // ─── PDF Counts ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (displayedVideos.length === 0) return;
+
     const fetchPdfCounts = async () => {
-        try {
-            const uniqueVideoIds = [...new Set(videos.map(v => v.id))];
-            const counts = {};
+      try {
+        const uniqueVideoIds = [...new Set(displayedVideos.map((v) => v.id))];
+        const counts = {};
 
-            await Promise.all(
-                uniqueVideoIds.map(async (videoId) => {
-                    try {
-                        const res = await axios.get(
-                            `${API_URL_LOCAL_ENDPOINT}/pdfnotes?videoId=${videoId}`
-                        );
-                        counts[videoId] = res.data?.count || 0;
-                    } catch (err) {
-                        counts[videoId] = 0;
-                    }
-                })
-            );
-
-            setPdfCounts(counts);
-        } catch (error) {
-            console.log('Error fetching PDF counts:', error);
-        }
-    };
-
-    useEffect(() => {
-        if (videos.length > 0) {
-            fetchPdfCounts();
-        }
-    }, [videos]);
-
-    const getVideoStatus = (video) => {
-        const now = new Date();
-
-        let classDateTime = null;
-        if (video.dateOfClass && video.TimeOfClass) {
-            const [year, month, day] = video.dateOfClass.split('-').map(Number);
-            const [hours, minutes, seconds = 0] = video.TimeOfClass.split(':').map(Number);
-            classDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
-        }
-
-        // Explicit live from backend
-        if (video.isLive && !video.isLiveEnded) {
-            return {
-                status: 'live',
-                label: 'Live Now',
-                color: '#dc2626',
-                bgColor: '#fef2f2',
-                icon: 'radio-button-on',
-            };
-        }
-
-        // Class time passed → Available
-        if (classDateTime && now >= classDateTime) {
-            return {
-                status: 'completed',
-                label: 'Available',
-                color: '#16a34a',
-                bgColor: '#f0fdf4',
-                icon: 'checkmark-circle',
-            };
-        }
-
-        // Future → Upcoming
-        if (classDateTime && now < classDateTime) {
-            return {
-                status: 'upcoming',
-                label: 'Upcoming',
-                color: '#d97706',
-                bgColor: '#fffbeb',
-                icon: 'time',
-            };
-        }
-
-        // Default
-        return {
-            status: 'completed',
-            label: 'Available',
-            color: '#16a34a',
-            bgColor: '#f0fdf4',
-            icon: 'checkmark-circle',
-        };
-    };
-
-    const filteredVideos = useMemo(() => {
-        let list = videos;
-
-        if (searchQuery.trim()) {
-            list = list.filter((video) =>
-                video.title.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        if (filterType !== 'all') {
-            list = list.filter((video) => getVideoStatus(video).status === filterType);
-        }
-
-        return list.sort((a, b) => {
-            const statusA = getVideoStatus(a).status;
-            const statusB = getVideoStatus(b).status;
-            const order = { live: 0, upcoming: 1, completed: 2 };
-            return order[statusA] - order[statusB];
-        });
-    }, [videos, searchQuery, filterType]);
-
-    const openVideo = async (video) => {
-        try {
-            if (!video || !user?.id || !token || !id || !video.secureToken) {
-                Alert.alert('Error', 'Unable to open video. Please try again.');
-                return;
+        await Promise.all(
+          uniqueVideoIds.map(async (videoId) => {
+            try {
+              const res = await axios.get(
+                `${API_URL_LOCAL_ENDPOINT}/pdfnotes?videoId=${videoId}`
+              );
+              counts[videoId] = res.data?.count || 0;
+            } catch {
+              counts[videoId] = 0;
             }
-
-            const status = getVideoStatus?.(video);
-
-            if (status?.status === 'upcoming') {
-                Alert.alert(
-                    'Class Not Started',
-                    'This class will be available after the scheduled start time.'
-                );
-                return;
-            }
-
-            navigation.navigate('PlayerScreen', {
-                video: video.secureToken,
-                batchId: video?.batchId ?? '',
-                userId: String(user.id),
-                token,
-                courseId: String(id),
-            });
-        } catch (error) {
-            console.error('openVideo error:', error);
-            Alert.alert('Error', 'Failed to open video');
-        }
-    };
-
-    if (isLoading) {
-        return (
-            <SafeAreaView style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#3b82f6" />
-                <Text style={styles.loadingText}>Loading classes...</Text>
-            </SafeAreaView>
+          })
         );
+
+        setPdfCounts(counts);
+      } catch (err) {
+        console.log('PDF counts fetch failed:', err);
+      }
+    };
+
+    fetchPdfCounts();
+  }, [displayedVideos]);
+
+  // ─── Video Status Logic ──────────────────────────────────────────
+  const getVideoStatus = (video) => {
+    const now = new Date();
+
+    let classDateTime = null;
+    if (video.dateOfClass && video.TimeOfClass) {
+      const [year, month, day] = video.dateOfClass.split('-').map(Number);
+      const [hours, minutes, seconds = 0] = video.TimeOfClass.split(':').map(Number);
+      classDateTime = new Date(year, month - 1, day, hours, minutes, seconds);
     }
 
-    if (error || !videosData?.success) {
-        return (
-            <SafeAreaView style={styles.centerContainer}>
-                <Ionicons name="alert-circle" size={64} color="#dc2626" />
-                <Text style={styles.errorTitle}>Unable to Load Classes</Text>
-                <Text style={styles.errorSubtitle}>
-                    Please check your connection and try again
-                </Text>
-            </SafeAreaView>
-        );
+    if (video.isLive && !video.isLiveEnded) {
+      return {
+        status: 'live',
+        label: 'Live Now',
+        color: '#dc2626',
+        bgColor: '#fef2f2',
+        icon: 'radio-button-on',
+      };
     }
 
+    if (classDateTime && now >= classDateTime) {
+      return {
+        status: 'completed',
+        label: 'Available',
+        color: '#16a34a',
+        bgColor: '#f0fdf4',
+        icon: 'checkmark-circle',
+      };
+    }
+
+    if (classDateTime && now < classDateTime) {
+      return {
+        status: 'upcoming',
+        label: 'Upcoming',
+        color: '#d97706',
+        bgColor: '#fffbeb',
+        icon: 'time',
+      };
+    }
+
+    return {
+      status: 'completed',
+      label: 'Available',
+      color: '#16a34a',
+      bgColor: '#f0fdf4',
+      icon: 'checkmark-circle',
+    };
+  };
+
+  // ─── Filtered & Sorted Videos ────────────────────────────────────
+  const filteredVideos = useMemo(() => {
+    let list = [...displayedVideos];
+
+    // Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((v) => v.title?.toLowerCase().includes(q));
+    }
+
+    // Status filter
+    if (filterType !== 'all') {
+      list = list.filter((v) => getVideoStatus(v).status === filterType);
+    }
+
+    // Sort priority: live > upcoming > completed
+    list.sort((a, b) => {
+      const order = { live: 0, upcoming: 1, completed: 2 };
+      return order[getVideoStatus(a).status] - order[getVideoStatus(b).status];
+    });
+
+    return list;
+  }, [displayedVideos, searchQuery, filterType]);
+
+  // ─── Open Video Handler ──────────────────────────────────────────
+  const openVideo = async (video) => {
+    if (!video || !user?.id || !token || !batchId || !video.secureToken) {
+      Alert.alert('Error', 'Missing required data to play video.');
+      return;
+    }
+
+    const status = getVideoStatus(video);
+
+    if (status.status === 'upcoming') {
+      Alert.alert('Not Available Yet', 'This class has not started.');
+      return;
+    }
+
+    navigation.navigate('PlayerScreen', {
+      video: video.secureToken,
+      batchId: video?.batchId ?? batchId,
+      userId: String(user.id),
+      token,
+      courseId: String(batchId),
+    });
+  };
+
+  // ─── Loading / Error States ──────────────────────────────────────
+  if (isLoading) {
     return (
-        <SafeAreaView style={styles.container}>
-            {/* Search Bar */}
-            <View style={styles.searchSection}>
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={20} color="#6b7280" />
-                    <TextInput
-                        placeholder="Search classes, topics..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        style={styles.searchInput}
-                        placeholderTextColor="#9ca3af"
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity
-                            onPress={() => setSearchQuery('')}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        >
-                            <Ionicons name="close-circle" size={20} color="#9ca3af" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </View>
-
-            {/* Filter Tabs */}
-            <View style={styles.filterSection}>
-                {[
-                    { key: 'all', label: 'All' },
-                    { key: 'live', label: 'Live' },
-                    { key: 'upcoming', label: 'Upcoming' },
-                    { key: 'completed', label: 'Available' },
-                ].map((filter) => (
-                    <TouchableOpacity
-                        key={filter.key}
-                        onPress={() => setFilterType(filter.key)}
-                        style={[
-                            styles.filterTab,
-                            filterType === filter.key && styles.filterTabActive,
-                        ]}
-                        activeOpacity={0.7}
-                    >
-                        <Text
-                            style={[
-                                styles.filterText,
-                                filterType === filter.key && styles.filterTextActive,
-                            ]}
-                        >
-                            {filter.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Video List */}
-            <FlatList
-                data={filteredVideos}
-                keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <MaterialCommunityIcons
-                            name="video-off-outline"
-                            size={72}
-                            color="#d1d5db"
-                        />
-                        <Text style={styles.emptyTitle}>No Classes Found</Text>
-                        <Text style={styles.emptySubtitle}>
-                            {searchQuery.trim()
-                                ? 'Try a different search term'
-                                : 'New classes will appear here'}
-                        </Text>
-                    </View>
-                }
-                renderItem={({ item }) => {
-                    const status = getVideoStatus(item);
-                    const pdfCount = pdfCounts[item.id] || 0;
-                    const isLive = status.status === 'live';
-                    const isUpcoming = status.status === 'upcoming';
-
-                    return (
-                        <TouchableOpacity
-                            onPress={() => openVideo(item)}
-                            style={[
-                                styles.videoCard,
-                                isLive && styles.liveCard,
-                                isUpcoming && styles.upcomingCard,
-                            ]}
-                            activeOpacity={0.7}
-                            disabled={isUpcoming}
-                        >
-                            {/* Live Indicator */}
-                            {isLive && (
-                                <View style={styles.liveTopBar}>
-                                    <View style={styles.livePulse} />
-                                    <Text style={styles.liveTopText}>LIVE NOW</Text>
-                                </View>
-                            )}
-
-                            <View style={styles.cardContent}>
-                                {/* Thumbnail */}
-                                <View style={styles.thumbnailContainer}>
-                                    {item?.imageUrl ? (
-                                        <Image
-                                            source={{ uri: item.imageUrl }}
-                                            style={styles.thumbnail}
-                                            resizeMode="cover"
-                                        />
-                                    ) : (
-                                        <View style={[styles.thumbnail, styles.placeholderThumb]}>
-                                            <MaterialCommunityIcons
-                                                name="play-circle-outline"
-                                                size={40}
-                                                color="#ffffff"
-                                            />
-                                        </View>
-                                    )}
-
-                                    {/* Duration badge on thumbnail */}
-                                    {item.duration && (
-                                        <View style={styles.durationBadge}>
-                                            <Text style={styles.durationText}>
-                                                {item.duration}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                {/* Content Section */}
-                                <View style={styles.infoSection}>
-                                    {/* Title */}
-                                    <Text style={styles.videoTitle} numberOfLines={2}>
-                                        {item.title}
-                                    </Text>
-
-                                    {/* Status Badge */}
-                                    <View
-                                        style={[
-                                            styles.statusBadge,
-                                            { backgroundColor: status.bgColor },
-                                        ]}
-                                    >
-                                        <Ionicons
-                                            name={status.icon}
-                                            size={14}
-                                            color={status.color}
-                                        />
-                                        <Text style={[styles.statusText, { color: status.color }]}>
-                                            {status.label}
-                                        </Text>
-                                    </View>
-
-                                    {/* Date & Time */}
-                                    {item?.dateOfClass && (
-                                        <View style={styles.dateTimeRow}>
-                                            <Ionicons
-                                                name="calendar-outline"
-                                                size={14}
-                                                color="#6b7280"
-                                            />
-                                            <Text style={styles.dateText}>
-                                                {new Date(item.dateOfClass).toLocaleDateString(
-                                                    'en-IN',
-                                                    {
-                                                        day: 'numeric',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                    }
-                                                )}
-                                            </Text>
-
-                                            {item?.TimeOfClass && !isLive && (
-                                                <>
-                                                    <Text style={styles.dateDivider}>•</Text>
-                                                    <Ionicons
-                                                        name="time-outline"
-                                                        size={14}
-                                                        color="#6b7280"
-                                                    />
-                                                    <Text style={styles.dateText}>
-                                                        {item.TimeOfClass.substring(0, 5)}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </View>
-                                    )}
-                                </View>
-
-                                {/* Right Actions */}
-                                <View style={styles.actionsColumn}>
-                                    {/* PDF Button - Only show if PDFs exist */}
-                                    {pdfCount > 0 && (
-                                        <TouchableOpacity
-                                            onPress={(e) => {
-                                                e.stopPropagation();
-                                                navigation.navigate('PdfNotes', {
-                                                    videoId: item.id,
-                                                    videoTitle: item.title,
-                                                    batchId: id,
-                                                });
-                                            }}
-                                            style={styles.pdfButton}
-                                            activeOpacity={0.7}
-                                        >
-                                            <MaterialCommunityIcons
-                                                name="file-pdf-box"
-                                                size={24}
-                                                color="#dc2626"
-                                            />
-                                            {pdfCount > 1 && (
-                                                <View style={styles.pdfCountBadge}>
-                                                    <Text style={styles.pdfCountText}>
-                                                        {pdfCount}
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {/* Chevron */}
-                                    {!isUpcoming && (
-                                        <Ionicons
-                                            name="chevron-forward"
-                                            size={24}
-                                            color="#9ca3af"
-                                            style={styles.chevron}
-                                        />
-                                    )}
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                }}
-            />
-        </SafeAreaView>
+      <SafeAreaView style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText}>Loading classes...</Text>
+      </SafeAreaView>
     );
+  }
+
+  if (error || !videosData?.success) {
+    return (
+      <SafeAreaView style={styles.centerContainer}>
+        <Ionicons name="alert-circle" size={64} color="#dc2626" />
+        <Text style={styles.errorTitle}>Failed to load videos</Text>
+        <Text style={styles.errorSubtitle}>Please check your connection</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const isSubjectMode = !!subjectId;
+  const pageTitle = isSubjectMode ? 'Subject Videos' : 'All Videos';
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#1f2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{pageTitle}</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#6b7280" />
+          <TextInput
+            placeholder="Search classes, topics..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={styles.searchInput}
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#9ca3af" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Filters */}
+      <View style={styles.filterSection}>
+        {[
+          { key: 'all', label: 'All' },
+          { key: 'live', label: 'Live' },
+          { key: 'upcoming', label: 'Upcoming' },
+          { key: 'completed', label: 'Available' },
+        ].map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            onPress={() => setFilterType(f.key)}
+            style={[styles.filterTab, filterType === f.key && styles.filterTabActive]}
+          >
+            <Text
+              style={[styles.filterText, filterType === f.key && styles.filterTextActive]}
+            >
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Video List */}
+      <FlatList
+        data={filteredVideos}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="video-off-outline" size={72} color="#d1d5db" />
+            <Text style={styles.emptyTitle}>No videos found</Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery.trim()
+                ? 'Try a different search'
+                : isSubjectMode
+                ? 'No videos available for this subject yet'
+                : 'New classes will appear here soon'}
+            </Text>
+          </View>
+        )}
+        renderItem={({ item }) => {
+          const status = getVideoStatus(item);
+          const pdfCount = pdfCounts[item.id] || 0;
+          const isLive = status.status === 'live';
+          const isUpcoming = status.status === 'upcoming';
+
+          return (
+            <TouchableOpacity
+              onPress={() => openVideo(item)}
+              style={[
+                styles.videoCard,
+                isLive && styles.liveCard,
+                isUpcoming && styles.upcomingCard,
+              ]}
+              activeOpacity={0.78}
+              disabled={isUpcoming}
+            >
+              {isLive && (
+                <View style={styles.liveTopBar}>
+                  <View style={styles.livePulse} />
+                  <Text style={styles.liveTopText}>LIVE NOW</Text>
+                </View>
+              )}
+
+              <View style={styles.cardContent}>
+                {/* Thumbnail */}
+                <View style={styles.thumbnailContainer}>
+                  {item?.imageUrl ? (
+                    <Image source={{ uri: item.imageUrl }} style={styles.thumbnail} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.thumbnail, styles.placeholderThumb]}>
+                      <MaterialCommunityIcons name="play-circle-outline" size={40} color="#fff" />
+                    </View>
+                  )}
+
+                  {item.duration && (
+                    <View style={styles.durationBadge}>
+                      <Text style={styles.durationText}>{item.duration}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Info */}
+                <View style={styles.infoSection}>
+                  <Text style={styles.videoTitle} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+
+                  <View style={[styles.statusBadge, { backgroundColor: status.bgColor }]}>
+                    <Ionicons name={status.icon} size={14} color={status.color} />
+                    <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                  </View>
+
+                  {item?.dateOfClass && (
+                    <View style={styles.dateTimeRow}>
+                      <Ionicons name="calendar-outline" size={14} color="#6b7280" />
+                      <Text style={styles.dateText}>
+                        {new Date(item.dateOfClass).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </Text>
+
+                      {item?.TimeOfClass && !isLive && (
+                        <>
+                          <Text style={styles.dateDivider}> • </Text>
+                          <Ionicons name="time-outline" size={14} color="#6b7280" />
+                          <Text style={styles.dateText}>{item.TimeOfClass.substring(0, 5)}</Text>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actionsColumn}>
+                  {pdfCount > 0 && (
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('PdfNotes', {
+                          videoId: item.id,
+                          videoTitle: item.title,
+                          batchId,
+                        });
+                      }}
+                      style={styles.pdfButton}
+                    >
+                      <MaterialCommunityIcons name="file-pdf-box" size={24} color="#dc2626" />
+                      {pdfCount > 1 && (
+                        <View style={styles.pdfCountBadge}>
+                          <Text style={styles.pdfCountText}>{pdfCount}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {!isUpcoming && (
+                    <Ionicons name="chevron-forward" size={24} color="#9ca3af" style={styles.chevron} />
+                  )}
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+      />
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -459,7 +405,40 @@ const styles = StyleSheet.create({
         marginTop: 8,
         textAlign: 'center',
     },
+header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
 
+  searchSection: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
+  },
     // Search Section
     searchSection: {
         backgroundColor: '#ffffff',

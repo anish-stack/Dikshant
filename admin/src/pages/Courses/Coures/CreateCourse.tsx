@@ -46,6 +46,8 @@ interface CreateBatchFormData {
   programId: string;
   startDate: string;
   endDate: string;
+  quizIds: number[];
+  testSeriesIds: number[];
   registrationStartDate: string;
   registrationEndDate: string;
   status: BatchStatus;
@@ -58,6 +60,15 @@ interface CreateBatchFormData {
   category: string;
 }
 
+interface Quiz {
+  id: number;
+  title: string;
+}
+
+interface TestSeries {
+  id: number;
+  title: string;
+}
 const CreateBatch = () => {
   const navigate = useNavigate();
 
@@ -69,6 +80,23 @@ const CreateBatch = () => {
   const [subjectSearch, setSubjectSearch] = useState("");
   const [subjectsDropdownOpen, setSubjectsDropdownOpen] = useState(false);
   const [programs, setPrograms] = useState<Program[]>([]);
+
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [testSeriesList, setTestSeriesList] = useState<TestSeries[]>([]);
+
+  const [loadingQuizzes, setLoadingQuizzes] = useState(true);
+  const [loadingTestSeries, setLoadingTestSeries] = useState(true);
+
+  const [selectedQuizIds, setSelectedQuizIds] = useState<number[]>([]);
+  const [selectedTestSeriesIds, setSelectedTestSeriesIds] = useState<number[]>(
+    [],
+  );
+
+  const [quizSearch, setQuizSearch] = useState("");
+  const [testSeriesSearch, setTestSeriesSearch] = useState("");
+
+  const [quizzesDropdownOpen, setQuizzesDropdownOpen] = useState(false);
+  const [testSeriesDropdownOpen, setTestSeriesDropdownOpen] = useState(false);
 
   const [isEmi, setIsEmi] = useState(false);
   const [emiMonths, setEmiMonths] = useState(2);
@@ -83,7 +111,7 @@ const CreateBatch = () => {
       readonly: false, // all options from https://xdsoft.net/jodit/docs/,
       placeholder: "Write Long Discription",
     }),
-    []
+    [],
   );
 
   const [formData, setFormData] = useState<CreateBatchFormData>({
@@ -93,6 +121,8 @@ const CreateBatch = () => {
     startDate: "",
     endDate: "",
     registrationStartDate: "",
+    quizIds: [],
+    testSeriesIds: [],
     registrationEndDate: "",
     status: "active", // ✅ now fully typed
     shortDescription: "",
@@ -112,6 +142,67 @@ const CreateBatch = () => {
       ? formData.batchDiscountPrice
       : formData.batchPrice;
 
+  useEffect(() => {
+    const fetchQuizzes = async () => {
+      try {
+        setLoadingQuizzes(true);
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "100", // adjust or implement pagination/search
+          is_admin: "true",
+        });
+
+        const res = await axios.get(
+          `https://www.dikapi.olyox.in/api/quiz/quizzes?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        // Adjust according to your real response shape
+        setQuizzes(res.data?.data || res.data || []);
+      } catch (err) {
+        console.error("Failed to load quizzes:", err);
+        // toast.error("Could not load quizzes");
+      } finally {
+        setLoadingQuizzes(false);
+      }
+    };
+
+    fetchQuizzes();
+  }, []);
+
+  useEffect(() => {
+    const fetchTestSeries = async () => {
+      try {
+        setLoadingTestSeries(true);
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+
+        const params = new URLSearchParams({
+          page: "1",
+          limit: "100",
+          // sortBy, sortOrder, search, etc. if needed
+        });
+
+        const res = await axios.get(
+          `https://www.dikapi.olyox.in/api/testseriess?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        console.log(res.data);
+        // Adjust path according to your API response
+        setTestSeriesList(res.data?.data || res.data || []);
+      } catch (err) {
+        console.error("Failed to load test series:", err);
+        // toast.error("Could not load test series");
+      } finally {
+        setLoadingTestSeries(false);
+      }
+    };
+
+    fetchTestSeries();
+  }, []);
   // Auto-calculate EMI schedule
   useEffect(() => {
     if (!isEmi || emiMonths < 1 || finalPrice <= 0) {
@@ -234,6 +325,8 @@ const CreateBatch = () => {
       data.append("category", formData.category);
       data.append("subjectId", JSON.stringify(selectedSubjectIds));
       data.append("startDate", formData.startDate);
+      data.append("quizIds", JSON.stringify(selectedQuizIds));
+      data.append("testSeriesIds", JSON.stringify(selectedTestSeriesIds));
       data.append("endDate", formData.endDate);
       data.append("registrationStartDate", formData.registrationStartDate);
       data.append("registrationEndDate", formData.registrationEndDate);
@@ -245,7 +338,7 @@ const CreateBatch = () => {
       if (formData.batchDiscountPrice > 0) {
         data.append(
           "batchDiscountPrice",
-          formData.batchDiscountPrice.toString()
+          formData.batchDiscountPrice.toString(),
         );
       }
 
@@ -283,7 +376,7 @@ const CreateBatch = () => {
   };
 
   const filteredSubjects = allSubjects.filter((s) =>
-    s.name.toLowerCase().includes(subjectSearch.toLowerCase())
+    s.name.toLowerCase().includes(subjectSearch.toLowerCase()),
   );
 
   return (
@@ -412,13 +505,14 @@ const CreateBatch = () => {
                       {loadingSubjects
                         ? "Loading subjects..."
                         : selectedSubjectIds.length === 0
-                        ? "Select subjects..."
-                        : selectedSubjectIds
-                            .map(
-                              (id) => allSubjects.find((s) => s.id === id)?.name
-                            )
-                            .filter(Boolean)
-                            .join(", ")}
+                          ? "Select subjects..."
+                          : selectedSubjectIds
+                              .map(
+                                (id) =>
+                                  allSubjects.find((s) => s.id === id)?.name,
+                              )
+                              .filter(Boolean)
+                              .join(", ")}
                     </span>
                     <ChevronDown
                       className={`w-4 h-4 transition-transform ${
@@ -449,7 +543,7 @@ const CreateBatch = () => {
                         ) : (
                           filteredSubjects.map((subject) => {
                             const isSelected = selectedSubjectIds.includes(
-                              subject.id
+                              subject.id,
                             );
                             return (
                               <label
@@ -474,7 +568,7 @@ const CreateBatch = () => {
                                     setSelectedSubjectIds((prev) =>
                                       prev.includes(subject.id)
                                         ? prev.filter((id) => id !== subject.id)
-                                        : [...prev, subject.id]
+                                        : [...prev, subject.id],
                                     );
                                   }}
                                 >
@@ -508,6 +602,190 @@ const CreateBatch = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="mb-6">
+              <Label className="text-sm">
+                Included Quizzes{" "}
+                <span className="text-xs text-gray-500">
+                  ({selectedQuizIds.length} selected)
+                </span>
+              </Label>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setQuizzesDropdownOpen(!quizzesDropdownOpen)}
+                  className="w-full px-3 py-2 text-sm text-left border ... flex justify-between items-center"
+                >
+                  <span className="truncate">
+                    {loadingQuizzes
+                      ? "Loading quizzes..."
+                      : selectedQuizIds.length === 0
+                        ? "Select quizzes (optional)"
+                        : selectedQuizIds
+                            .map(
+                              (id) => quizzes.find((q) => q.id === id)?.title,
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${quizzesDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {quizzesDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white ... max-h-80 overflow-hidden shadow-lg z-50">
+                    <div className="p-2 sticky top-0 ...">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search quizzes..."
+                          value={quizSearch}
+                          onChange={(e) => setQuizSearch(e.target.value)}
+                          className="pl-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {quizzes
+                        .filter((q) =>
+                          q.title
+                            .toLowerCase()
+                            .includes(quizSearch.toLowerCase()),
+                        )
+                        .map((quiz) => {
+                          const isSelected = selectedQuizIds.includes(quiz.id);
+                          return (
+                            <label
+                              key={quiz.id}
+                              className="flex items-start gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300"}`}
+                              >
+                                {isSelected && (
+                                  <Check className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSelectedQuizIds((prev) =>
+                                    prev.includes(quiz.id)
+                                      ? prev.filter((id) => id !== quiz.id)
+                                      : [...prev, quiz.id],
+                                  );
+                                }}
+                              >
+                                <div className="font-medium text-sm">
+                                  {quiz.title}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <Label className="text-sm">
+                Included Test Series{" "}
+                <span className="text-xs text-gray-500">
+                  ({selectedTestSeriesIds.length} selected)
+                </span>
+              </Label>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTestSeriesDropdownOpen(!testSeriesDropdownOpen)
+                  }
+                  className="w-full px-3 py-2 text-sm text-left border ... flex justify-between items-center"
+                >
+                  <span className="truncate">
+                    {loadingQuizzes
+                      ? "Loading quizzes..."
+                      : selectedTestSeriesIds.length === 0
+                        ? "Select quizzes (optional)"
+                        : selectedTestSeriesIds
+                            .map(
+                              (id) => quizzes.find((q) => q.id === id)?.title,
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform ${testSeriesDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {testSeriesDropdownOpen && (
+                  <div className="absolute top-full mt-1 w-full bg-white ... max-h-80 overflow-hidden shadow-lg z-50">
+                    <div className="p-2 sticky top-0 ...">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search Test Series..."
+                          value={testSeriesSearch}
+                          onChange={(e) => setTestSeriesSearch(e.target.value)}
+                          className="pl-9 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto py-1">
+                      {testSeriesList
+                        .filter((q) =>
+                          q.title
+                            .toLowerCase()
+                            .includes(testSeriesSearch.toLowerCase()),
+                        )
+                        .map((quiz) => {
+                          const isSelected = selectedTestSeriesIds.includes(
+                            quiz.id,
+                          );
+                          return (
+                            <label
+                              key={quiz.id}
+                              className="flex items-start gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <div
+                                className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300"}`}
+                              >
+                                {isSelected && (
+                                  <Check className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <div
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setSelectedTestSeriesIds((prev) =>
+                                    prev.includes(quiz.id)
+                                      ? prev.filter((id) => id !== quiz.id)
+                                      : [...prev, quiz.id],
+                                  );
+                                }}
+                              >
+                                <div className="font-medium text-sm">
+                                  {quiz.title}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Dates */}
@@ -601,7 +879,6 @@ const CreateBatch = () => {
               </div>
               <div>
                 <Label className="text-sm">Long Description</Label>
-               
 
                 <JoditEditor
                   ref={editor}
@@ -726,7 +1003,7 @@ const CreateBatch = () => {
                         ₹
                         {emiSchedule.length > 0
                           ? Math.round(finalPrice / emiMonths).toLocaleString(
-                              "en-IN"
+                              "en-IN",
                             )
                           : 0}
                       </div>

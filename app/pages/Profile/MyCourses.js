@@ -40,7 +40,7 @@ export default function MyCourses() {
   const fetchCourses = async () => {
     try {
       const res = await api.get(`/Orders/user/${user.id}`);
-      console.log(res.data)
+    
       if (res.data) {
         const batch = res.data.filter((i)=> i.type === 'batch')
         setCourses(batch  || []);
@@ -58,7 +58,6 @@ export default function MyCourses() {
     fetchCourses();
   }, [user?.id]);
 
-  console.log("courses",courses)
   const myCourses =courses
 
 
@@ -70,7 +69,9 @@ export default function MyCourses() {
   });
 
   const redirectCourse = (id) => {
-    navigation.navigate("my-course", { unlocked: true, courseId: id });
+  navigation.navigate("my-course-subjects", { unlocked: true, courseId: id });
+
+    // navigation.navigate("my-course", { unlocked: true, courseId: id });
   };
 
   if (loading) {

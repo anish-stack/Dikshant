@@ -1,429 +1,609 @@
 "use strict";
 
-const { Order, Coupon, Batch, Program, Subject, QuizPayments, Quizzes, TestSeries,Sequelize } = require("../models");
+const {
+  Order,
+  Coupon,
+  Batch,
+  Program,
+  Subject,
+  QuizPayments,
+  Quizzes,
+  TestSeries,
+Sequelize,
+  sequelize
+} = require("../models");
 const redis = require("../config/redis");
 const NotificationController = require("./NotificationController");
 const razorpay = require("../config/razorpay");
-
 const crypto = require("crypto");
-class OrderController {
 
-  // CREATE RAZORPAY ORDER
-  static async createOrder(req, res) {
-    console.log("🟡 CREATE ORDER API HIT");
-    console.log("➡️ BODY:", req.body);
+const { Op } = Sequelize;
+
+class OrderController {
+  // ────────────────────────────────────────────────
+  // GRANT ACCESS TO QUIZZES & TESTS INCLUDED IN A BATCH
+  // Always idempotent + supports transaction
+  // ────────────────────────────────────────────────
+static async grantBatchChildAccess({
+  userId,
+  batch,
+  parentOrderId,
+  isAdmin = false,
+  transaction = null,
+}) {
+  const t = transaction || (await Sequelize.transaction());
+
+  try {
+    // Idempotency check
+    const existing = await Order.count({
+      where: {
+        userId,
+        parentOrderId,
+        type: { [Op.in]: ["quiz", "test"] },
+      },
+      transaction: t,
+    });
+
+    if (existing > 0) {
+      console.log(
+        `[grantBatchChildAccess] Skipped – ${existing} child orders already exist for parent ${parentOrderId}`
+      );
+      if (!transaction) await t.commit();
+      return {
+        success: true,
+        skipped: true,
+        message: "Child orders already granted",
+        existingCount: existing,
+      };
+    }
+
+    // ─── Parse quizIds & testSeriesIds correctly ────────────────────────────────
+    let quizIds = [];
+    let testIds = [];
 
     try {
-      const {
-        userId,
-        type,
-        itemId,
-        amount,
-        gst = 0,
-        couponCode
-      } = req.body;
+      const quizRaw = batch.quizIds || '[]';
+      const testRaw = batch.testSeriesIds || '[]';
 
-      console.log("📦 Parsed Fields:", {
-        userId, type, itemId, amount, gst, couponCode
-      });
+      quizIds = JSON.parse(quizRaw);
+      testIds = JSON.parse(testRaw);
+    } catch (parseErr) {
+      console.error(
+        `[grantBatchChildAccess] JSON parse error for batch ${batch?.id || 'unknown'}:`,
+        parseErr,
+        { quizIdsRaw: batch?.quizIds, testIdsRaw: batch?.testSeriesIds }
+      );
+    }
 
-      if (!userId || !type || !itemId || !amount) {
-        console.warn("❌ Missing required fields");
-        return res.status(400).json({ message: "Missing required fields" });
-      }
+    // Ensure arrays & convert IDs to numbers
+    quizIds = Array.isArray(quizIds) ? quizIds.map(Number).filter(n => !isNaN(n)) : [];
+    testIds  = Array.isArray(testIds)  ? testIds.map(Number).filter(n => !isNaN(n))  : [];
 
+    console.log(`Quiz Ids after parse:`, quizIds);
+    console.log(`Test  Ids after parse:`, testIds);
+
+    // Prepare bulk data
+    const quizOrders = quizIds.map((quizId) => ({
+      userId,
+      type: "quiz",
+      itemId: quizId,
+      parentOrderId,
+      amount: 0,
+      discount: 0,
+      gst: 0,
+      totalAmount: 0,
+      status: "success",
+      paymentDate: new Date(),
+      enrollmentStatus: "active",
+      reason: isAdmin ? "ADMIN_BATCH_ASSIGN" : "BATCH_INCLUDED",
+      razorpayOrderId: `batch_${parentOrderId}_q_${quizId}`.slice(0, 120),
+    }));
+
+    const testOrders = testIds.map((testId) => ({
+      userId,
+      type: "test",
+      itemId: testId,
+      parentOrderId,
+      amount: 0,
+      discount: 0,
+      gst: 0,
+      totalAmount: 0,
+      status: "success",
+      paymentDate: new Date(),
+      enrollmentStatus: "active",
+      reason: isAdmin ? "ADMIN_BATCH_ASSIGN" : "BATCH_INCLUDED",
+      razorpayOrderId: `batch_${parentOrderId}_t_${testId}`.slice(0, 120),
+    }));
+
+    // Bulk insert
+    if (quizOrders.length > 0) {
+      await Order.bulkCreate(quizOrders, { transaction: t });
+    }
+    if (testOrders.length > 0) {
+      await Order.bulkCreate(testOrders, { transaction: t });
+    }
+
+    if (!transaction) await t.commit();
+
+    console.log(
+      `[grantBatchChildAccess] Success – parent=${parentOrderId}, quizzes=${quizOrders.length}, tests=${testOrders.length}`
+    );
+
+    return {
+      success: true,
+      skipped: false,
+      quizzesCreated: quizOrders.length,
+      testsCreated: testOrders.length,
+    };
+  } catch (err) {
+    if (!transaction) await t.rollback();
+    console.error("[grantBatchChildAccess] ERROR:", err);
+    throw err;
+  }
+}
+
+  // ────────────────────────────────────────────────
+  // CREATE RAZORPAY ORDER + DB ENTRY
+  // ────────────────────────────────────────────────
+  static async createOrder(req, res) {
+    console.log("🟡 CREATE ORDER API HIT", { body: req.body });
+
+    const {
+      userId,
+      type,
+      itemId,
+      amount,
+      gst = 0,
+      couponCode,
+      accessValidityDays,
+      isFree = false, // optional flag for free/promo items
+    } = req.body;
+
+    if (!userId || !type || !itemId || amount == null) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
       let discount = 0;
       let couponSnapshot = {
         couponId: null,
         couponCode: null,
         couponDiscount: null,
-        couponDiscountType: null
+        couponDiscountType: null,
       };
 
-      /* 🎟 Coupon Validation */
+      // Coupon logic
       if (couponCode) {
-        console.log("🎫 Coupon Code Received:", couponCode);
-
         const coupon = await Coupon.findOne({
-          where: { code: couponCode.toUpperCase() }
+          where: { code: couponCode.toUpperCase() },
+          transaction: t,
         });
 
-        console.log("🎫 Coupon Found:", coupon?.id);
-
         if (!coupon) {
-          console.warn("❌ Invalid coupon");
-          return res.status(404).json({ message: "Invalid coupon code" });
+          await t.rollback();
+          return res.status(404).json({ success: false, message: "Invalid coupon code" });
         }
 
         const now = new Date();
         if (now > coupon.validTill) {
-          console.warn("❌ Coupon expired");
-          return res.status(400).json({ message: "Coupon expired" });
+          await t.rollback();
+          return res.status(400).json({ success: false, message: "Coupon expired" });
         }
 
         couponSnapshot = {
           couponId: coupon.id,
           couponCode: coupon.code,
           couponDiscount: coupon.discount,
-          couponDiscountType: coupon.discountType
+          couponDiscountType: coupon.discountType,
         };
 
         if (coupon.discountType === "flat") {
           discount = coupon.discount;
-        }
-
-        if (coupon.discountType === "percentage") {
+        } else if (coupon.discountType === "percentage") {
           discount = (amount * coupon.discount) / 100;
           if (coupon.maxDiscount && discount > coupon.maxDiscount) {
             discount = coupon.maxDiscount;
           }
         }
-
-        console.log("💸 Discount Calculated:", discount);
       }
 
-      const totalAmount = amount - discount + gst;
+      const finalAmount = Math.max(0, amount - discount + gst);
 
-      console.log("🧮 Final Amount:", {
-        amount,
-        discount,
-        gst,
-        totalAmount
-      });
-
-      /* 🔐 Razorpay Keys Debug */
-      console.log("🔐 Razorpay Key Loaded:", {
-        key_id: process.env.RAZORPAY_KEY ? "✅ YES" : "❌ NO",
-        key_secret: process.env.RAZORPAY_SECRET ? "✅ YES" : "❌ NO"
-      });
-
-      /* 💳 Razorpay Order */
-      console.log("🚀 Creating Razorpay Order...");
+      // Prevent invalid Razorpay amounts (except explicit free items)
+      if (finalAmount <= 0 && !isFree) {
+        await t.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Final amount cannot be zero or negative for paid orders",
+        });
+      }
 
       const razorOrder = await razorpay.orders.create({
-        amount: Math.round(totalAmount * 100),
+        amount: Math.round(finalAmount * 100),
         currency: "INR",
-        receipt: `order_${Date.now()}`
+        receipt: `ord_${Date.now()}`.slice(0, 40),
       });
 
-      console.log("✅ Razorpay Order Created:", razorOrder.id);
-
-
-      let quiz = null
-
-      /* 🎯 If order is for QUIZ, save in quiz_payments */
+      let quiz = null;
       if (type === "quiz") {
-        console.log("🎯 Quiz order detected, saving QuizPayments entry");
-        let quiz = await Quizzes.findByPk(itemId);
-
+        quiz = await Quizzes.findByPk(itemId, { transaction: t });
         if (!quiz) {
-          console.warn("❌ Quiz not found for QuizPayments");
-          return res.status(404).json({ message: "Quiz not found" });
+          await t.rollback();
+          return res.status(404).json({ success: false, message: "Quiz not found" });
         }
-        console.log("📘 Quiz Found:", quiz);
-        await QuizPayments.create({
-          userId: userId,
-          quizId: itemId,               // itemId = quizId
-          razorpayOrderId: razorOrder.id,
-          amount: totalAmount,
-          currency: "INR",
-          status: "pending",
-        });
 
-        console.log("✅ QuizPayments entry created");
+        await QuizPayments.create(
+          {
+            userId,
+            quizId: itemId,
+            razorpayOrderId: razorOrder.id,
+            amount: finalAmount,
+            currency: "INR",
+            status: "pending",
+          },
+          { transaction: t }
+        );
       }
 
+      const newOrder = await Order.create(
+        {
+          userId,
+          type,
+          itemId,
+          amount,
+          discount,
+          gst,
+          totalAmount: finalAmount,
+          quiz_limit: type === "quiz" ? (quiz?.attemptLimit ?? 3) : null,
+          razorpayOrderId: razorOrder.id,
+          status: "pending",
+          couponId: couponSnapshot.couponId,
+          couponCode: couponSnapshot.couponCode,
+          couponDiscount: couponSnapshot.couponDiscount,
+          couponDiscountType: couponSnapshot.couponDiscountType,
+          accessValidityDays: accessValidityDays || null,
+          enrollmentStatus: "active",
+        },
+        { transaction: t }
+      );
 
-
-
-      /* 🧾 DB Order */
-      const newOrder = await Order.create({
-        userId,
-        type,
-        itemId,
-        amount,
-        discount,
-        gst,
-        totalAmount,
-        quiz_limit: type === "quiz" && quiz?.attemptLimit || 3,
-        razorpayOrderId: razorOrder.id,
-        status: "pending",
-        couponId: couponSnapshot.couponId,
-        couponCode: couponSnapshot.couponCode,
-        couponDiscount: couponSnapshot.couponDiscount,
-        couponDiscountType: couponSnapshot.couponDiscountType,
-        accessValidityDays: req.body.accessValidityDays || null,
-        enrollmentStatus: "active"
-      });
-
-      console.log("📦 Order Saved:", newOrder.id);
+      await t.commit();
 
       await redis.del(`orders:${userId}`);
-      console.log("🧹 Redis cache cleared");
 
       return res.json({
         success: true,
         message: "Order created successfully",
         razorOrder,
         key: process.env.RAZORPAY_KEY,
-        order: newOrder
+        order: newOrder,
       });
-
     } catch (error) {
-      console.error("🔥 ORDER CREATE ERROR FULL:", {
-        message: error.message,
-        statusCode: error.statusCode,
-        error: error.error,
-        stack: error.stack
-      });
-
+      await t.rollback();
+      console.error("[createOrder] ERROR:", error);
       return res.status(500).json({
+        success: false,
         message: "Order creation failed",
-        razorpayError: error.error || null
+        error: error.message,
       });
     }
   }
 
-  // ADMIN: ASSIGN COURSE WITHOUT PAYMENT
-  static async adminAssignCourse(req, res) {
-    try {
-      const {
-        userId,
-        type,          // batch / test
-        itemId,
-        accessValidityDays,
-        reason         // Optional: reason for free assignment
-      } = req.body;
+static async adminAssignCourse(req, res) {
+    const { userId, type, itemId, accessValidityDays, reason } = req.body;
 
-      if (!userId || !type || !itemId) {
-        return res.status(400).json({ message: "Missing required fields" });
+    if (!userId || !type || !itemId) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+      const newOrder = await Order.create(
+        {
+          userId,
+          type,
+          itemId,
+          amount: 0,
+          discount: 0,
+          gst: 0,
+          totalAmount: 0,
+          razorpayOrderId: `admin_${Date.now()}_${type}_${itemId}`.slice(0, 120),
+          status: "success",
+          paymentDate: new Date(),
+          accessValidityDays: accessValidityDays || null,
+          enrollmentStatus: "active",
+          reason: reason || "ADMIN_ASSIGNED",
+        },
+        { transaction: t }
+      );
+
+      if (type === "batch") {
+        const batch = await Batch.findByPk(itemId, { transaction: t });
+        if (batch) {
+          await this.grantBatchChildAccess({
+            userId,
+            batch,
+            parentOrderId: newOrder.id,
+            isAdmin: true,
+            transaction: t,
+          });
+        }
       }
 
-      // Create order with zero amount and success status
-      const newOrder = await Order.create({
-        userId,
-        type,
-        itemId,
-        amount: 0,
-        discount: 0,
-        gst: 0,
-        totalAmount: 0,
-        razorpayOrderId: `admin_${Date.now()}`,
-        razorpayPaymentId: null,
-        razorpaySignature: null,
-        status: "success",
-        paymentDate: new Date(),
-        accessValidityDays: accessValidityDays || null,
-        enrollmentStatus: "active",
-        couponId: null,
-        reason: reason || "ADMIN_ASSIGNED",
-        couponDiscount: null,
-        couponDiscountType: null
-      });
-
-      // Send notification to user
       await NotificationController.createNotification({
-        userId: userId,
+        userId,
         title: "Course Assigned by Admin",
-        message: `You have been enrolled in a course by the administrator.`,
+        message: `You have been enrolled in ${type} by the administrator.`,
         type: "course",
         relatedId: newOrder.id,
       });
 
-      // Clear cache
-      await redis.del(`orders:${userId}`);
+      await t.commit();
 
-      return res.json({
-        success: true,
-        message: "Course assigned successfully",
-        order: newOrder
-      });
-
-    } catch (error) {
-      console.log("ADMIN ASSIGN ERROR:", error);
-      return res.status(500).json({
-        message: "Course assignment failed",
-        error
-      });
-    }
-  }
-  static async adminReverseAssignCourse(req, res) {
-    try {
-      const { userId, orderId, reason } = req.body;
-
-      if (!userId || !orderId) {
-        return res.status(400).json({
-          success: false,
-          message: "userId and orderId are required"
-        });
-      }
-
-      // 🔍 Find only ADMIN assigned order
-      const order = await Order.findOne({
-        where: {
-          id: orderId,
-          userId,
-          enrollmentStatus: "active"
-        }
-      });
-
-      if (!order) {
-        return res.status(404).json({
-          success: false,
-          message: "Active admin assigned course not found"
-        });
-      }
-
-      // ❌ Safety: Paid orders should not be reversed
-      if (order.amount > 0) {
-        return res.status(403).json({
-          success: false,
-          message: "Paid orders cannot be reversed by admin"
-        });
-      }
-
-      // 🔁 Reverse assignment
-      await order.update({
-        enrollmentStatus: "cancelled",
-        status: "failed",
-        reason: reason || "ADMIN_REVERSED"
-      });
-
-      // 🔔 Notify user
-      await NotificationController.createNotification({
-        userId,
-        title: "Course Access Revoked",
-        message: "Your course access has been revoked by the administrator.",
-        type: "course",
-        relatedId: order.id
-      });
-
-      // 🧹 Clear Redis cache
       await redis.del(`orders:${userId}`);
       await redis.del(`user:courses:${userId}`);
 
       return res.json({
         success: true,
-        message: "Course access revoked successfully",
-        order
+        message: "Course assigned successfully",
+        order: newOrder,
       });
-
-    } catch (error) {
-      console.error("ADMIN REVERSE ASSIGN ERROR:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to revoke course",
-        error: error.message
-      });
+    } catch (err) {
+      await t.rollback();
+      console.error("[adminAssignCourse] ERROR:", err);
+      return res.status(500).json({ success: false, message: "Assignment failed", error: err.message });
     }
   }
 
-  static async verifyPayment(req, res) {
-    console.log("🟢 VERIFY PAYMENT API HIT");
-    console.log("➡️ BODY:", req.body);
+  // ────────────────────────────────────────────────
+  // ADMIN: REVOKE FREE/ADMIN-ASSIGNED ACCESS
+  // ────────────────────────────────────────────────
+  static async adminReverseAssignCourse(req, res) {
+    const { userId, orderId, reason } = req.body;
+
+    if (!userId || !orderId) {
+      return res.status(400).json({ success: false, message: "userId and orderId required" });
+    }
+
+    const t = await sequelize.transaction();
 
     try {
-      const {
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-      } = req.body;
-
-      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-        return res.status(400).json({
-          success: false,
-          message: "Missing Razorpay verification fields",
-        });
-      }
-
-      /* 🔐 Signature verification */
-      const generatedSignature = crypto
-        .createHmac("sha256", process.env.RAZORPAY_SECRET)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest("hex");
-
-      if (generatedSignature !== razorpay_signature) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid payment signature",
-        });
-      }
-
-      /* 🔍 Fetch order */
       const order = await Order.findOne({
-        where: { razorpayOrderId: razorpay_order_id },
+        where: {
+          id: orderId,
+          userId,
+          amount: 0, // only free/admin assignments
+          enrollmentStatus: "active",
+        },
+        transaction: t,
       });
 
       if (!order) {
+        await t.rollback();
+        return res.status(404).json({ success: false, message: "Revocable admin order not found" });
+      }
+
+      await order.update(
+        {
+          enrollmentStatus: "cancelled",
+          status: "failed",
+          reason: reason || "ADMIN_REVERSED",
+        },
+        { transaction: t }
+      );
+
+      if (order.type === "batch") {
+        await Order.update(
+          {
+            enrollmentStatus: "cancelled",
+            status: "failed",
+            reason: "BATCH_REVOKED",
+          },
+          {
+            where: {
+              userId,
+              parentOrderId: order.id,
+              type: { [Op.in]: ["quiz", "test"] },
+            },
+            transaction: t,
+          }
+        );
+      }
+
+      await NotificationController.createNotification({
+        userId,
+        title: "Course Access Revoked",
+        message: "Your course access has been revoked by the administrator.",
+        type: "course",
+        relatedId: order.id,
+      });
+
+      await t.commit();
+
+      await redis.del(`orders:${userId}`);
+      await redis.del(`user:courses:${userId}`);
+
+      return res.json({
+        success: true,
+        message: "Access revoked successfully",
+        order,
+      });
+    } catch (err) {
+      await t.rollback();
+      console.error("[adminReverseAssignCourse] ERROR:", err);
+      return res.status(500).json({ success: false, message: "Revocation failed", error: err.message });
+    }
+  }
+static async verifyPayment(req, res) {
+  console.log("🟢 VERIFY PAYMENT API HIT", { body: req.body });
+
+  // ✅ Normalize body (camelCase + snake_case)
+  const razorpay_order_id =
+    req.body.razorpay_order_id || req.body.razorpayOrderId;
+
+  const razorpay_payment_id =
+    req.body.razorpay_payment_id || req.body.razorpayPaymentId;
+
+  const razorpay_signature =
+    req.body.razorpay_signature || req.body.razorpaySignature;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing Razorpay verification fields",
+    });
+  }
+
+  // 🔐 Signature verification
+  const generatedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_SECRET)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest("hex");
+
+  if (generatedSignature !== razorpay_signature) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment signature",
+    });
+  }
+
+  const t = await sequelize.transaction();
+
+  try {
+    // 🔒 Atomic lock: pending → verifying
+    const [updatedRows] = await Order.update(
+      { status: "verifying" },
+      {
+        where: {
+          razorpayOrderId: razorpay_order_id,
+          status: { [Op.in]: ["pending", "created"] },
+        },
+        transaction: t,
+      }
+    );
+
+    if (updatedRows === 0) {
+      const existingOrder = await Order.findOne({
+        where: { razorpayOrderId: razorpay_order_id },
+        transaction: t,
+      });
+
+      await t.commit();
+
+      if (!existingOrder) {
         return res.status(404).json({
           success: false,
           message: "Order not found",
         });
       }
 
-      /* 🛑 Prevent duplicate verification */
-      if (order.status === "success") {
+      if (existingOrder.status === "success") {
         return res.json({
           success: true,
           message: "Payment already verified",
-          order,
+          orderId: existingOrder.id,
         });
       }
 
-      /* ✅ Update Order (IMPORTANT CHANGE HERE) */
-      await order.update({
-        status: "success", // ✅ VALID ENUM
+      return res.status(409).json({
+        success: false,
+        message: `Order already processed (status: ${existingOrder.status})`,
+      });
+    }
+
+    // 🔍 Fetch locked order
+    const order = await Order.findOne({
+      where: { razorpayOrderId: razorpay_order_id },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Order not found after lock",
+      });
+    }
+
+    // ✅ Final success update
+    await order.update(
+      {
+        status: "success",
         razorpayPaymentId: razorpay_payment_id,
         razorpaySignature: razorpay_signature,
         paymentDate: new Date(),
-      });
+      },
+      { transaction: t }
+    );
 
-      /* 🎯 Update QuizPayments */
-      if (order.type === "quiz") {
-        const quizPayment = await QuizPayments.findOne({
-          where: { razorpayOrderId: razorpay_order_id },
-        });
-
-        if (!quizPayment) {
-          return res.status(404).json({
-            success: false,
-            message: "Quiz payment record not found",
-          });
-        }
-
-        await quizPayment.update({
-          status: "completed",
-          razorpayPaymentId: razorpay_payment_id,
-          razorpaySignature: razorpay_signature,
+    // 🎁 Batch → auto grant quiz & test access
+    if (order.type === "batch") {
+      const batch = await Batch.findByPk(order.itemId, { transaction: t });
+      console.log(batch)
+      if (batch) {
+        await OrderController.grantBatchChildAccess({
+          userId: order.userId,
+          batch,
+          parentOrderId: order.id,
+          isAdmin: false,
+          transaction: t,
         });
       }
-
-      /* 🧹 Clear cache */
-      await redis.del(`orders:${order.userId}`);
-      await redis.del(`user:quizzes:${order.userId}`);
-
-      return res.json({
-        success: true,
-        message: "Payment verified successfully",
-        orderId: order.id,
-      });
-
-    } catch (error) {
-      console.error("🔥 VERIFY PAYMENT ERROR:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Payment verification failed",
-        error: error.message,
-      });
     }
+
+    // 🎯 QuizPayments sync
+    if (order.type === "quiz") {
+      const quizPayment = await QuizPayments.findOne({
+        where: { razorpayOrderId: razorpay_order_id },
+        transaction: t,
+      });
+
+      if (quizPayment) {
+        await quizPayment.update(
+          {
+            status: "completed",
+            razorpayPaymentId: razorpay_payment_id,
+            razorpaySignature: razorpay_signature,
+          },
+          { transaction: t }
+        );
+      }
+    }
+
+    await t.commit();
+
+    // 🧹 Cache cleanup (post-commit only)
+    await redis.del(`orders:${order.userId}`);
+    await redis.del(`user:courses:${order.userId}`);
+    await redis.del(`user:quizzes:${order.userId}`);
+
+    return res.json({
+      success: true,
+      message: "Payment verified successfully",
+      order:order,
+      orderId: order.id,
+    });
+  } catch (err) {
+    await t.rollback();
+    console.error("[verifyPayment] ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Payment verification failed",
+      error: err.message,
+    });
   }
+}
 
 
-  static async paymentFailed(req, res) {
+static async paymentFailed(req, res) {
+    const { razorpay_order_id, reason } = req.body;
+
     try {
-      const { razorpay_order_id, reason } = req.body;
-
       await Order.update(
         { status: "failed", reason: reason || "PAYMENT_FAILED" },
         { where: { razorpayOrderId: razorpay_order_id } }
@@ -434,30 +614,19 @@ class OrderController {
         { where: { razorpayOrderId: razorpay_order_id } }
       );
 
-      return res.json({
-        success: true,
-        message: "Payment marked as failed",
-      });
-
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to mark payment failed",
-      });
+      return res.json({ success: true, message: "Payment marked as failed" });
+    } catch (err) {
+      console.error("[paymentFailed] ERROR:", err);
+      return res.status(500).json({ success: false, message: "Failed to mark payment failed" });
     }
   }
 
-
-  // USER ORDERS
-  static async userOrders(req, res) {
+static async userOrders(req, res) {
     try {
       const userId = req.params.userId;
 
       const orders = await Order.findAll({
-        where: {
-          userId,
-          status: "success",
-        },
+        where: { userId, status: "success" },
         order: [["createdAt", "DESC"]],
       });
 
@@ -467,31 +636,19 @@ class OrderController {
 
           const batch = await Batch.findOne({
             where: { id: order.itemId },
-            include: [
-              {
-                model: Program,
-                as: "program",
-                attributes: ["id", "name", "slug"],
-              },
-            ],
+            include: [{ model: Program, as: "program", attributes: ["id", "name", "slug"] }],
           });
 
-          if (!batch) {
-            return {
-              ...order.toJSON(),
-              batch: null,
-              subjects: [],
-            };
-          }
+          if (!batch) return { ...order.toJSON(), batch: null, subjects: [] };
 
           let subjectIds = [];
           try {
             subjectIds = JSON.parse(batch.subjectId || "[]");
-          } catch (e) {
+          } catch {
             subjectIds = [];
           }
 
-          const subjectsList = await Subject.findAll({
+          const subjects = await Subject.findAll({
             where: { id: subjectIds },
             attributes: ["id", "name", "slug", "description"],
           });
@@ -499,19 +656,17 @@ class OrderController {
           return {
             ...order.toJSON(),
             batch: batch.toJSON(),
-            subjects: subjectsList,
+            subjects,
           };
         })
       );
 
       return res.json(finalOrders);
-
-    } catch (e) {
-      console.log(e);
-      return res.status(500).json({ message: "Error fetching orders", e });
+    } catch (err) {
+      console.error("[userOrders] ERROR:", err);
+      return res.status(500).json({ success: false, message: "Error fetching orders" });
     }
   }
-
   // ALL ORDERS (ADMIN)
   static async allOrders(req, res) {
     try {
@@ -541,119 +696,74 @@ class OrderController {
     }
   }
 
-
 static async alreadyPurchased(req, res) {
-  try {
-    const userId = req.user?.id || req.query.userId;
-    const { itemId, type } = req.query;
+    try {
+      const userId = req.user?.id || req.query.userId;
+      const { itemId, type } = req.query;
 
-    console.log("🟢 ALREADY PURCHASED API HIT", {
-      userId,
-      itemId,
-      type,
-    });
+      if (!userId || !itemId || !type) {
+        return res.status(400).json({ success: false, message: "userId, itemId and type required" });
+      }
 
-    if (!userId || !itemId || !type) {
-      return res.status(400).json({
-        success: false,
-        message: "userId, itemId and type are required",
+      const order = await Order.findOne({
+        where: {
+          userId,
+          itemId,
+          type,
+          status: "success",
+          enrollmentStatus: "active",
+        },
       });
-    }
 
-    const order = await Order.findOne({
-      where: {
-        userId,
-        itemId,
-        type,
-        status: "success",
-        enrollmentStatus: "active",
-      },
-    });
+      if (!order) {
+        return res.json({ success: true, purchased: false });
+      }
 
-    /* ---------------- NOT PURCHASED ---------------- */
-    if (!order) {
-      return res.json({
+      const response = {
         success: true,
-        purchased: false,
-      });
-    }
-
-    /* ---------------- BASE RESPONSE ---------------- */
-    const response = {
-      success: true,
-      purchased: true,
-      orderId: order.id,
-      paymentDate: order.paymentDate,
-      totalAmount: order.totalAmount,
-      couponCode: order.couponCode,
-    };
-
-    /* =====================================================
-       🧠 QUIZ LOGIC
-    ===================================================== */
-    if (type === "quiz") {
-      const quizLimit = order.quiz_limit ?? 0;
-      const attemptsUsed = order.quiz_attempts_used ?? 0;
-
-      const remainingAttempts =
-        quizLimit > 0 ? Math.max(quizLimit - attemptsUsed, 0) : 0;
-
-      response.quizLimit = quizLimit;
-      response.quizAttemptsUsed = attemptsUsed;
-      response.remainingAttempts = remainingAttempts;
-      response.canAttempt =
-        quizLimit === 0 ? false : remainingAttempts > 0;
-
-      if (!response.canAttempt) {
-        response.message = "Quiz attempt limit reached";
-      }
-    }
-
-    /* =====================================================
-       📘 TEST SERIES LOGIC
-    ===================================================== */
-    if (type === "test") {
-      const testSeries = await TestSeries.findByPk(itemId);
-
-      if (!testSeries) {
-        return res.status(404).json({
-          success: false,
-          message: "Test series not found",
-        });
-      }
-
-      const now = new Date();
-      const isExpired =
-        testSeries.expirSeries &&
-        new Date(testSeries.expirSeries) < now;
-
-      response.testSeries = {
-        id: testSeries.id,
-        title: testSeries.title,
-        expirSeries: testSeries.expirSeries,
+        purchased: true,
+        orderId: order.id,
+        paymentDate: order.paymentDate,
+        totalAmount: order.totalAmount,
+        couponCode: order.couponCode,
       };
 
-      response.canAccess = !isExpired;
+      if (type === "quiz") {
+        const limit = order.quiz_limit ?? 3;
+        const used = order.quiz_attempts_used ?? 0;
+        const remaining = Math.max(limit - used, 0);
 
-      if (isExpired) {
-        response.message = "Test series access has expired";
+        response.quizLimit = limit;
+        response.quizAttemptsUsed = used;
+        response.remainingAttempts = remaining;
+        response.canAttempt = remaining > 0;
+        if (!response.canAttempt) response.message = "Quiz attempt limit reached";
       }
+
+      if (type === "test") {
+        const testSeries = await TestSeries.findByPk(itemId);
+        if (!testSeries) {
+          return res.status(404).json({ success: false, message: "Test series not found" });
+        }
+
+        const now = new Date();
+        const expired = testSeries.expirSeries && new Date(testSeries.expirSeries) < now;
+
+        response.testSeries = {
+          id: testSeries.id,
+          title: testSeries.title,
+          expirSeries: testSeries.expirSeries,
+        };
+        response.canAccess = !expired;
+        if (expired) response.message = "Test series access has expired";
+      }
+
+      return res.json(response);
+    } catch (err) {
+      console.error("[alreadyPurchased] ERROR:", err);
+      return res.status(500).json({ success: false, message: "Failed to check purchase status" });
     }
-
-    return res.json(response);
-
-  } catch (error) {
-    console.error("🔥 ALREADY PURCHASED ERROR:", {
-      message: error.message,
-      stack: error.stack,
-    });
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to check purchase status",
-    });
   }
-}
 
 
 

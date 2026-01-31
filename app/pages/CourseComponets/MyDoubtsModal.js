@@ -42,7 +42,6 @@ export default function MyDoubtsModal({
         }
       })
 
-      console.log("✅ My Doubts:", res.data)
       const data = res.data?.data || res.data
       setDoubts(data || [])
     } catch (error) {
