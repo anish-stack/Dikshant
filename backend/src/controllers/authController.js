@@ -1,14 +1,168 @@
-const { User,Order,Batch ,Program, Subject, Sequelize, sequelize, Notification} = require("../models");
+const { User, Order, Batch, Program, Subject, Sequelize, sequelize, Notification } = require("../models");
 const bcrypt = require("bcrypt");
 const { sign, verify } = require("../utils/generateToken");
 const redis = require("../config/redis");
 const { Op } = require("sequelize");
+const sendEmail = require("../utils/sendEmail");
 
 // ==================== HELPER FUNCTIONS ====================
 
 function genOtp() {
-  return 123456;
+  return Math.floor(100000 + Math.random() * 900000);
 }
+
+
+
+const otpEmailTemplate = (title = "Verify Your Account", otp, user = {}, logoUrl = "https://i.ibb.co/V0rVWKYm/image.png") => {
+  const userName = user.name?.trim() || "there";
+  const safeOtp = String(otp).padStart(6, '0'); // ensure 6 digits
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-scheme" content="light dark">
+  <title>${title} - Dikshant IAS</title>
+  <style type="text/css">
+    body { margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#f6f6f6; }
+    table,td { border-collapse:collapse; }
+    a { color:#E74C3C; text-decoration:none; }
+
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      body { background:#121212 !important; color:#e0e0e0 !important; }
+      .container { background:#1e1e1e !important; }
+      .content { color:#e0e0e0 !important; }
+      .otp-box { background:#2d2d2d !important; border-color:#E74C3C !important; color:#ffffff !important; }
+      .footer { color:#aaaaaa !important; background:#181818 !important; }
+    }
+
+    .wrapper { width:100%; background:#f6f6f6; padding:40px 10px; }
+    .container { max-width:600px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.1); }
+    .header { background:linear-gradient(135deg, #E74C3C 0%, #c0392b 100%); padding:48px 30px 36px; text-align:center; }
+    .logo { max-width:220px; height:auto; margin-bottom:16px; }
+    .title { color:#ffffff; font-size:30px; font-weight:700; margin:0; letter-spacing:-0.5px; }
+    .content { padding:40px 36px 32px; color:#2d2d2d; font-size:16px; line-height:1.65; }
+    .greeting { margin:0 0 20px; }
+    .otp-container { text-align:center; margin:32px 0 24px; }
+    .otp-box {
+      display:inline-block;
+      font-size:40px;
+      font-weight:800;
+      letter-spacing:14px;
+      padding:20px 36px;
+      background:#fff5f5;
+      border:3px dashed #E74C3C;
+      border-radius:16px;
+      color:#E74C3C;
+      font-family:monospace;
+      box-shadow:0 2px 10px rgba(231,76,60,0.15);
+    }
+    .validity { font-size:15px; color:#555; text-align:center; margin:0 0 28px; }
+    .security-note {
+      font-size:14px;
+      color:#666;
+      text-align:center;
+      margin:0 0 32px;
+      line-height:1.5;
+    }
+    .button {
+      display:inline-block;
+      background:#E74C3C;
+      color:white;
+      padding:16px 48px;
+      border-radius:50px;
+      font-size:16px;
+      font-weight:600;
+      margin:12px 0 32px;
+      text-decoration:none;
+      box-shadow:0 4px 16px rgba(231,76,60,0.3);
+    }
+    .footer {
+      background:#f9f9f9;
+      padding:32px 36px;
+      text-align:center;
+      font-size:14px;
+      color:#666;
+      border-top:1px solid #eee;
+    }
+    .footer a { color:#E74C3C; }
+    @media only screen and (max-width:520px) {
+      .header { padding:36px 24px 28px; }
+      .content { padding:32px 24px 28px; }
+      .otp-box { font-size:32px; letter-spacing:10px; padding:16px 28px; }
+      .title { font-size:26px; }
+    }
+  </style>
+</head>
+<body>
+  <table role="presentation" width="100%" class="wrapper">
+    <tr>
+      <td align="center">
+        <table role="presentation" class="container">
+          <!-- Header -->
+          <tr>
+            <td class="header">
+              <img src="${logoUrl}" alt="Dikshant IAS" class="logo" />
+              <h1 class="title">${title}</h1>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td class="content">
+              <p class="greeting">Hello <strong>${userName}</strong>,</p>
+              
+              <p>Thank you for registering with <strong>Dikshant IAS Education Centre</strong>!</p>
+              <p>Use the verification code below to complete your account setup:</p>
+
+              <div class="otp-container">
+                <div class="otp-box">${safeOtp}</div>
+              </div>
+
+              <p class="validity">This code will expire in <strong>10 minutes</strong>.</p>
+
+              <p class="security-note">
+                For your security, please do not share this code with anyone.<br>
+                Our team will never ask for your OTP.
+              </p>
+
+              <!-- Uncomment if you want a CTA button -->
+              <!--
+              <div style="text-align:center;">
+                <a href="https://your-app.com/verify?token=..." class="button">
+                  Verify My Account
+                </a>
+              </div>
+              -->
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td class="footer">
+              <p><strong>Dikshant IAS Education Centre</strong><br>
+              Preparing tomorrow's leaders today • Delhi, India</p>
+              <p style="margin:16px 0 0;">
+                If you did not request this code, please ignore this email<br>
+                or contact support at <a href="mailto:support@dikshantias.com">support@dikshantias.com</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim();
+};
+
 
 function generateTokens(user) {
   const payload = {
@@ -56,7 +210,7 @@ exports.signup = async (req, res) => {
       platform,
       appVersion,
     } = req.body;
-
+console.log(req.body)
     // Validation
     if (!email && !mobile) {
       return res.status(400).json({
@@ -133,11 +287,11 @@ exports.signup = async (req, res) => {
       fcm_token,
       fcm_update_at: fcm_token ? new Date() : "",
       platform,
-      appVersion,   
+      appVersion,
     });
 
     // Generate OTP
-    const otp = 123456;
+    const otp = genOtp();
     await redis.set(`otp:${user.id}`, otp, "EX", 600); // 10 mins
     await user.update({
       otp,
@@ -146,6 +300,21 @@ exports.signup = async (req, res) => {
 
     // TODO: Send OTP via SMS/Email
     console.log(`📧 OTP for user ${user.id}: ${otp}`);
+    try {
+      const html = otpEmailTemplate(
+        "Your OTP Verification Code",
+        otp,
+        user
+      );
+
+      const res = await sendEmail(html, {
+        receiver_email: user.email,
+        subject: "Your Dikshant IAS OTP Verification Code",
+      });
+      console.log("Email response", res)
+    } catch (error) {
+      console.log("Email Error", error)
+    }
 
     return res.status(201).json({
       status: "success",
@@ -479,7 +648,7 @@ exports.adminLogin = async (req, res) => {
     const { accessToken, refreshToken } = generateTokens(user);
     // user.refresh_token = refreshToken;
     // await user.save();
-// console.log("user check done");
+    // console.log("user check done");
     return res.status(200).json({
       success: true,
       message: "Admin logged in successfully!",
@@ -752,7 +921,7 @@ exports.getAllProfile = async (req, res) => {
             let subjectIds = [];
             try {
               subjectIds = JSON.parse(batch.subjectId || "[]");
-            } catch {}
+            } catch { }
 
             const subjects = await Subject.findAll({
               where: { id: subjectIds },

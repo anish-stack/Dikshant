@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 import JoditEditor from "jodit-react";
 
-const BATCH_API = "http://localhost:5001/api/batchs";
-const SUBJECTS_API = "http://localhost:5001/api/subjects";
-const PROGRAMS_API = "http://localhost:5001/api/programs";
+const BATCH_API = "https://www.dikapi.olyox.in/api/batchs";
+const SUBJECTS_API = "https://www.dikapi.olyox.in/api/subjects";
+const PROGRAMS_API = "https://www.dikapi.olyox.in/api/programs";
 
 interface Subject {
   id: number;
@@ -32,6 +32,26 @@ interface Subject {
 }
 
 type BatchStatus = "active" | "inactive";
+
+interface EditBatchFormData {
+  name: string;
+  displayOrder: number;
+  programId: string;
+  startDate: string;
+  endDate: string;
+  registrationStartDate: string;
+  registrationEndDate: string;
+  status: BatchStatus;
+  shortDescription: string;
+  longDescription: string;
+  quizIds: number[];
+  testSeriesIds: number[];
+  batchPrice: number;
+  batchDiscountPrice: number;
+  gst: number;
+  offerValidityDays: number;
+  category: "online" | "offline" | "recorded" | "";
+}
 
 interface Batch {
   id: number;
@@ -112,7 +132,7 @@ const EditBatch = () => {
     Array<{ month: number; amount: number }>
   >([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EditBatchFormData>({
     name: "",
     displayOrder: 1,
     programId: "",
@@ -129,8 +149,9 @@ const EditBatch = () => {
     batchDiscountPrice: 0,
     gst: 18,
     offerValidityDays: 0,
-    category: "", // 👈 ADD
+    category: "",
   });
+
   const editor = useRef(null);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -302,7 +323,11 @@ const EditBatch = () => {
 
           category:
             typeof data.category === "string"
-              ? data.category.toLowerCase()
+              ? (data.category.toLowerCase() as
+                  | ""
+                  | "online"
+                  | "offline"
+                  | "recorded")
               : "",
         });
 
@@ -346,7 +371,8 @@ const EditBatch = () => {
     }
 
     try {
-      const ids = JSON.parse(batch.quizIds);
+      const ids = JSON.parse(batch.quizIds as unknown as string);
+
       if (Array.isArray(ids)) {
         setSelectedQuizIds(
           ids.map(Number).filter((n) => Number.isInteger(n) && n > 0),
@@ -366,16 +392,17 @@ const EditBatch = () => {
     }
 
     try {
-      const ids = JSON.parse(batch?.testSeriesIds);
+      const ids = JSON.parse(batch.testSeriesIds as unknown as string);
+
       if (Array.isArray(ids)) {
         setSelectedTestSeriesIds(
           ids.map(Number).filter((n) => Number.isInteger(n) && n > 0),
         );
       } else {
-        setSelectedQuizIds([]);
+        setSelectedTestSeriesIds([]);
       }
     } catch {
-      setSelectedQuizIds([]);
+      setSelectedTestSeriesIds([]);
     }
   }, [batch]);
 
@@ -628,7 +655,14 @@ const EditBatch = () => {
                 <select
                   value={formData.category}
                   onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
+                    setFormData({
+                      ...formData,
+                      category: e.target.value as
+                        | ""
+                        | "online"
+                        | "offline"
+                        | "recorded",
+                    })
                   }
                   className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
                 >

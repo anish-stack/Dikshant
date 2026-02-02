@@ -30,22 +30,15 @@ import { LOCAL_ENDPOINT } from "../../constant/api";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const images = [img2, img1];
-const API_URL = `${LOCAL_ENDPOINT}/assets`
+const API_URL = `${LOCAL_ENDPOINT}/assets`;
+
 export default function Login({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { login, loginWithPassword } = useAuthStore();
-  const [onboardingImages, setOnboardingImages] = useState([]); // ["url1", "url2"]
-  const [loadingImages, setLoadingImages] = useState(true);  // Login Method Selection
-  const [loginMethod, setLoginMethod] = useState("otp"); // "otp" or "password"
+  const { login } = useAuthStore();
 
-  // OTP Flow
-  const [step, setStep] = useState(1); // 1 = phone, 2 = verify OTP
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [otpError, setOtpError] = useState("");
+  const [onboardingImages, setOnboardingImages] = useState([]);
+  const [loadingImages, setLoadingImages] = useState(true);
 
-  // Password Flow
   const [phoneOrEmail, setPhoneOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +52,8 @@ export default function Login({ navigation }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
-useEffect(() => {
+  // Fetch onboarding images from API (fallback to local)
+  useEffect(() => {
     const fetchAssets = async () => {
       try {
         setLoadingImages(true);
@@ -67,17 +61,17 @@ useEffect(() => {
         const data = response.data?.data;
 
         if (data) {
-        
           const images = [];
           if (data.onboardingImageOne) images.push(data.onboardingImageOne);
           if (data.onboardingImageTwo) images.push(data.onboardingImageTwo);
-
-          setOnboardingImages(images.length > 0 ? images : []); 
+          setOnboardingImages(images.length > 0 ? images : []);
         }
       } catch (err) {
         console.error("Failed to load onboarding images:", err);
-  
-        setOnboardingImages([require("../../assets/images/bg.png"), require("../../assets/images/g.png")]);
+        setOnboardingImages([
+          require("../../assets/images/bg.png"),
+          require("../../assets/images/g.png"),
+        ]);
       } finally {
         setLoadingImages(false);
       }
@@ -86,8 +80,8 @@ useEffect(() => {
     fetchAssets();
   }, []);
 
-
-useEffect(() => {
+  // Auto-slide carousel (only if multiple images)
+  useEffect(() => {
     if (onboardingImages.length <= 1) return;
 
     const id = setInterval(() => {
@@ -99,22 +93,7 @@ useEffect(() => {
     return () => clearInterval(id);
   }, [activeIdx, onboardingImages.length]);
 
-  useEffect(() => {
-    if (showModal) {
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 8,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: SCREEN_HEIGHT,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [showModal]);
+  // Bottom sheet animation
   useEffect(() => {
     if (showModal) {
       Animated.spring(slideAnim, {
@@ -138,92 +117,13 @@ useEffect(() => {
     if (idx !== activeIdx) setActiveIdx(idx);
   };
 
-  // Reset all errors and fields when switching login methods
-  const switchLoginMethod = (method) => {
-    setLoginMethod(method);
-    setPhoneError("");
-    setOtpError("");
-    setPasswordError("");
-    setIdentifierError("");
-    setPhone("");
-    setOtp("");
-    setPhoneOrEmail("");
-    setPassword("");
-    setStep(1);
-  };
-
-  // OTP Flow Handlers
-  const handleSendOtp = async () => {
-    try {
-      // Validate phone number
-      if (!/^[0-9]{10}$/.test(phone)) {
-        setPhoneError("Enter a valid 10-digit phone number");
-        return;
-      }
-
-      setPhoneError("");
-      setIsLoading(true);
-      const deviceInfo = await getDeviceInfo();
-      const tokenFcm = await getFCMToken();
-
-      // Call OTP API
-      const res = await login(
-        phone,
-        "",
-        "",
-        deviceInfo?.device_id,
-        tokenFcm,
-        deviceInfo?.platform,
-        Application.nativeApplicationVersion
-      );
-      if (res.message || res.success) {
-        setStep(2);
-      }
-    } catch (error) {
-      console.error("OTP Send Error:", error);
-      setPhoneError(error.message || "Failed to send OTP. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    try {
-      if (!/^[0-9]{6}$/.test(otp)) {
-        setOtpError("Enter a valid 6-digit OTP");
-        return;
-      }
-
-      setOtpError("");
-      setIsLoading(true);
-
-      const res = await login(phone, otp);
-      if (!res.success) {
-        setOtpError(res.message || "Invalid OTP");
-        return;
-      }
-
-      setOtpError("");
-      setShowModal(false);
-      navigation.replace("Home");
-    } catch (error) {
-      console.error("OTP Verify Error:", error);
-      setOtpError(error.message || "Failed to verify OTP");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Password Flow Handler
   const handlePasswordLogin = async () => {
     try {
-      // Validate identifier (phone or email)
       if (!phoneOrEmail.trim()) {
-        setIdentifierError("Phone number or email is required");
+        setIdentifierError("Email or phone number is required");
         return;
       }
 
-      // Validate password
       if (!password.trim()) {
         setPasswordError("Password is required");
         return;
@@ -240,7 +140,7 @@ useEffect(() => {
 
       const deviceInfo = await getDeviceInfo();
       const tokenFcm = await getFCMToken();
-      // Call Password Login API
+
       const res = await login(
         phoneOrEmail,
         "",
@@ -259,8 +159,8 @@ useEffect(() => {
       setShowModal(false);
       navigation.replace("Home");
     } catch (error) {
-      console.error("Password Login Error:", error);
-      setPasswordError(error.message || "Failed to login. Please try again.");
+      console.error("Login Error:", error);
+      setPasswordError(error.message || "Failed to sign in. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -273,8 +173,8 @@ useEffect(() => {
       <SafeAreaView style={styles.mainContent}>
         <View style={styles.logoContainer}>
           <View style={styles.logoBox}>
-            <Text style={styles.logoText}>Dikshant Ias</Text>
-            <Text style={styles.logoSubtext}>Education centre</Text>
+            <Text style={styles.logoText}>Dikshant IAS</Text>
+            <Text style={styles.logoSubtext}>Education Centre</Text>
           </View>
         </View>
 
@@ -315,7 +215,7 @@ useEffect(() => {
         </View>
       </SafeAreaView>
 
-      {/* Login Modal */}
+      {/* Login Modal – Email + Password only */}
       <Modal
         visible={showModal}
         transparent
@@ -345,318 +245,114 @@ useEffect(() => {
                   >
                     <View style={styles.sheetHandle} />
 
-                    {/* Title */}
-                    <Text style={styles.sheetTitle}>
-                      {loginMethod === "otp"
-                        ? step === 1
-                          ? "Sign in with OTP"
-                          : "Verify OTP"
-                        : "Sign in with Password"}
-                    </Text>
+                    <Text style={styles.sheetTitle}>Sign in</Text>
 
-                    {/* Subtitle */}
                     <Text style={styles.sheetSubtitle}>
-                      {loginMethod === "otp"
-                        ? step === 1
-                          ? "Enter your phone number to receive OTP"
-                          : `We sent a 6-digit code to ${phone}`
-                        : "Enter your credentials to continue"}
+                      Enter your credentials to continue
                     </Text>
 
-                    {/* Login Method Toggle */}
-                    {step === 1 && (
-                      <View style={styles.toggleContainer}>
-                        <TouchableOpacity
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>
+                        Email or Phone Number
+                      </Text>
+                      <View style={styles.inputWrapper}>
+                        <Feather
+                          name="user"
+                          size={20}
+                          color="#999"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
                           style={[
-                            styles.toggleButton,
-                            loginMethod === "otp" && styles.toggleButtonActive,
+                            styles.textInput,
+                            styles.textInputWithIcon,
+                            identifierError ? styles.textInputError : null,
                           ]}
-                          onPress={() => switchLoginMethod("otp")}
-                        >
-                          <Feather
-                            name="smartphone"
-                            size={18}
-                            color={loginMethod === "otp" ? "#FFFFFF" : "#666"}
-                          />
-                          <Text
-                            style={[
-                              styles.toggleButtonText,
-                              loginMethod === "otp" &&
-                              styles.toggleButtonTextActive,
-                            ]}
-                          >
-                            Login with OTP
-                          </Text>
-                        </TouchableOpacity>
+                          value={phoneOrEmail}
+                          onChangeText={(t) => {
+                            setPhoneOrEmail(t);
+                            setIdentifierError("");
+                          }}
+                          placeholder="Email or phone"
+                          placeholderTextColor="#999"
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          autoFocus
+                          returnKeyType="next"
+                          editable={!isLoading}
+                        />
+                      </View>
+                      {identifierError ? (
+                        <Text style={styles.errorText}>{identifierError}</Text>
+                      ) : null}
+                    </View>
 
-                        <TouchableOpacity
+                    <View style={styles.inputContainer}>
+                      <Text style={styles.inputLabel}>Password</Text>
+                      <View style={styles.inputWrapper}>
+                        <Feather
+                          name="lock"
+                          size={20}
+                          color="#999"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
                           style={[
-                            styles.toggleButton,
-                            loginMethod === "password" &&
-                            styles.toggleButtonActive,
+                            styles.textInput,
+                            styles.textInputWithIcon,
+                            styles.passwordInput,
+                            passwordError ? styles.textInputError : null,
                           ]}
-                          onPress={() => switchLoginMethod("password")}
+                          value={password}
+                          onChangeText={(t) => {
+                            setPassword(t);
+                            setPasswordError("");
+                          }}
+                          placeholder="Enter your password"
+                          placeholderTextColor="#999"
+                          secureTextEntry={!showPassword}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          returnKeyType="done"
+                          onSubmitEditing={handlePasswordLogin}
+                          editable={!isLoading}
+                        />
+                        <TouchableOpacity
+                          style={styles.eyeIcon}
+                          onPress={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
                         >
                           <Feather
-                            name="lock"
-                            size={18}
-                            color={
-                              loginMethod === "password" ? "#FFFFFF" : "#666"
-                            }
+                            name={showPassword ? "eye" : "eye-off"}
+                            size={20}
+                            color="#999"
                           />
-                          <Text
-                            style={[
-                              styles.toggleButtonText,
-                              loginMethod === "password" &&
-                              styles.toggleButtonTextActive,
-                            ]}
-                          >
-                            Login with Password
-                          </Text>
                         </TouchableOpacity>
                       </View>
-                    )}
+                      {passwordError ? (
+                        <Text style={styles.errorText}>{passwordError}</Text>
+                      ) : null}
+                    </View>
 
-                    {/* OTP Login Flow */}
-                    {loginMethod === "otp" && (
-                      <>
-                        {step === 1 && (
-                          <>
-                            <View style={styles.inputContainer}>
-                              <Text style={styles.inputLabel}>
-                                Phone Number
-                              </Text>
-                              <View style={styles.inputWrapper}>
-                                <Feather
-                                  name="phone"
-                                  size={20}
-                                  color="#999"
-                                  style={styles.inputIcon}
-                                />
-                                <TextInput
-                                  style={[
-                                    styles.textInput,
-                                    styles.textInputWithIcon,
-                                    phoneError ? styles.textInputError : null,
-                                  ]}
-                                  value={phone}
-                                  onChangeText={(t) => {
-                                    setPhone(t);
-                                    setPhoneError("");
-                                  }}
-                                  placeholder="Enter 10-digit phone number"
-                                  placeholderTextColor="#999"
-                                  keyboardType="number-pad"
-                                  maxLength={10}
-                                  autoFocus
-                                  returnKeyType="done"
-                                  onSubmitEditing={handleSendOtp}
-                                  editable={!isLoading}
-                                />
-                              </View>
-                              {phoneError ? (
-                                <Text style={styles.errorText}>
-                                  {phoneError}
-                                </Text>
-                              ) : null}
-                            </View>
-                            <Button
-                              color={colors.card}
-                              title={isLoading ? "Sending..." : "Send OTP"}
-                              onPress={handleSendOtp}
-                              disabled={isLoading}
-                            />
-                          </>
-                        )}
+                    <TouchableOpacity
+                      style={styles.forgotPassword}
+                      onPress={() => {
+                        setShowModal(false);
+                        navigation.navigate("ForgotPassword");
+                      }}
+                    >
+                      <Text style={styles.forgotPasswordText}>
+                        Forgot Password?
+                      </Text>
+                    </TouchableOpacity>
 
-                        {step === 2 && (
-                          <>
-                            <View style={styles.inputContainer}>
-                              <Text style={styles.inputLabel}>
-                                Enter 6-digit OTP
-                              </Text>
-                              <TextInput
-                                style={[
-                                  styles.textInput,
-                                  styles.otpInput,
-                                  otpError ? styles.textInputError : null,
-                                ]}
-                                value={otp}
-                                onChangeText={(t) => {
-                                  setOtp(t);
-                                  setOtpError("");
-                                }}
-                                placeholder="------"
-                                placeholderTextColor="#999"
-                                keyboardType="number-pad"
-                                maxLength={6}
-                                autoFocus
-                                returnKeyType="done"
-                                onSubmitEditing={handleVerifyOtp}
-                                editable={!isLoading}
-                              />
-                              {otpError ? (
-                                <Text style={styles.errorText}>{otpError}</Text>
-                              ) : null}
-                            </View>
-                            <Button
-                              color={"#fff"}
-                              title={
-                                isLoading ? "Verifying..." : "Verify & Sign in"
-                              }
-                              onPress={handleVerifyOtp}
-                              disabled={isLoading}
-                            />
-
-                            <View style={styles.otpActions}>
-                              <TouchableOpacity
-                                onPress={() => {
-                                  setStep(1);
-                                  setOtp("");
-                                  setOtpError("");
-                                }}
-                                style={styles.changeBtn}
-                                disabled={isLoading}
-                              >
-                                <Feather
-                                  name="edit-2"
-                                  size={16}
-                                  color="#E74C3C"
-                                />
-                                <Text style={styles.changeTxt}>
-                                  Change Phone Number
-                                </Text>
-                              </TouchableOpacity>
-
-                              <TouchableOpacity
-                                onPress={handleSendOtp}
-                                style={styles.resendBtn}
-                                disabled={isLoading}
-                              >
-                                <Feather
-                                  name="refresh-cw"
-                                  size={16}
-                                  color="#E74C3C"
-                                />
-                                <Text style={styles.changeTxt}>Resend OTP</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </>
-                        )}
-                      </>
-                    )}
-
-                    {/* Password Login Flow */}
-                    {loginMethod === "password" && (
-                      <>
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>
-                            Phone Number or Email
-                          </Text>
-                          <View style={styles.inputWrapper}>
-                            <Feather
-                              name="user"
-                              size={20}
-                              color="#999"
-                              style={styles.inputIcon}
-                            />
-                            <TextInput
-                              style={[
-                                styles.textInput,
-                                styles.textInputWithIcon,
-                                identifierError ? styles.textInputError : null,
-                              ]}
-                              value={phoneOrEmail}
-                              onChangeText={(t) => {
-                                setPhoneOrEmail(t);
-                                setIdentifierError("");
-                              }}
-                              placeholder="Phone or email"
-                              placeholderTextColor="#999"
-                              keyboardType="default"
-                              autoCapitalize="none"
-                              autoCorrect={false}
-                              autoFocus
-                              returnKeyType="next"
-                              editable={!isLoading}
-                            />
-                          </View>
-                          {identifierError ? (
-                            <Text style={styles.errorText}>
-                              {identifierError}
-                            </Text>
-                          ) : null}
-                        </View>
-
-                        <View style={styles.inputContainer}>
-                          <Text style={styles.inputLabel}>Password</Text>
-                          <View style={styles.inputWrapper}>
-                            <Feather
-                              name="lock"
-                              size={20}
-                              color="#999"
-                              style={styles.inputIcon}
-                            />
-                            <TextInput
-                              style={[
-                                styles.textInput,
-                                styles.textInputWithIcon,
-                                styles.passwordInput,
-                                passwordError ? styles.textInputError : null,
-                              ]}
-                              value={password}
-                              onChangeText={(t) => {
-                                setPassword(t);
-                                setPasswordError("");
-                              }}
-                              placeholder="Enter your password"
-                              placeholderTextColor="#999"
-                              secureTextEntry={!showPassword}
-                              autoCapitalize="none"
-                              autoCorrect={false}
-                              returnKeyType="done"
-                              onSubmitEditing={handlePasswordLogin}
-                              editable={!isLoading}
-                            />
-                            <TouchableOpacity
-                              style={styles.eyeIcon}
-                              onPress={() => setShowPassword(!showPassword)}
-                              disabled={isLoading}
-                            >
-                              <Feather
-                                name={showPassword ? "eye" : "eye-off"}
-                                size={20}
-                                color="#999"
-                              />
-                            </TouchableOpacity>
-                          </View>
-                          {passwordError ? (
-                            <Text style={styles.errorText}>
-                              {passwordError}
-                            </Text>
-                          ) : null}
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.forgotPassword}
-                          onPress={() => {
-                            // Handle forgot password
-                            setShowModal(false);
-                            navigation.navigate("ForgotPassword");
-                          }}
-                        >
-                          <Text style={styles.forgotPasswordText}>
-                            Forgot Password?
-                          </Text>
-                        </TouchableOpacity>
-
-                        <Button
-                          title={isLoading ? "Signing in..." : "Sign in"}
-                          onPress={handlePasswordLogin}
-                          disabled={isLoading}
-                        />
-                      </>
-                    )}
+                    <Button
+                      title={isLoading ? "Signing in..." : "Sign in"}
+                      color={"#fff"}
+                      onPress={handlePasswordLogin}
+                      disabled={isLoading}
+                    />
                   </ScrollView>
                 </Animated.View>
               </TouchableWithoutFeedback>
@@ -668,21 +364,14 @@ useEffect(() => {
   );
 }
 
+// ────────────────────────────────────────────────
+// Styles remain mostly the same — removed unused OTP-related styles
+// ────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  mainContent: {
-    flex: 1,
-  },
-  logoContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  logoBox: {
-    alignSelf: "flex-start",
-  },
+  container: { flex: 1, backgroundColor: "#FFFFFF" },
+  mainContent: { flex: 1 },
+  logoContainer: { paddingHorizontal: 20, paddingTop: 20 },
+  logoBox: { alignSelf: "flex-start" },
   logoText: {
     fontSize: 32,
     fontWeight: "700",
@@ -696,21 +385,14 @@ const styles = StyleSheet.create({
     fontFamily: "Geist",
     marginTop: -4,
   },
-  imageSlider: {
-    height: SCREEN_HEIGHT * 0.35,
-    marginTop: 40,
-    margin: 12,
-  },
+  imageSlider: { height: SCREEN_HEIGHT * 0.35, marginTop: 40, margin: 12 },
   slide: {
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT * 0.5,
     alignItems: "center",
     justifyContent: "center",
   },
-  slideImg: {
-    width: SCREEN_WIDTH,
-    height: "100%",
-  },
+  slideImg: { width: SCREEN_WIDTH, height: "100%" },
   bottomSection: {
     paddingHorizontal: 20,
     paddingBottom: 30,
@@ -726,15 +408,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
     ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 4,
-      },
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      android: { elevation: 4 },
     }),
   },
   loginButtonText: {
@@ -743,16 +418,8 @@ const styles = StyleSheet.create({
     fontFamily: "Geist",
     color: "#E74C3C",
   },
-  signupRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 10,
-  },
-  signupTxt: {
-    fontSize: 15,
-    fontFamily: "Geist",
-    color: "#FFFFFF",
-  },
+  signupRow: { flexDirection: "row", justifyContent: "center", marginTop: 10 },
+  signupTxt: { fontSize: 15, fontFamily: "Geist", color: "#FFFFFF" },
   signupLink: {
     fontSize: 15,
     fontFamily: "Geist",
@@ -760,11 +427,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textDecorationLine: "underline",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   bottomSheet: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 30,
@@ -773,15 +436,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     maxHeight: SCREEN_HEIGHT * 0.85,
     ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-      },
-      android: {
-        elevation: 16,
-      },
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.2, shadowRadius: 12 },
+      android: { elevation: 16 },
     }),
   },
   sheetHandle: {
@@ -797,7 +453,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontFamily: "Geist",
     textAlign: "center",
-    color: "#fff",
+    color: "#000",          // ← changed from #fff (was probably a copy-paste leftover)
     marginBottom: 8,
   },
   sheetSubtitle: {
@@ -808,50 +464,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
-  toggleContainer: {
-    flexDirection: "row",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 24,
-    gap: 4,
-  },
-  toggleButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "transparent",
-  },
-  toggleButtonActive: {
-    backgroundColor: "#E74C3C",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#E74C3C",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  toggleButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    fontFamily: "Geist",
-    color: "#666",
-  },
-  toggleButtonTextActive: {
-    color: "#FFFFFF",
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
+  inputContainer: { marginBottom: 20 },
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
@@ -859,16 +472,8 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 8,
   },
-  inputWrapper: {
-    position: "relative",
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  inputIcon: {
-    position: "absolute",
-    left: 16,
-    zIndex: 1,
-  },
+  inputWrapper: { position: "relative", flexDirection: "row", alignItems: "center" },
+  inputIcon: { position: "absolute", left: 16, zIndex: 1 },
   textInput: {
     backgroundColor: "#F5F5F5",
     borderRadius: 12,
@@ -881,29 +486,14 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
     flex: 1,
   },
-  textInputWithIcon: {
-    paddingLeft: 48,
-  },
-  passwordInput: {
-    paddingRight: 48,
-  },
+  textInputWithIcon: { paddingLeft: 48 },
+  passwordInput: { paddingRight: 48 },
   textInputError: {
     fontFamily: "Geist",
     borderColor: "#E74C3C",
     backgroundColor: "#FFF5F5",
   },
-  otpInput: {
-    letterSpacing: 8,
-    fontFamily: "Geist",
-    textAlign: "center",
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    padding: 4,
-  },
+  eyeIcon: { position: "absolute", right: 16, padding: 4 },
   errorText: {
     color: "#E74C3C",
     fontFamily: "Geist",
@@ -911,35 +501,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 4,
   },
-  otpActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    gap: 12,
-  },
-  changeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-  },
-  resendBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-  },
-  changeTxt: {
-    color: "#E74C3C",
-    fontSize: 14,
-    fontFamily: "Geist",
-    fontWeight: "600",
-  },
-  forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: 20,
-    marginTop: -8,
-  },
+  forgotPassword: { alignSelf: "flex-end", marginBottom: 20, marginTop: -8 },
   forgotPasswordText: {
     color: "#E74C3C",
     fontSize: 14,

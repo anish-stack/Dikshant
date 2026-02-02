@@ -29,19 +29,21 @@ export default function CoursePage() {
   const navigation = useNavigation();
   const route = useRoute();
   const { filter } = route.params || {};
-  const {token} = useAuthStore()
-  
+  const { token } = useAuthStore()
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMode, setSelectedMode] = useState(filter ? filter : "all");
   const [priceRange, setPriceRange] = useState("all");
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(20);
   const [page, setPage] = useState(1);
   const [purchasedCourses, setPurchasedCourses] = useState({});
   const [checkingPurchases, setCheckingPurchases] = useState(false);
 
-  const { data: response, error, isLoading } = useSWR("/batchs", fetcher);
+  const { data: response, error, isLoading } = useSWR(`/batchs?limit=${limit}&page=${page}`, fetcher);
 
   const batches = useMemo(() => response?.items || [], [response]);
+  const batchPages = response?.pages
+  console.log(batchPages)
 
   // Check purchase status for all courses
   const checkPurchaseStatus = async (batchIds) => {
@@ -127,10 +129,8 @@ export default function CoursePage() {
     return filtered;
   }, [batches, searchQuery, selectedMode, priceRange]);
 
-  const paginatedBatches = useMemo(() => {
-    const start = (page - 1) * limit;
-    return filteredBatches.slice(start, start + limit);
-  }, [filteredBatches, page, limit]);
+  const paginatedBatches = filteredBatches;
+
 
   const totalPages = Math.ceil(filteredBatches.length / limit);
 
@@ -170,10 +170,12 @@ export default function CoursePage() {
     const handlePress = () => {
       if (isPurchased) {
         // Navigate to my-course if already purchased
-        navigation.navigate("my-course", {
-          unlocked: true,
-          courseId:item.id,
-        });
+        navigation.navigate("my-course-subjects", { unlocked: true, courseId: item.id });
+
+        // navigation.navigate("my-course", {
+        //   unlocked: true,
+        //   courseId: item.id,
+        // });
       } else {
         // Navigate to course detail if not purchased
         navigation.navigate("CourseDetail", {
@@ -394,7 +396,7 @@ export default function CoursePage() {
         )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {batchPages > 1 && (
           <View style={styles.pagination}>
             <TouchableOpacity
               onPress={() => setPage((p) => Math.max(1, p - 1))}
@@ -410,12 +412,13 @@ export default function CoursePage() {
 
             <View style={styles.pageIndicator}>
               <Text style={styles.pageText}>{page}</Text>
-              <Text style={styles.pageTotal}>of {totalPages}</Text>
+              <Text style={styles.pageTotal}>of {batchPages}</Text>
             </View>
 
             <TouchableOpacity
-              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
+              onPress={() => setPage((p) => Math.min(batchPages, p + 1))}
+              disabled={page === batchPages}
+
               style={[
                 styles.pageButton,
                 page === totalPages && styles.pageButtonDisabled

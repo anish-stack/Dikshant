@@ -334,6 +334,7 @@ export default function Signup({ navigation }) {
               <Button
                 title={loading ? "Creating Account..." : "Continue"}
                 onPress={handleSignup}
+                color={"#fff"}
                 disabled={loading}
               />
 
@@ -361,7 +362,7 @@ export default function Signup({ navigation }) {
             <View style={styles.formContainer}>
               <Text style={styles.stepTitle}>Verify OTP</Text>
               <Text style={styles.stepSubtitle}>
-                We sent a 6-digit code to {formData.phone}
+                We sent a 6-digit code to {formData.email}
               </Text>
 
               <View style={styles.inputContainer}>

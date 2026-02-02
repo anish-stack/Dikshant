@@ -111,13 +111,7 @@ static async create(req, res) {
       limit = parseInt(limit);
       const offset = (page - 1) * limit;
 
-      // const redisKey = `batches:page:${page}:limit:${limit}:search:${search}`;
-
-      // const cache = await redis.get(redisKey);
-      // if (cache) {
-      //   return res.json(JSON.parse(cache));
-      // }
-
+      
       const where = {};
 
       if (search.trim()) {

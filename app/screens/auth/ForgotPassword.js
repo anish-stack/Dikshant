@@ -15,6 +15,7 @@ import axios from "axios";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LOCAL_ENDPOINT } from "../../constant/api";
 
 const ForgotPassword = () => {
   const [mobile, setMobile] = useState("");
@@ -51,7 +52,7 @@ const ForgotPassword = () => {
 
     try {
       const response = await axios.post(
-        "https://www.dikapi.olyox.in/api/auth/update-password",
+        `${LOCAL_ENDPOINT}/auth/update-password`,
         {
           mobile,
           newPassword,

@@ -136,10 +136,12 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
   const handlePress = () => {
     if (isPurchased) {
       // Navigate to my-course if already purchased
-      navigation.navigate("my-course", {
-        unlocked: true,
-        courseId:batch.id,
-      });
+        navigation.navigate("my-course-subjects", { unlocked: true, courseId: batch.id });
+
+      // navigation.navigate("my-course", {
+      //   unlocked: true,
+      //   courseId:batch.id,
+      // });
     } else {
       // Navigate to course detail if not purchased
       navigation.navigate("CourseDetail", {

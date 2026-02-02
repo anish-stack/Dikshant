@@ -87,9 +87,9 @@ export default function EnrollCourse() {
     ? appliedCoupon.discountType === "flat"
       ? appliedCoupon.discount
       : Math.min(
-          (subtotal * appliedCoupon.discount) / 100,
-          appliedCoupon.maxDiscount || Infinity
-        )
+        (subtotal * appliedCoupon.discount) / 100,
+        appliedCoupon.maxDiscount || Infinity
+      )
     : 0;
 
   const totalAmount = Math.round(subtotal - discount);
@@ -97,7 +97,7 @@ export default function EnrollCourse() {
   const triggerHaptic = () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Apply Coupon
@@ -149,159 +149,159 @@ export default function EnrollCourse() {
   };
 
   // Create Razorpay Order & Pay
-const initiatePayment = async () => {
-  if (paymentLoading) {
-    console.log("⏳ Payment already in progress");
-    return;
-  }
-
-  console.log("🚀 Initiating payment...");
-  setPaymentLoading(true);
-
-  try {
-    if (!token) {
-      console.error("❌ Token missing");
-      showPaymentResult("failed", "User token missing. Please login again.");
-      setPaymentLoading(false);
+  const initiatePayment = async () => {
+    if (paymentLoading) {
+      console.log("⏳ Payment already in progress");
       return;
     }
 
-    console.log("📦 Creating order with payload:", {
-      userId: user.id,
-      type: "batch",
-      itemId: batchId,
-      amount: subtotal,
-      gst: 0,
-      couponCode: appliedCoupon?.code || null,
-    });
+    console.log("🚀 Initiating payment...");
+    setPaymentLoading(true);
 
-    const orderResponse = await axios.post(
-      `${API_URL_LOCAL_ENDPOINT}/orders`,
-      {
+    try {
+      if (!token) {
+        console.error("❌ Token missing");
+        showPaymentResult("failed", "User token missing. Please login again.");
+        setPaymentLoading(false);
+        return;
+      }
+
+      console.log("📦 Creating order with payload:", {
         userId: user.id,
         type: "batch",
         itemId: batchId,
         amount: subtotal,
         gst: 0,
         couponCode: appliedCoupon?.code || null,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    console.log("✅ Order API response:", orderResponse.data);
-
-    if (!orderResponse.data.success) {
-      throw new Error(orderResponse.data.message || "Failed to create order");
-    }
-
-    const { razorOrder, key } = orderResponse.data;
-
-    console.log("🧾 Razorpay order created:", razorOrder);
-
-    const options = {
-      description: `Enrollment for ${batchData?.name}`,
-      image:
-        "https://www.dikshantias.com/_next/image?url=https%3A%2F%2Fdikshantiasnew-web.s3.ap-south-1.amazonaws.com%2Fweb%2F1757750048833-e5243743-d7ec-40f6-950d-849cd31d525f-dikshant-logo.png&w=384&q=75",
-      currency: "INR",
-      key: key || "rzp_live_S0aOl8Cd5iz5jk",
-      amount: razorOrder.amount,
-      name: "Dikshant IAS",
-      order_id: razorOrder.id,
-      theme: { color: colors.primary },
-      prefill: {
-        name: user?.name,
-        email: user?.email,
-        contact: user?.mobile,
-      },
-    };
-
-    console.log("💳 Opening Razorpay with options:", options);
-
-    RazorpayCheckout.open(options)
-      .then(async (data) => {
-        console.log("✅ Razorpay success callback:", data);
-
-        try {
-          console.log("🔐 Verifying payment with backend...");
-
-          const res = await axios.post(
-            `${API_URL_LOCAL_ENDPOINT}/orders/verify`,
-            {
-              razorpayOrderId: data.razorpay_order_id,
-              razorpayPaymentId: data.razorpay_payment_id,
-              razorpaySignature: data.razorpay_signature,
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          console.log("✅ Payment verification response:", res.data);
-
-          const { order, relatedId } = res.data;
-          const courseId = order.itemId || relatedId;
-
-          console.log("🎓 Enrollment success, courseId:", courseId);
-
-          showPaymentResult(
-            "success",
-            "Payment successful! You are now enrolled in the course."
-          );
-          setTimeout(()=>{
-                navigation.dispatch(
-            CommonActions.reset({
-              index: 1,
-              routes: [
-                { name: "Home" },
-                {
-                  name: "my-course",
-                  params: {
-                    unlocked: true,
-                    courseId,
-                  },
-                },
-              ],
-            })
-          );
-          },2000)
-      
-        } catch (verifyErr) {
-          console.error("❌ Payment verification failed:", verifyErr);
-          showPaymentResult(
-            "failed",
-            "Payment verification failed. Please contact support."
-          );
-        }
-      })
-      .catch((error) => {
-        console.error("❌ Razorpay payment failed:", error);
-        showPaymentResult(
-          "failed",
-          error?.description?.error?.description ||
-            "Payment failed. Please try again."
-        );
-      })
-      .finally(() => {
-        console.log("🔚 Razorpay flow ended");
-        setPaymentLoading(false);
       });
 
-  } catch (error) {
-    console.error("❌ initiatePayment error:", error);
-    showPaymentResult(
-      "failed",
-      error.message || "Payment failed. Please try again."
-    );
-    setPaymentLoading(false);
-  }
-};
+      const orderResponse = await axios.post(
+        `${API_URL_LOCAL_ENDPOINT}/orders`,
+        {
+          userId: user.id,
+          type: "batch",
+          itemId: batchId,
+          amount: subtotal,
+          gst: 0,
+          couponCode: appliedCoupon?.code || null,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("✅ Order API response:", orderResponse.data);
+
+      if (!orderResponse.data.success) {
+        throw new Error(orderResponse.data.message || "Failed to create order");
+      }
+
+      const { razorOrder, key } = orderResponse.data;
+
+      console.log("🧾 Razorpay order created:", razorOrder);
+
+      const options = {
+        description: `Enrollment for ${batchData?.name}`,
+        image:
+          "https://www.dikshantias.com/_next/image?url=https%3A%2F%2Fdikshantiasnew-web.s3.ap-south-1.amazonaws.com%2Fweb%2F1757750048833-e5243743-d7ec-40f6-950d-849cd31d525f-dikshant-logo.png&w=384&q=75",
+        currency: "INR",
+        key: key || "rzp_live_S0aOl8Cd5iz5jk",
+        amount: razorOrder.amount,
+        name: "Dikshant IAS",
+        order_id: razorOrder.id,
+        theme: { color: colors.primary },
+        prefill: {
+          name: user?.name,
+          email: user?.email,
+          contact: user?.mobile,
+        },
+      };
+
+      console.log("💳 Opening Razorpay with options:", options);
+
+      RazorpayCheckout.open(options)
+        .then(async (data) => {
+          console.log("✅ Razorpay success callback:", data);
+
+          try {
+            console.log("🔐 Verifying payment with backend...");
+
+            const res = await axios.post(
+              `${API_URL_LOCAL_ENDPOINT}/orders/verify`,
+              {
+                razorpayOrderId: data.razorpay_order_id,
+                razorpayPaymentId: data.razorpay_payment_id,
+                razorpaySignature: data.razorpay_signature,
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+
+            console.log("✅ Payment verification response:", res.data);
+
+            const { order, relatedId } = res.data;
+            const courseId = order.itemId || relatedId;
+
+            console.log("🎓 Enrollment success, courseId:", courseId);
+
+            showPaymentResult(
+              "success",
+              "Payment successful! You are now enrolled in the course."
+            );
+            setTimeout(() => {
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 1,
+                  routes: [
+                    { name: "Home" },
+                    {
+                      name: "my-course-subjects",
+                      params: {
+                        unlocked: true,
+                        courseId,
+                      },
+                    },
+                  ],
+                })
+              );
+            }, 2000)
+
+          } catch (verifyErr) {
+            console.error("❌ Payment verification failed:", verifyErr);
+            showPaymentResult(
+              "failed",
+              "Payment verification failed. Please contact support."
+            );
+          }
+        })
+        .catch((error) => {
+          console.error("❌ Razorpay payment failed:", error);
+          showPaymentResult(
+            "failed",
+            error?.description?.error?.description ||
+            "Payment failed. Please try again."
+          );
+        })
+        .finally(() => {
+          console.log("🔚 Razorpay flow ended");
+          setPaymentLoading(false);
+        });
+
+    } catch (error) {
+      console.error("❌ initiatePayment error:", error);
+      showPaymentResult(
+        "failed",
+        error.message || "Payment failed. Please try again."
+      );
+      setPaymentLoading(false);
+    }
+  };
 
   const selectCoupon = (coupon) => {
     setCouponCode(coupon.code);
