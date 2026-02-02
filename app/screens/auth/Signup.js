@@ -404,6 +404,7 @@ export default function Signup({ navigation }) {
               <Button
                 title={loading ? "Verifying..." : "Verify & Create Account"}
                 onPress={handleVerifyOtp}
+                color={"#fff"}
                 disabled={loading || otp.length !== 6}
               />
 

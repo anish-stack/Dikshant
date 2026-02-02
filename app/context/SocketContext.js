@@ -23,7 +23,7 @@ export const SocketProvider = ({ children, userId }) => {
     if (!userId) return
 
     // Create socket connection
-    const newSocket = io('https://www.dikapi.olyox.in', {
+    const newSocket = io('http://192.168.1.8:5001', {
       query: { userId },
       transports: ["polling", "websocket"], // ✅ allow both
       forceNew: true,

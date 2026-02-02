@@ -214,7 +214,7 @@ export default function TestSeriesView({ route, navigation }) {
       setPaymentStatus("success");
       setTimeout(() => {
         setPaymentStatus(null);
-        navigation.replace("MyTestSeries");
+        navigation.replace("TestSeries");
       }, 3500);
     } catch (error) {
       setPaying(false);
