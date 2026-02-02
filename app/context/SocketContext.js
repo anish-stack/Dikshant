@@ -23,7 +23,7 @@ export const SocketProvider = ({ children, userId }) => {
     if (!userId) return
 
     // Create socket connection
-    const newSocket = io('http://192.168.1.8:5001', {
+    const newSocket = io('https://app.api.dikshantias.com', {
       query: { userId },
       transports: ["polling", "websocket"], // ✅ allow both
       forceNew: true,
