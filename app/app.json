@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dikshant IAS",
     "slug": "dikshant-ias",
-    "version": "1.0.0",
+    "version": "1.4.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "icon": "./assets/icon.png",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "UIBackgroundModes": ["location", "fetch", "location", "fetch"],
+        "UIBackgroundModes": ["fetch"],
         "UIUserNotificationAlertStyle": "alert"
       },
       "entitlements": {
@@ -32,14 +32,11 @@
       "package": "in.kaksya.dikshant",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
+        "foregroundImage": "./assets/small.png",
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./google-services.json",
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
         "POST_NOTIFICATIONS",
         "SCHEDULE_EXACT_ALARM",
         "RECEIVE_BOOT_COMPLETED",
@@ -48,25 +45,7 @@
         "WAKE_LOCK",
         "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "VIBRATE",
-        "USE_FULL_SCREEN_INTENT",
-        "SYSTEM_ALERT_WINDOW",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "RECEIVE_BOOT_COMPLETED",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "WAKE_LOCK",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION",
-        "VIBRATE",
-        "USE_FULL_SCREEN_INTENT",
-        "SYSTEM_ALERT_WINDOW"
+        "VIBRATE"
       ],
       "intentFilters": [
         {
@@ -144,7 +123,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/logo.png",
+          "icon": "./assets/small.png",
           "color": "#FB2B37"
         }
       ],

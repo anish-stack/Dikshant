@@ -21,9 +21,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 
-const BATCH_API = "https://www.dikapi.olyox.in/api/batchs";
-const SUBJECTS_API = "https://www.dikapi.olyox.in/api/subjects";
-const PROGRAMS_API = "https://www.dikapi.olyox.in/api/programs";
+const BATCH_API = "https://www.app.api.dikshantias.com/api/batchs";
+const SUBJECTS_API = "https://www.app.api.dikshantias.com/api/subjects";
+const PROGRAMS_API = "https://www.app.api.dikshantias.com/api/programs";
 
 interface Subject {
   id: number;
@@ -156,7 +156,7 @@ const CreateBatch = () => {
         });
 
         const res = await axios.get(
-          `https://www.dikapi.olyox.in/api/quiz/quizzes?${params}`,
+          `https://www.app.api.dikshantias.com/api/quiz/quizzes?${params}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
@@ -187,7 +187,7 @@ const CreateBatch = () => {
         });
 
         const res = await axios.get(
-          `https://www.dikapi.olyox.in/api/testseriess?${params}`,
+          `https://www.app.api.dikshantias.com/api/testseriess?${params}`,
           { headers: { Authorization: `Bearer ${token}` } },
         );
         console.log(res.data);

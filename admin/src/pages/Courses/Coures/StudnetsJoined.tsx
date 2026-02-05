@@ -19,7 +19,7 @@ const StudentsJoined = () => {
   const { id } = useParams(); // ✅ get id from URL
 
   const VIDEO_ID = id;
-  const API_URL = `https://www.dikapi.olyox.in/api/chat/joined-student/${VIDEO_ID}`;
+  const API_URL = `https://www.app.api.dikshantias.com/api/chat/joined-student/${VIDEO_ID}`;
 
   const fetchJoinedStudents = useCallback(async () => {
     try {

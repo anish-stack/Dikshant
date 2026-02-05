@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
-const API_BASE = "https://www.dikapi.olyox.in/api/pdfnotes";
+const API_BASE = "https://www.app.api.dikshantias.com/api/pdfnotes";
 
 interface Category {
   id: string;

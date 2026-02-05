@@ -13,7 +13,7 @@ import {
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 import JoditEditor from "jodit-react";
-const API_URL = "https://www.dikapi.olyox.in/api/announcements";
+const API_URL = "https://www.app.api.dikshantias.com/api/announcements";
 
 interface Announcement {
   id: number;

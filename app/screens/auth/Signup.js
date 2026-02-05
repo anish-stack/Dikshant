@@ -305,7 +305,7 @@ export default function Signup({ navigation }) {
 
               {/* Password Input */}
               <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Password</Text>
+                <Text style={styles.inputLabel}>Password (Min 8 chars with upper, lower & number)</Text>
                 <TextInput
                   style={[
                     styles.textInput,
@@ -313,7 +313,6 @@ export default function Signup({ navigation }) {
                   ]}
                   value={formData.password}
                   onChangeText={(text) => updateField("password", text)}
-                  placeholder="Min 8 chars with upper, lower & number"
                   placeholderTextColor="#999"
                   secureTextEntry
                   autoCapitalize="none"

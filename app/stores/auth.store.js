@@ -162,7 +162,6 @@ export const useAuthStore = create((set, get) => ({
   // 🔹 Step 4: Direct Login with Password
   login: async (
     phone,
-    otp,
     password,
     device_id,
     fcm_token,
@@ -173,14 +172,14 @@ export const useAuthStore = create((set, get) => ({
       if (!phone) {
         throw new Error("Phone number is required");
       }
+      console.log("password",password)
 
-      if (!/^[0-9]{10}$/.test(phone)) {
-        throw new Error("Invalid phone number");
-      }
+      // if (!/^[0-9]{10}$/.test(phone)) {
+      //   throw new Error("Invalid phone number");
+      // }
 
       const response = await axios.post("/auth/login", {
         mobile: phone,
-        otp: otp ? otp : "",
         password: password ? password : "",
         device_id,
         fcm_token,

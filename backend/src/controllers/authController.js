@@ -210,7 +210,6 @@ exports.signup = async (req, res) => {
       platform,
       appVersion,
     } = req.body;
-console.log(req.body)
     // Validation
     if (!email && !mobile) {
       return res.status(400).json({
@@ -462,7 +461,6 @@ exports.login = async (req, res) => {
       appVersion,
     } = req.body;
 
-    console.log("Login Request Body:", req.body);
 
     // -------------------------------------------------
     // 1️⃣ MOBILE REQUIRED

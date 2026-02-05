@@ -117,7 +117,7 @@ export function Settings() {
         style: "destructive",
         onPress: async () => {
           try {
-            await axios.get(`https://www.dikapi.olyox.in/flush-all`);
+            await axios.get(`https://www.app.api.dikshantias.com/flush-all`);
             Alert.alert("Cache cleared successfully");
           } catch (error) {
             console.error("❌ Clear cache failed", error);

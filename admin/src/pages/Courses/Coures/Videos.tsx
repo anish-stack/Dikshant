@@ -21,8 +21,8 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
-const API_URL = "https://www.dikapi.olyox.in/api/videocourses";
-const BATCHS_API = "https://www.dikapi.olyox.in/api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com/api/videocourses";
+const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
 const ITEMS_PER_PAGE = 10;
 
 interface Subject {

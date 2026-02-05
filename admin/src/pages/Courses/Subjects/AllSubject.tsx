@@ -16,7 +16,7 @@ import { Skeleton } from "../../../components/ui/Skeleton/Skeleton";
 import { Plus, Search, Edit, Trash2, AlertCircle, X } from "lucide-react";
 import Label from "../../../components/form/Label";
 
-const API_URL = "https://www.dikapi.olyox.in/api/subjects";
+const API_URL = "https://www.app.api.dikshantias.com/api/subjects";
 
 interface Subject {
   id: number;

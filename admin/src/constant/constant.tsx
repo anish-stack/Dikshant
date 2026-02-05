@@ -1,1 +1,1 @@
-export const API_URL="https://www.dikapi.olyox.in/api"
+export const API_URL="https://www.app.api.dikshantias.com/api"

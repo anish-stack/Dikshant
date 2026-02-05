@@ -1,38 +1,15 @@
-import { NavigationContainer } from "@react-navigation/native";
 import { usePreventScreenCapture } from 'expo-screen-capture';
-
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import useFontStyle from "./hooks/useFontLoad";
-import Splash from "./screens/splash/splash";
-import Login from "./screens/auth/Login";
-import Home from "./pages/Home/Home";
-import { StatusBar } from "expo-status-bar";
-import Signup from "./screens/auth/Signup";
-import CourseDetail from "./screens/courses/CourseDetail";
-import Course from "./screens/courses/Courses";
-import CoursePage from "./screens/courses/CoursePage";
-import { Text, TextInput, Alert, AppState, StyleSheet } from "react-native";
-import EBooks from "./pages/Books/EBooks";
-import TestScreen from "./screens/Tests/Tests";
-import QuesAndScreen from "./screens/Tests/QuesAndScreen";
-import Profile from "./pages/Profile/Profile";
-import Downloads from "./pages/Downloads/Downloads";
-import RecordedCourses from "./pages/RecordedCourses/RecordedCourses";
-import TestSeries from "./pages/TestSeries/TestSeries";
-import { Settings } from "./screens/Others/Settings";
-import { HelpSupport } from "./screens/Others/HelpSupport";
-import { About } from "./screens/Others/About";
-import Notifications from "./screens/Others/Notifications";
-import PermissionsScreen from "./screens/Others/PermissionsScreen";
+import { Text, TextInput, Alert, AppState, StyleSheet, View, Modal, TouchableOpacity } from "react-native";
 import { useEffect, useState, useRef } from "react";
 import * as ExpoNotifications from "expo-notifications";
-import * as Location from "expo-location";
-import { Platform } from "react-native";
-import Scholarship from "./pages/Scholarship/AllScholarship";
-import ApplyScholarship from "./pages/Scholarship/ApplyScholarship";
-import EnrollCourse from "./screens/courses/EnrollCourse";
+import * as Updates from 'expo-updates';
+import axios from "axios";
+import { API_URL_LOCAL_ENDPOINT } from "./constant/api";
+import { useAuthStore } from "./stores/auth.store";
+import { SocketProvider } from "./context/SocketContext";
+import { colors } from "./constant/color";
 import { isDeveloperOptionsEnabled } from "./utils/deviceChecks";
-import MyEnrollCourse from "./pages/Profile/MyEnrollCourse";
 import {
   setupNotifications,
   setupBackgroundNotifications,
@@ -41,36 +18,7 @@ import {
   refreshFCMToken,
   getDeviceInfo,
 } from "./utils/permissions";
-import axios from "axios";
-import { API_URL_LOCAL_ENDPOINT } from "./constant/api";
-import { useAuthStore } from "./stores/auth.store";
-import {
-  HelpSupportScreen,
-  RateUsScreen,
-  ShareAppScreen,
-} from "./pages/Profile/ShareApp";
-import ForgotPassword from "./screens/auth/ForgotPassword";
-import { SocketProvider } from "./context/SocketContext";
-import { colors } from "./constant/color";
-import AnnouncementDetails from "./components/AnnouncementDetails";
-import ViewAllVideos from "./pages/CourseComponets/ViewAllVideos";
-import PlayerScreen from "./screens/PlayerScreen/PlayerScreen";
-import IntroQuiz from "./pages/Quiz/IntroQuiz";
-import AllQuizes from "./pages/Quiz/AllQuizes";
-import QuizDetails from "./pages/Quiz/QuizDetails";
-import QuizPlay from "./pages/QuizPlay";
-import QuizResult from "./pages/QuizPlay/components/QuizResult";
-import MyCourses from "./pages/Profile/MyCourses";
-import MyAllQuiz from "./pages/Profile/MyAllQuiz";
-import AllAtemptsQuiz from "./pages/Profile/AllAtemptsQuiz";
-import PdfNotesScreen from "./pages/CourseComponets/PdfNotesScreen";
-import IntroTestSeries from "./pages/TestSeries/IntroTestSeries";
-import TestSeriesView from "./pages/TestSeries/TestSeriesView";
-import ResultScreen from "./pages/TestSeries/ResultScreen";
-import follow from "./pages/Profile/follow";
-import CourseSubjectEnrolled from "./pages/Profile/CourseSubjectEnrolled";
-
-const Stack = createNativeStackNavigator();
+import AppRouter from "./src/navigation/AppRouter";
 
 // Configure Expo Notifications handler
 ExpoNotifications.setNotificationHandler({
@@ -85,7 +33,7 @@ ExpoNotifications.setNotificationHandler({
 setupBackgroundNotifications();
 
 export default function App() {
-  // usePreventScreenCapture();
+  usePreventScreenCapture();
   const fontsLoaded = useFontStyle();
   const [fcmToken, setFcmToken] = useState(null);
   const [notificationData, setNotificationData] = useState(null);
@@ -97,25 +45,14 @@ export default function App() {
   const navigationRef = useRef();
   const [isDevOptionsEnabled, setIsDevOptionsEnabled] = useState(false);
   const [showDevWarning, setShowDevWarning] = useState(false);
+  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
+  const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const { token, user } = useAuthStore();
-
-
-  const linking = {
-    prefixes: ["https://www.player.dikshantias.com"],
-    config: {
-      screens: {
-        Home: "app/open-home",
-        MyEnrollCourse: "app/my-enroll",
-      },
-    },
-  };
-
-
 
   useEffect(() => {
     initializeApp();
 
-    // Monitor app state for screen time tracking
+    // Monitor app state for screen time tracking and updates
     const subscription = AppState.addEventListener(
       "change",
       handleAppStateChange
@@ -132,6 +69,9 @@ export default function App() {
 
   const initializeApp = async () => {
     try {
+      // Check for EAS updates first
+      await checkForUpdates();
+
       // Initialize FCM and notifications
       await initializeNotifications();
 
@@ -142,19 +82,67 @@ export default function App() {
     }
   };
 
+  // EAS Update Logic
+  const checkForUpdates = async () => {
+    try {
+      if (__DEV__) {
+        console.log("⚠️ Skipping update check in development mode");
+        return;
+      }
+
+      setIsCheckingForUpdate(true);
+      console.log("🔍 Checking for updates...");
+
+      const update = await Updates.checkForUpdateAsync();
+
+      if (update.isAvailable) {
+        console.log("✅ Update available! Downloading...");
+        setIsUpdateAvailable(true);
+
+        Alert.alert(
+          "Update Available",
+          "A new version is available. Downloading update...",
+          [{ text: "OK" }]
+        );
+
+        await Updates.fetchUpdateAsync();
+
+        Alert.alert(
+          "Update Ready",
+          "Update has been downloaded. The app will restart to apply the update.",
+          [
+            {
+              text: "Restart Now",
+              onPress: async () => {
+                await Updates.reloadAsync();
+              },
+            },
+          ]
+        );
+      } else {
+        console.log("✅ App is up to date");
+      }
+    } catch (error) {
+      console.error("❌ Error checking for updates:", error);
+      // Don't block app startup if update check fails
+    } finally {
+      setIsCheckingForUpdate(false);
+    }
+  };
+
   const handleAppStateChange = (nextAppState) => {
     if (
       appState.current.match(/inactive|background/) &&
       nextAppState === "active"
     ) {
       console.log("App has come to the foreground!");
-      // You can track session start time here
+      // Check for updates when app comes to foreground
+      checkForUpdates();
     } else if (
       appState.current === "active" &&
       nextAppState.match(/inactive|background/)
     ) {
       console.log("App has gone to the background!");
-      // You can track session end time here
     }
     appState.current = nextAppState;
   };
@@ -190,9 +178,9 @@ export default function App() {
           },
         }
       );
-      console.log("Server update  token", res.data);
+      console.log("✅ Server update token", res.data);
     } catch (error) {
-      console.log("server error", error.response.data);
+      console.log("❌ Server error", error.response?.data);
     }
   };
 
@@ -211,7 +199,7 @@ export default function App() {
         const deviceInfo = await getDeviceInfo();
         console.log("📱 Device info:", deviceInfo);
 
-        // 3. TODO: Send FCM token to your backend
+        // 3. Send FCM token to backend
         await updateFcmTokenAPI({
           fcm_token: result.token,
           device_id: deviceInfo.device_id,
@@ -223,7 +211,7 @@ export default function App() {
           console.log("🔄 Token refreshed:", newToken);
           setFcmToken(newToken);
 
-          // TODO: Update token on backend
+          // Update token on backend
           await updateFcmTokenAPI({ fcm_token: newToken });
         });
 
@@ -292,7 +280,6 @@ export default function App() {
 
         case "assignment":
           if (data.assignment_id) {
-            // Navigate to assignments screen
             navigationRef.current.navigate("Assignments", {
               assignmentId: data.assignment_id,
             });
@@ -322,11 +309,11 @@ export default function App() {
 
   const checkDeveloperOptions = async () => {
     const enabled = await isDeveloperOptionsEnabled();
-    console.log("Dev Mode", enabled)
+    console.log("Dev Mode", enabled);
     setIsDevOptionsEnabled(enabled);
 
     if (enabled && !showDevWarning) {
-      setShowDevWarning(true); // Modal show करो
+      setShowDevWarning(true);
     }
   };
 
@@ -343,9 +330,11 @@ export default function App() {
 
     return () => subscription?.remove();
   }, []);
+
   if (!fontsLoaded || !permissionsGranted) {
     return null;
   }
+
   if (isDevOptionsEnabled) {
     return (
       <Modal
@@ -366,8 +355,12 @@ export default function App() {
 
             <View style={styles.steps}>
               <Text style={styles.stepText}>1. Settings → About Phone</Text>
-              <Text style={styles.stepText}>2. Build Number पर 7 बार टैप करें (बंद करने के लिए)</Text>
-              <Text style={styles.stepText}>3. Developer Options को ऑफ करें</Text>
+              <Text style={styles.stepText}>
+                2. Build Number पर 7 बार टैप करें (बंद करने के लिए)
+              </Text>
+              <Text style={styles.stepText}>
+                3. Developer Options को ऑफ करें
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -382,8 +375,6 @@ export default function App() {
     );
   }
 
-
-
   // Apply Geist font globally
   Text.defaultProps = Text.defaultProps || {};
   Text.defaultProps.style = { fontFamily: "Geist" };
@@ -393,88 +384,13 @@ export default function App() {
 
   return (
     <SocketProvider userId={user?.id}>
-      <NavigationContainer ref={navigationRef} linking={linking}>
-        <StatusBar style="auto" />
-        <Stack.Navigator
-          initialRouteName="Splash"
-          screenOptions={{
-            headerShown: false,
-            animation: "slide_from_right",
-          }}
-        >
-          <Stack.Screen name="Splash" component={Splash} />
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="Signup" component={Signup} />
-          <Stack.Screen name="Home" component={Home} />
-
-          <Stack.Screen name="ShareApp" component={ShareAppScreen} />
-          <Stack.Screen name="RateUs" component={RateUsScreen} />
-          <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-          <Stack.Screen name="view-all-videos" component={ViewAllVideos} />
-
-          {/* PlayerScreen*/}
-          <Stack.Screen name="PlayerScreen" component={PlayerScreen} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
-
-          <Stack.Screen name="CourseDetail" component={CourseDetail} />
-          <Stack.Screen name="Courses" component={CoursePage} />
-          <Stack.Screen name="enroll-course" component={EnrollCourse} />
-          <Stack.Screen name="my-course" component={MyEnrollCourse} />
-          <Stack.Screen name="my-course-subjects" component={CourseSubjectEnrolled} />
-
-
-          <Stack.Screen name="all-my-course" component={MyCourses} />
-          <Stack.Screen name="all-my-quiz" component={MyAllQuiz} />
-          <Stack.Screen name="ResultScreen" component={ResultScreen} />
-
-          <Stack.Screen name="AllQuizAttempts" component={AllAtemptsQuiz} />
-          <Stack.Screen name="PdfNotes" component={PdfNotesScreen} />
-
-          {/* AllAtemptsQuiz */}
-
-          <Stack.Screen name="annouce-details" component={AnnouncementDetails} />
-          <Stack.Screen name="EBooks" component={EBooks} />
-          <Stack.Screen name="Quiz" component={TestScreen} />
-          <Stack.Screen name="startQuz" component={QuesAndScreen} />
-          <Stack.Screen name="Profile" component={Profile} />
-          <Stack.Screen name="Downloads" component={Downloads} />
-          <Stack.Screen name="RecordedCourses" component={RecordedCourses} />
-          <Stack.Screen name="TestSeries" component={TestSeries} />
-          <Stack.Screen name="Settings" component={Settings} />
-          <Stack.Screen name="Support" component={HelpSupport} />
-          <Stack.Screen name="About" component={About} />
-          <Stack.Screen name="Notifications" component={Notifications} />
-          <Stack.Screen name="Permissions" component={PermissionsScreen} />
-          <Stack.Screen name="apply-sch" component={Scholarship} />
-          <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
-
-
-          <Stack.Screen name="follow" component={follow} />
-
-          <Stack.Screen name="IntroTestSeries" component={IntroTestSeries} />
-          <Stack.Screen name="testseries-view" component={TestSeriesView} />
-
-          {/* Quiz Screens */}
-          <Stack.Screen name="Quiz-Intro" component={IntroQuiz} />
-          {/*  */}
-          <Stack.Screen name="AllQuizes" component={AllQuizes} />
-          <Stack.Screen name="QuizDetails" component={QuizDetails} />
-          <Stack.Screen name="QuizPlay" component={QuizPlay} />
-          <Stack.Screen name="QuizResult" component={QuizResult} />
-
-
-
-
-
-        </Stack.Navigator>
-      </NavigationContainer>
-
+      <AppRouter 
+        navigationRef={navigationRef}
+        handleNotificationData={handleNotificationData}
+      />
     </SocketProvider>
-
   );
 }
-
-
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -532,4 +448,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 16,
   },
-})
+});

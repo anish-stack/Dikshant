@@ -1,14 +1,11 @@
-
 import messaging from '@react-native-firebase/messaging';
 import * as ExpoNotifications from 'expo-notifications';
-import * as Location from 'expo-location';
 import * as Device from 'expo-device';
 import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const PermissionTypes = {
   NOTIFICATIONS: 'notifications',
-  LOCATION: 'location',
   ACTIVITY: 'activity',
   CAMERA: 'camera',
   MEDIA_LIBRARY: 'media_library',
@@ -18,14 +15,12 @@ export const PermissionTypes = {
 
 export const getFCMToken = async () => {
   try {
-    // Check if device is registered (v22 compatible)
     const isRegistered = await messaging().isDeviceRegisteredForRemoteMessages;
 
     if (!isRegistered) {
       await messaging().registerDeviceForRemoteMessages();
     }
 
-    // Get FCM token (v22 compatible)
     const token = await messaging().getToken();
 
     if (token) {
@@ -43,7 +38,6 @@ export const getFCMToken = async () => {
 
 export const refreshFCMToken = async (onTokenRefresh) => {
   try {
-    // Listen for token refresh (v22 compatible)
     const unsubscribe = messaging().onTokenRefresh(async (newToken) => {
       console.log('🔄 FCM Token refreshed:', newToken);
       await AsyncStorage.setItem('fcm_token', newToken);
@@ -76,21 +70,18 @@ export const deleteFCMToken = async () => {
 
 export const setupNotifications = async () => {
   try {
-    // Request notification permission
     const hasPermission = await requestNotificationPermission();
 
     if (!hasPermission) {
       return { success: false, message: 'Notification permission denied' };
     }
 
-    // Get FCM token
     const token = await getFCMToken();
 
     if (!token) {
       return { success: false, message: 'Failed to get FCM token' };
     }
 
-    // Setup notification channels (Android) using Expo
     if (Platform.OS === 'android') {
       await setupNotificationChannels();
     }
@@ -98,14 +89,14 @@ export const setupNotifications = async () => {
     return {
       success: true,
       token,
-      message: 'Notifications setup successfully'
+      message: 'Notifications setup successfully',
     };
   } catch (error) {
     console.error('❌ Error setting up notifications:', error);
     return {
       success: false,
       message: 'Failed to setup notifications',
-      error: error.message
+      error: error.message,
     };
   }
 };
@@ -117,8 +108,8 @@ const requestNotificationPermission = async () => {
       return false;
     }
 
+    // iOS
     if (Platform.OS === 'ios') {
-      // iOS - use Firebase messaging permission
       const authStatus = await messaging().requestPermission({
         sound: true,
         alert: true,
@@ -131,8 +122,9 @@ const requestNotificationPermission = async () => {
       );
     }
 
+    // Android
     if (Platform.OS === 'android') {
-      // Android 13+ requires runtime permission
+      // Android 13+
       if (Platform.Version >= 33) {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
@@ -143,11 +135,14 @@ const requestNotificationPermission = async () => {
             buttonNegative: 'Deny',
           }
         );
+
         return granted === PermissionsAndroid.RESULTS.GRANTED;
       }
 
-      // Android < 13 - use Expo Notifications
-      const { status: existingStatus } = await ExpoNotifications.getPermissionsAsync();
+      // Android < 13
+      const { status: existingStatus } =
+        await ExpoNotifications.getPermissionsAsync();
+
       let finalStatus = existingStatus;
 
       if (existingStatus !== 'granted') {
@@ -169,7 +164,6 @@ const setupNotificationChannels = async () => {
   if (Platform.OS !== 'android') return;
 
   try {
-    // Create channels using Expo Notifications
     await ExpoNotifications.setNotificationChannelAsync('default', {
       name: 'Default Notifications',
       importance: ExpoNotifications.AndroidImportance.HIGH,
@@ -228,11 +222,9 @@ const setupNotificationChannels = async () => {
 
 export const setupForegroundNotifications = (onNotificationReceived) => {
   try {
-    // Handle foreground notifications (v22 compatible)
     const unsubscribe = messaging().onMessage(async (remoteMessage) => {
       console.log('📩 Foreground notification:', remoteMessage);
 
-      // Display notification using Expo Notifications
       if (remoteMessage.notification) {
         await ExpoNotifications.scheduleNotificationAsync({
           content: {
@@ -241,7 +233,7 @@ export const setupForegroundNotifications = (onNotificationReceived) => {
             data: remoteMessage.data || {},
             sound: true,
           },
-          trigger: null, // Show immediately
+          trigger: null,
         });
       }
 
@@ -260,11 +252,9 @@ export const setupForegroundNotifications = (onNotificationReceived) => {
 // ==================== BACKGROUND NOTIFICATIONS ====================
 
 export const setupBackgroundNotifications = () => {
-  // This should be called OUTSIDE of any component (e.g., index.js or App.js top level)
   messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('📩 Background notification:', remoteMessage);
 
-    // Handle background notification
     try {
       await AsyncStorage.setItem(
         'last_notification',
@@ -274,8 +264,6 @@ export const setupBackgroundNotifications = () => {
         })
       );
 
-      // Firebase automatically displays background notifications
-      // But you can process the data here if needed
       console.log('✅ Background notification handled');
     } catch (error) {
       console.error('❌ Error handling background notification:', error);
@@ -287,7 +275,6 @@ export const setupBackgroundNotifications = () => {
 
 export const setupNotificationOpenHandler = (onNotificationOpen) => {
   try {
-    // Handle notification opened when app is in background (v22 compatible)
     messaging().onNotificationOpenedApp((remoteMessage) => {
       console.log('📱 Notification opened (background):', remoteMessage);
 
@@ -296,7 +283,6 @@ export const setupNotificationOpenHandler = (onNotificationOpen) => {
       }
     });
 
-    // Handle notification opened when app was completely closed (v22 compatible)
     messaging()
       .getInitialNotification()
       .then((remoteMessage) => {
@@ -309,22 +295,21 @@ export const setupNotificationOpenHandler = (onNotificationOpen) => {
         }
       });
 
-    // Also handle Expo notification interactions
-    const subscription = ExpoNotifications.addNotificationResponseReceivedListener((response) => {
-      console.log('📱 Expo notification tapped:', response);
+    const subscription =
+      ExpoNotifications.addNotificationResponseReceivedListener((response) => {
+        console.log('📱 Expo notification tapped:', response);
 
-      if (onNotificationOpen && typeof onNotificationOpen === 'function') {
-        // Convert Expo notification format to FCM-like format
-        const convertedMessage = {
-          notification: {
-            title: response.notification.request.content.title,
-            body: response.notification.request.content.body,
-          },
-          data: response.notification.request.content.data || {},
-        };
-        onNotificationOpen(convertedMessage);
-      }
-    });
+        if (onNotificationOpen && typeof onNotificationOpen === 'function') {
+          const convertedMessage = {
+            notification: {
+              title: response.notification.request.content.title,
+              body: response.notification.request.content.body,
+            },
+            data: response.notification.request.content.data || {},
+          };
+          onNotificationOpen(convertedMessage);
+        }
+      });
 
     return subscription;
   } catch (error) {
@@ -337,11 +322,7 @@ export const setupNotificationOpenHandler = (onNotificationOpen) => {
 
 export const setBadgeCount = async (count) => {
   try {
-    if (Platform.OS === 'ios') {
-      await ExpoNotifications.setBadgeCountAsync(count);
-    } else if (Platform.OS === 'android') {
-      await ExpoNotifications.setBadgeCountAsync(count);
-    }
+    await ExpoNotifications.setBadgeCountAsync(count);
   } catch (error) {
     console.error('❌ Error setting badge count:', error);
   }
@@ -365,18 +346,15 @@ export const getBadgeCount = async () => {
 export const checkPermission = async (permissionType) => {
   try {
     switch (permissionType) {
-      case PermissionTypes.NOTIFICATIONS:
+      case PermissionTypes.NOTIFICATIONS: {
         const authStatus = await messaging().hasPermission();
         return (
           authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
           authStatus === messaging.AuthorizationStatus.PROVISIONAL
         );
+      }
 
-      case PermissionTypes.LOCATION:
-        const { status: locStatus } = await Location.getForegroundPermissionsAsync();
-        return locStatus === 'granted';
-
-      case PermissionTypes.ACTIVITY:
+      case PermissionTypes.ACTIVITY: {
         if (Platform.OS === 'android' && Platform.Version >= 29) {
           const granted = await PermissionsAndroid.check(
             PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
@@ -384,6 +362,7 @@ export const checkPermission = async (permissionType) => {
           return granted;
         }
         return true;
+      }
 
       default:
         return false;
@@ -400,9 +379,6 @@ export const requestPermission = async (permissionType) => {
       case PermissionTypes.NOTIFICATIONS:
         return await requestNotificationPermission();
 
-      case PermissionTypes.LOCATION:
-        return await requestLocation();
-
       case PermissionTypes.ACTIVITY:
         return await requestActivityRecognition();
 
@@ -413,32 +389,6 @@ export const requestPermission = async (permissionType) => {
     console.error(`❌ Error requesting ${permissionType} permission:`, error);
     return false;
   }
-};
-
-// ==================== LOCATION PERMISSION ====================
-
-const requestLocation = async () => {
-  const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    Alert.alert(
-      'Permission Required',
-      'Location access helps provide location-based features.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-      ]
-    );
-    return false;
-  }
-
-  return true;
 };
 
 // ==================== ACTIVITY RECOGNITION ====================
@@ -470,15 +420,12 @@ export const openAppSettings = () => {
 
 export const getDeviceInfo = async () => {
   try {
-    // Use Device constants instead of async method
     const deviceId = Device.modelName || Device.deviceName || 'Unknown';
-    const platform = Platform.OS;
-    const version = Platform.Version;
 
     return {
       device_id: deviceId,
-      platform: platform,
-      os_version: version.toString(),
+      platform: Platform.OS,
+      os_version: Platform.Version.toString(),
     };
   } catch (error) {
     console.error('❌ Error getting device info:', error);
@@ -492,7 +439,12 @@ export const getDeviceInfo = async () => {
 
 // ==================== SCHEDULE LOCAL NOTIFICATION ====================
 
-export const scheduleLocalNotification = async (title, body, data = {}, trigger = null) => {
+export const scheduleLocalNotification = async (
+  title,
+  body,
+  data = {},
+  trigger = null
+) => {
   try {
     await ExpoNotifications.scheduleNotificationAsync({
       content: {
@@ -502,8 +454,9 @@ export const scheduleLocalNotification = async (title, body, data = {}, trigger 
         sound: true,
         badge: 1,
       },
-      trigger: trigger || null, // null = immediate, or { seconds: 60 } for delayed
+      trigger: trigger || null,
     });
+
     console.log('📬 Local notification scheduled');
   } catch (error) {
     console.error('❌ Error scheduling local notification:', error);
@@ -534,7 +487,8 @@ export const cancelNotification = async (notificationId) => {
 
 export const getAllScheduledNotifications = async () => {
   try {
-    const notifications = await ExpoNotifications.getAllScheduledNotificationsAsync();
+    const notifications =
+      await ExpoNotifications.getAllScheduledNotificationsAsync();
     return notifications;
   } catch (error) {
     console.error('❌ Error getting scheduled notifications:', error);

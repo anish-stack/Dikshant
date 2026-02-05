@@ -107,7 +107,7 @@ export default function LiveChat({
 
   const fetchChatHistory = async () => {
     try {
-      const res = await fetch(`https://www.dikapi.olyox.in/api/chat/history/${videoId}?limit=500`)
+      const res = await fetch(`https://www.app.api.dikshantias.com/api/chat/history/${videoId}?limit=500`)
       const data = await res.json()
       if (data.success && Array.isArray(data.data)) {
         // FIXED: Sirf messageType === "message" filter karo

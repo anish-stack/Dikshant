@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import axios, { AxiosError, isAxiosError } from "axios";
 import Swal from "sweetalert2";
 
-const API_URL = "https://www.dikapi.olyox.in/api/assets";
+const API_URL = "https://www.app.api.dikshantias.com/api/assets";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 interface Category {

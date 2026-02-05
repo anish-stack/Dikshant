@@ -17,7 +17,7 @@ export default function CommentsSection({ video, token, userId }) {
   const intervalRef = useRef(null)
   const previousCommentsRef = useRef([])
 
-  const API_BASE = "https://www.dikapi.olyox.in/api"
+  const API_BASE = "https://www.app.api.dikshantias.com/api"
 
   // Toast notification
   const showToast = (message, type = "success") => {

@@ -18,7 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-const API_URL = "https://www.dikapi.olyox.in/api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com/api/batchs";
 
 interface Subject {
   id: number;

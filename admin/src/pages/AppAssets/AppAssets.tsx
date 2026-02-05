@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-const API_URL = "https://www.dikapi.olyox.in/api/assets"; // adjust if needed
+const API_URL = "https://www.app.api.dikshantias.com/api/assets"; // adjust if needed
 
 type AppAssetsType = {
   id?: number;

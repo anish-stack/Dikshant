@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Layout from '../../components/layout';
@@ -21,7 +22,6 @@ import {
 export default function PermissionsScreen() {
   const [permissions, setPermissions] = useState({
     notifications: false,
-    location: false,
     activity: false,
   });
   const [loading, setLoading] = useState(false);
@@ -38,12 +38,10 @@ export default function PermissionsScreen() {
 
   const checkAllPermissions = async () => {
     const notif = await checkPermission(PermissionTypes.NOTIFICATIONS);
-    const loc = await checkPermission(PermissionTypes.LOCATION);
     const activity = await checkPermission(PermissionTypes.ACTIVITY);
 
     setPermissions({
       notifications: notif,
-      location: loc,
       activity: activity,
     });
   };
@@ -55,20 +53,19 @@ export default function PermissionsScreen() {
     const currentStatus = permissions[permissionType];
 
     if (currentStatus) {
-      // Already granted, open settings to disable
       Alert.alert(
-        "Manage Permission",
+        'Manage Permission',
         `To disable ${permissionType} permission, please go to Settings.`,
         [
-          { text: "Cancel", style: "cancel" },
-          { text: "Open Settings", onPress: openAppSettings },
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: openAppSettings },
         ]
       );
     } else {
-      // Request permission
       const granted = await requestPermission(
         PermissionTypes[permissionType.toUpperCase()]
       );
+
       setPermissions((prev) => ({
         ...prev,
         [permissionType]: granted,
@@ -86,14 +83,6 @@ export default function PermissionsScreen() {
       description: 'Receive updates about courses, tests, and achievements',
       color: '#DC3545',
       required: true,
-    },
-    {
-      key: 'location',
-      icon: 'map-pin',
-      title: 'Location Access',
-      description: 'Find nearby test centers and local study groups',
-      color: '#10b981',
-      required: false,
     },
     {
       key: 'activity',
@@ -198,22 +187,26 @@ export default function PermissionsScreen() {
               {
                 icon: 'bell',
                 title: 'Stay Updated',
-                description: 'Never miss important course updates and test reminders',
-              },
-              {
-                icon: 'map-pin',
-                title: 'Find Nearby',
-                description: 'Discover test centers and study groups near you',
+                description:
+                  'Never miss important course updates and test reminders',
               },
               {
                 icon: 'trending-up',
                 title: 'Track Progress',
-                description: 'Monitor your study habits and improve productivity',
+                description:
+                  'Monitor your study habits and improve productivity',
               },
               {
                 icon: 'shield',
                 title: 'Privacy First',
-                description: 'Your data is secure and never shared with third parties',
+                description:
+                  'Your data is secure and never shared with third parties',
+              },
+              {
+                icon: 'settings',
+                title: 'Full Control',
+                description:
+                  'You can enable or disable permissions anytime from settings',
               },
             ].map((benefit, idx) => (
               <View key={idx} style={styles.benefitCard}>

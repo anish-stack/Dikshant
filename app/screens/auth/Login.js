@@ -143,7 +143,6 @@ export default function Login({ navigation }) {
 
       const res = await login(
         phoneOrEmail,
-        "",
         password,
         deviceInfo?.device_id,
         tokenFcm,
@@ -174,7 +173,7 @@ export default function Login({ navigation }) {
         <View style={styles.logoContainer}>
           <View style={styles.logoBox}>
             <Text style={styles.logoText}>Dikshant IAS</Text>
-            <Text style={styles.logoSubtext}>Education Centre</Text>
+            {/* <Text style={styles.logoSubtext}>Education Centre</Text> */}
           </View>
         </View>
 
@@ -251,42 +250,47 @@ export default function Login({ navigation }) {
                       Enter your credentials to continue
                     </Text>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.inputLabel}>
-                        Email or Phone Number
-                      </Text>
-                      <View style={styles.inputWrapper}>
-                        <Feather
-                          name="user"
-                          size={20}
-                          color="#999"
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          style={[
-                            styles.textInput,
-                            styles.textInputWithIcon,
-                            identifierError ? styles.textInputError : null,
-                          ]}
-                          value={phoneOrEmail}
-                          onChangeText={(t) => {
-                            setPhoneOrEmail(t);
-                            setIdentifierError("");
-                          }}
-                          placeholder="Email or phone"
-                          placeholderTextColor="#999"
-                          keyboardType="email-address"
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          autoFocus
-                          returnKeyType="next"
-                          editable={!isLoading}
-                        />
-                      </View>
-                      {identifierError ? (
-                        <Text style={styles.errorText}>{identifierError}</Text>
-                      ) : null}
-                    </View>
+                <View style={styles.inputContainer}>
+  <Text style={styles.inputLabel}>Phone Number</Text>
+
+  <View style={styles.inputWrapper}>
+    <Feather
+      name="phone"
+      size={20}
+      color="#999"
+      style={styles.inputIcon}
+    />
+
+    <TextInput
+      style={[
+        styles.textInput,
+        styles.textInputWithIcon,
+        identifierError && styles.textInputError,
+      ]}
+      value={phoneOrEmail}
+      onChangeText={(t) => {
+        // allow only numbers
+        const cleaned = t.replace(/[^0-9]/g, "");
+        setPhoneOrEmail(cleaned);
+        setIdentifierError("");
+      }}
+      placeholder="Enter phone number"
+      placeholderTextColor="#999"
+      keyboardType="phone-pad"
+      maxLength={10}
+      autoCapitalize="none"
+      autoCorrect={false}
+      autoFocus
+      returnKeyType="next"
+      editable={!isLoading}
+    />
+  </View>
+
+  {identifierError ? (
+    <Text style={styles.errorText}>{identifierError}</Text>
+  ) : null}
+</View>
+
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Password</Text>

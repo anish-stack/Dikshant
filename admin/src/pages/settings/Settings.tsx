@@ -41,8 +41,8 @@ interface Message {
   text: string;
 }
 
-const API_GET_URL = 'https://www.dikapi.olyox.in/api/appsettings';
-const API_SAVE_URL = 'https://www.dikapi.olyox.in/api/appsettings';
+const API_GET_URL = 'https://www.app.api.dikshantias.com/api/appsettings';
+const API_SAVE_URL = 'https://www.app.api.dikshantias.com/api/appsettings';
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
