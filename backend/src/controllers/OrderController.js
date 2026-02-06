@@ -846,7 +846,7 @@ class OrderController {
       if (type === "batch") {
         const batch = await Batch.findByPk(itemId, { transaction: t });
         if (batch) {
-          await this.grantBatchChildAccess({
+          await OrderController.grantBatchChildAccess({
             userId,
             batch,
             parentOrderId: newOrder.id,

@@ -32,7 +32,7 @@
       "package": "in.kaksya.dikshant",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/small.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./google-services.json",
@@ -62,7 +62,7 @@
       ],
       "edgeToEdgeEnabled": true,
       "notification": {
-        "icon": "./assets/small.png",
+        "icon": "./assets/adaptive-icon.png",
         "color": "#FB2B37",
         "priority": "max",
         "channels": [
@@ -123,7 +123,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/small.png",
+          "icon": "./assets/adaptive-icon.png",
           "color": "#FB2B37"
         }
       ],

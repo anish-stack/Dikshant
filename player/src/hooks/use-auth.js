@@ -8,7 +8,7 @@ const useAuth = (token) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  // console.log(token)
+  console.log(token)
   const refetch = useCallback(async () => {
     if (!token) {
       setLoading(false)
