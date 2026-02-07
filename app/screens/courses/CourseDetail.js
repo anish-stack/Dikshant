@@ -112,6 +112,8 @@ const formatDate = (dateString) => {
 
 // Helper function to extract YouTube video ID
 const getYouTubeVideoId = (url) => {
+    console.log("object url",url);
+
   if (!url || typeof url !== "string") return null;
   const regex =
     /(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/;
@@ -121,6 +123,7 @@ const getYouTubeVideoId = (url) => {
 
 // Helper function to get YouTube thumbnail
 const getYouTubeThumbnail = (url) => {
+  console.log("object url",url);
   const videoId = getYouTubeVideoId(url);
   return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
 };
@@ -300,6 +303,7 @@ export default function CourseDetail() {
   };
 
   const handleVideoPress = (video) => {
+    console.log(video)
     triggerHaptic();
     setCurrentVideo(video);
     setShowVideoModal(true);
@@ -767,7 +771,7 @@ export default function CourseDetail() {
                 <YoutubePlayer
                   height={width * 0.5625}
                   width={width}
-                  videoId={getYouTubeVideoId(currentVideo.url)}
+                  videoId={getYouTubeVideoId(currentVideo)}
                   play={playing}
                   onChangeState={onStateChange}
                   webViewStyle={styles.youtubePlayer}

@@ -152,7 +152,6 @@ static async FindByBathId(req, res) {
     const isAdmin = req.query.admin === "true";
     const { id } = req.params;
 
-    // Fetch all videos for the batch
     let items = await VideoCourse.findAll({
       where: { batchId: id },
       order: [["createdAt", "ASC"]],
@@ -165,28 +164,64 @@ static async FindByBathId(req, res) {
       });
     }
 
-
-    // Process each video: ensure stable secureToken exists
     const response = await Promise.all(
       items.map(async (video) => {
-        let secureToken = video.secureToken; // DB se pehle check
 
-        // Agar token nahi hai → generate + save
+        // ✅ DEMO VIDEO: direct url (no token)
+        if (video.isDemo === true) {
+          return {
+            id: video.id,
+            title: video.title,
+            imageUrl: video.imageUrl,
+            videoSource: video.videoSource,
+
+            batchId: video.batchId,
+            subjectId: video.subjectId,
+
+            isDownloadable: video.isDownloadable,
+            isDemo: video.isDemo,
+            status: video.status,
+
+            isLive: video.isLive,
+            isLiveEnded: video.isLiveEnded,
+            LiveEndAt: video.LiveEndAt,
+            DateOfLive: video.DateOfLive,
+            TimeOfLIve: video.TimeOfLIve,
+
+            dateOfClass: video.dateOfClass,
+            TimeOfClass: video.TimeOfClass,
+
+            createdAt: video.createdAt,
+
+            // ✅ direct url for demo (even non-admin)
+            url: video.url,
+
+            // demo video has no secureToken
+            secureToken: null,
+          };
+        }
+
+        // ================================
+        // 🔒 NON-DEMO VIDEO: token required
+        // ================================
+        let secureToken = video.secureToken;
+
         if (!secureToken) {
           secureToken = encryptVideoPayload({
             videoId: video.id,
             batchId: video.batchId,
             videoSource: video.videoSource,
-            exp: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year stable
+            exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
           });
 
-          // Save to DB for future calls
           try {
             await video.update({ secureToken });
             console.log(`Generated & saved secureToken for video ID: ${video.id}`);
           } catch (updateErr) {
-            console.error(`Failed to save secureToken for video ${video.id}:`, updateErr);
-            // Continue anyway – token abhi bhi valid hai
+            console.error(
+              `Failed to save secureToken for video ${video.id}:`,
+              updateErr
+            );
           }
         }
 
@@ -214,10 +249,10 @@ static async FindByBathId(req, res) {
 
           createdAt: video.createdAt,
 
-          // Guaranteed stable token
+          // 🔒 guaranteed stable token
           secureToken,
 
-          // Admin gets raw URL
+          // ✅ Admin gets raw URL
           ...(isAdmin ? { url: video.url } : {}),
         };
       })
