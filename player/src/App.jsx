@@ -323,7 +323,7 @@ function LMSContent() {
         </div>
       )}
 
-      {scrolled && (
+      {/* {scrolled && (
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="lg:hidden fixed top-4 left-4 z-50 p-3 bg-white rounded-xl shadow-2xl border"
@@ -334,9 +334,9 @@ function LMSContent() {
 
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
+      )} */}
 
-      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
+      {/* <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
         <Sidebar
           videos={videos}
           currentVideo={currentVideo}
@@ -344,7 +344,7 @@ function LMSContent() {
           onVideoClick={handleVideoClick}
           onClose={() => setSidebarOpen(false)}
         />
-      </aside>
+      </aside> */}
 
       {/* Main content area - NO SCROLL */}
       <main className="flex-1 flex flex-col h-screen bg-slate-50 overflow-hidden">
