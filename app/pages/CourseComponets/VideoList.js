@@ -489,8 +489,9 @@ export default function VideoList({
       <View style={styles.headerContainer}>
         <Text style={styles.mainTitle}>📚 All Lectures</Text>
 
-        <TouchableOpacity onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId,subjectId })}>
-          <Text style={styles.viewAllText}>View All </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('my-course-subjects',
+          { courseId: courseId, unlocked: true })}>
+          <Text style={styles.viewAllText}>All Content </Text>
         </TouchableOpacity>
       </View>
 

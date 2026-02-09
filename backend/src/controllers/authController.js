@@ -1024,45 +1024,168 @@ exports.updateFcmToken = async (req, res) => {
 };
 
 
-exports.updatePassword = async (req, res) => {
+exports.sendForgotPasswordOtp = async (req, res) => {
   try {
-    const { mobile, newPassword } = req.body;
+    const { mobile } = req.body;
 
-    if (!mobile || !newPassword) {
+    if (!mobile) {
       return res.status(400).json({
-        error: "Mobile number and new password are required",
+        error: "Mobile number is required",
+      });
+    }
+
+    const user = await User.findOne({ where: { mobile } });
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User with this mobile not found",
+      });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({
+        error: "User email not found",
+      });
+    }
+
+    // ✅ Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // ✅ Expire in 5 minutes
+    const expireTime = new Date(Date.now() + 5 * 60 * 1000);
+
+    // ✅ Save OTP in DB
+    await user.update({
+      forgetPasswordOtp: otp,
+      timeOfExipreOtp: expireTime,
+      tempPassword: null,
+    });
+
+    // ✅ Send Email
+    const html = otpEmailTemplate("Your OTP Password Reset Code", otp, user);
+
+    await sendEmail(html, {
+      receiver_email: user.email,
+      subject: "Your Dikshant IAS OTP Verification Code",
+    });
+
+    return res.json({
+      success: true,
+      message: "OTP sent successfully to registered email",
+    });
+  } catch (err) {
+    console.error("Send Forgot Password OTP Error:", err);
+    return res.status(500).json({
+      error: "Unable to send OTP. Please try again",
+    });
+  }
+};
+
+exports.verifyForgotPasswordOtpAndUpdatePassword = async (req, res) => {
+  try {
+    const { mobile, otp, newPassword } = req.body;
+
+    // ✅ BEFORE LOG
+    console.log("[verifyForgotPasswordOtpAndUpdatePassword] REQUEST:", {
+      mobile,
+      otpEntered: otp ? "YES" : "NO",
+      passwordLength: newPassword?.length || 0,
+    });
+
+    if (!mobile || !otp || !newPassword) {
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] MISSING_FIELDS");
+
+      return res.status(400).json({
+        error: "Mobile, OTP and new password are required",
       });
     }
 
     if (newPassword.length < 6) {
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] WEAK_PASSWORD:", {
+        mobile,
+        passwordLength: newPassword.length,
+      });
+
       return res.status(400).json({
         error: "New password must be at least 6 characters long",
       });
     }
 
-    // Find user by mobile
     const user = await User.findOne({ where: { mobile } });
 
     if (!user) {
-      return res.status(404).json({ error: "User with this mobile not found" });
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] USER_NOT_FOUND:", {
+        mobile,
+      });
+
+      return res.status(404).json({
+        error: "User with this mobile not found",
+      });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-    await user.save();
+    // ✅ OTP exists check
+    if (!user.forgetPasswordOtp || !user.timeOfExipreOtp) {
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] OTP_NOT_GENERATED:", {
+        mobile,
+      });
 
-    res.json({
-      status: "success",
+      return res.status(400).json({
+        error: "OTP not generated. Please request OTP again",
+      });
+    }
+
+    // ✅ OTP match check
+    if (String(user.forgetPasswordOtp) !== String(otp)) {
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] INVALID_OTP:", {
+        mobile,
+      });
+
+      return res.status(400).json({
+        error: "Invalid OTP",
+      });
+    }
+
+    // ✅ Expiry check
+    if (new Date(user.timeOfExipreOtp) < new Date()) {
+      console.log("[verifyForgotPasswordOtpAndUpdatePassword] OTP_EXPIRED:", {
+        mobile,
+        expireAt: user.timeOfExipreOtp,
+      });
+
+      return res.status(400).json({
+        error: "OTP expired. Please request again",
+      });
+    }
+
+    // ✅ Hash password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await user.update({
+      password: hashedPassword,
+      forgetPasswordOtp: null,
+      timeOfExipreOtp: null,
+    });
+
+    // ✅ AFTER LOG
+    console.log("[verifyForgotPasswordOtpAndUpdatePassword] SUCCESS:", {
+      mobile,
+      userId: user.id,
+      message: "Password updated",
+    });
+
+    return res.json({
+      success: true,
       message: "Password updated successfully",
     });
   } catch (err) {
-    console.error("Update Password Error:", err);
-    res.status(500).json({
+    console.error("[verifyForgotPasswordOtpAndUpdatePassword] ERROR:", err);
+
+    return res.status(500).json({
       error: "Unable to update password. Please try again",
     });
   }
 };
+
 
 
 exports.toggleUserActive = async (req, res) => {

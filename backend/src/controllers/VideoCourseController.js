@@ -12,96 +12,96 @@ class VideoCourseController {
   /* ======================
       CREATE
   ====================== */
-static async create(req, res) {
-  try {
-    const requiredFields = [
-      "title",
-      "videoSource",
-      "url",
-      "batchId",
-      "subjectId",
-    ];
+  static async create(req, res) {
+    try {
+      const requiredFields = [
+        "title",
+        "videoSource",
+        "url",
+        "batchId",
+        "subjectId",
+      ];
 
-    for (const field of requiredFields) {
-      if (!req.body[field]) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} is required`,
-        });
+      for (const field of requiredFields) {
+        if (!req.body[field]) {
+          return res.status(400).json({
+            success: false,
+            message: `${field} is required`,
+          });
+        }
       }
-    }
 
-    const isLive = req.body.isLive === true || req.body.isLive === "true";
+      const isLive = req.body.isLive === true || req.body.isLive === "true";
 
-    if (isLive) {
-      if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
-        return res.status(400).json({
-          success: false,
-          message: "DateOfLive and TimeOfLIve are required when the video is live",
-        });
+      if (isLive) {
+        if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
+          return res.status(400).json({
+            success: false,
+            message: "DateOfLive and TimeOfLIve are required when the video is live",
+          });
+        }
       }
+
+      let imageUrl = null;
+      if (req.file) {
+        imageUrl = await uploadToS3(req.file, "videocourses");
+      }
+
+      const payload = {
+        title: req.body.title.trim(),
+        videoSource: req.body.videoSource,
+        url: req.body.url.trim(),
+        batchId: Number(req.body.batchId),
+        subjectId: Number(req.body.subjectId),
+        isDownloadable: req.body.isDownloadable === true || req.body.isDownloadable === "true",
+        isDemo: req.body.isDemo === true || req.body.isDemo === "true",
+        isLive,
+        DateOfLive: isLive ? req.body.DateOfLive : null,
+        TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
+        dateOfClass: req.body.dateOfClass ?? null,
+        TimeOfClass: req.body.TimeOfClass ?? null,
+        status: "active",
+        imageUrl,
+      };
+
+      // CREATE VIDEO FIRST → video.id milega
+      const item = await VideoCourse.create(payload);
+
+      // GENERATE STABLE SECURE TOKEN USING DETERMINISTIC ENCRYPTION
+
+      const secureToken = encryptVideoPayload({
+        videoId: item.id,
+        batchId: item.batchId,
+        videoSource: item.videoSource,
+        // Long expiry (1 year) – since token is stable, no need for short expiry
+        exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      });
+
+      // UPDATE VIDEO WITH STABLE TOKEN (Optional but Recommended)
+      await item.update({ secureToken });
+
+      // CLEAR CACHE
+      const redis = require("../config/redis"); // adjust path
+      await redis.del("videocourses");
+      await redis.del(`videocourses:batch:${payload.batchId}`);
+
+      // RETURN WITH TOKEN
+      return res.status(201).json({
+        success: true,
+        message: "Video course created successfully",
+        data: {
+          ...item.toJSON(),
+          secureToken, // frontend ko bhi dikhao
+        },
+      });
+    } catch (error) {
+      console.error("VideoCourse Create Error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
+      });
     }
-
-    let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadToS3(req.file, "videocourses");
-    }
-
-    const payload = {
-      title: req.body.title.trim(),
-      videoSource: req.body.videoSource,
-      url: req.body.url.trim(),
-      batchId: Number(req.body.batchId),
-      subjectId: Number(req.body.subjectId),
-      isDownloadable: req.body.isDownloadable === true || req.body.isDownloadable === "true",
-      isDemo: req.body.isDemo === true || req.body.isDemo === "true",
-      isLive,
-      DateOfLive: isLive ? req.body.DateOfLive : null,
-      TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
-      dateOfClass: req.body.dateOfClass ?? null,
-      TimeOfClass: req.body.TimeOfClass ?? null,
-      status: "active",
-      imageUrl,
-    };
-
-    // CREATE VIDEO FIRST → video.id milega
-    const item = await VideoCourse.create(payload);
-
-    // GENERATE STABLE SECURE TOKEN USING DETERMINISTIC ENCRYPTION
-
-    const secureToken = encryptVideoPayload({
-      videoId: item.id,
-      batchId: item.batchId,
-      videoSource: item.videoSource,
-      // Long expiry (1 year) – since token is stable, no need for short expiry
-      exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-    });
-
-    // UPDATE VIDEO WITH STABLE TOKEN (Optional but Recommended)
-    await item.update({ secureToken });
-
-    // CLEAR CACHE
-    const redis = require("../config/redis"); // adjust path
-    await redis.del("videocourses");
-    await redis.del(`videocourses:batch:${payload.batchId}`);
-
-    // RETURN WITH TOKEN
-    return res.status(201).json({
-      success: true,
-      message: "Video course created successfully",
-      data: {
-        ...item.toJSON(),
-        secureToken, // frontend ko bhi dikhao
-      },
-    });
-  } catch (error) {
-    console.error("VideoCourse Create Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
   }
-}
   /* ======================
       GET ALL
   ====================== */
@@ -147,28 +147,84 @@ static async create(req, res) {
     }
   }
 
-static async FindByBathId(req, res) {
-  try {
-    const isAdmin = req.query.admin === "true";
-    const { id } = req.params;
+  static async FindByBathId(req, res) {
+    try {
+      const isAdmin = req.query.admin === "true";
+      const { id } = req.params;
 
-    let items = await VideoCourse.findAll({
-      where: { batchId: id },
-      order: [["createdAt", "ASC"]],
-    });
-
-    if (items.length === 0) {
-      return res.json({
-        success: true,
-        data: [],
+      let items = await VideoCourse.findAll({
+        where: { batchId: id },
+        order: [["createdAt", "ASC"]],
       });
-    }
 
-    const response = await Promise.all(
-      items.map(async (video) => {
+      if (items.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+        });
+      }
 
-        // ✅ DEMO VIDEO: direct url (no token)
-        if (video.isDemo === true) {
+      const response = await Promise.all(
+        items.map(async (video) => {
+
+          // // ✅ DEMO VIDEO: direct url (no token)
+          // if (video.isDemo === true) {
+          //   return {
+          //     id: video.id,
+          //     title: video.title,
+          //     imageUrl: video.imageUrl,
+          //     videoSource: video.videoSource,
+
+          //     batchId: video.batchId,
+          //     subjectId: video.subjectId,
+
+          //     isDownloadable: video.isDownloadable,
+          //     isDemo: video.isDemo,
+          //     status: video.status,
+
+          //     isLive: video.isLive,
+          //     isLiveEnded: video.isLiveEnded,
+          //     LiveEndAt: video.LiveEndAt,
+          //     DateOfLive: video.DateOfLive,
+          //     TimeOfLIve: video.TimeOfLIve,
+
+          //     dateOfClass: video.dateOfClass,
+          //     TimeOfClass: video.TimeOfClass,
+
+          //     createdAt: video.createdAt,
+
+          //     // ✅ direct url for demo (even non-admin)
+          //     url: video.url,
+
+          //     // demo video has no secureToken
+          //     secureToken: null,
+          //   };
+          // }
+
+          // ================================
+          // 🔒 NON-DEMO VIDEO: token required
+          // ================================
+          let secureToken = video.secureToken;
+
+          if (!secureToken) {
+            secureToken = encryptVideoPayload({
+              videoId: video.id,
+              batchId: video.batchId,
+              videoSource: video.videoSource,
+              exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+            });
+
+            try {
+              await video.update({ secureToken });
+              console.log(`Generated & saved secureToken for video ID: ${video.id}`);
+            } catch (updateErr) {
+              console.error(
+                `Failed to save secureToken for video ${video.id}:`,
+                updateErr
+              );
+            }
+          }
+
           return {
             id: video.id,
             title: video.title,
@@ -193,85 +249,29 @@ static async FindByBathId(req, res) {
 
             createdAt: video.createdAt,
 
-            // ✅ direct url for demo (even non-admin)
-            url: video.url,
+            // 🔒 guaranteed stable token
+            secureToken,
 
-            // demo video has no secureToken
-            secureToken: null,
+            // ✅ Admin gets raw URL
+            ...(isAdmin ? { url: video.url } : {}),
           };
-        }
+        })
+      );
 
-        // ================================
-        // 🔒 NON-DEMO VIDEO: token required
-        // ================================
-        let secureToken = video.secureToken;
-
-        if (!secureToken) {
-          secureToken = encryptVideoPayload({
-            videoId: video.id,
-            batchId: video.batchId,
-            videoSource: video.videoSource,
-            exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-          });
-
-          try {
-            await video.update({ secureToken });
-            console.log(`Generated & saved secureToken for video ID: ${video.id}`);
-          } catch (updateErr) {
-            console.error(
-              `Failed to save secureToken for video ${video.id}:`,
-              updateErr
-            );
-          }
-        }
-
-        return {
-          id: video.id,
-          title: video.title,
-          imageUrl: video.imageUrl,
-          videoSource: video.videoSource,
-
-          batchId: video.batchId,
-          subjectId: video.subjectId,
-
-          isDownloadable: video.isDownloadable,
-          isDemo: video.isDemo,
-          status: video.status,
-
-          isLive: video.isLive,
-          isLiveEnded: video.isLiveEnded,
-          LiveEndAt: video.LiveEndAt,
-          DateOfLive: video.DateOfLive,
-          TimeOfLIve: video.TimeOfLIve,
-
-          dateOfClass: video.dateOfClass,
-          TimeOfClass: video.TimeOfClass,
-
-          createdAt: video.createdAt,
-
-          // 🔒 guaranteed stable token
-          secureToken,
-
-          // ✅ Admin gets raw URL
-          ...(isAdmin ? { url: video.url } : {}),
-        };
-      })
-    );
-
-    return res.json({
-      success: true,
-      data: response,
-    });
-  } catch (error) {
-    console.error("FindByBathId error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+      return res.json({
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      console.error("FindByBathId error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
+      });
+    }
   }
-}
 
-static async decryptAndPassVideo(req, res) {
+  static async decryptAndPassVideo(req, res) {
     try {
       const { token } = req.body;
       const userId = req.params.userId;
@@ -302,7 +302,7 @@ static async decryptAndPassVideo(req, res) {
         return res.status(404).json({ message: "Video not found" });
       }
 
-   
+
       const hasAccess = await Order.findOne({
         where: {
           userId,
@@ -364,13 +364,26 @@ static async decryptAndPassVideo(req, res) {
       const toBool = (val) =>
         val === true || val === "true" || val === 1 || val === "1";
 
+      const normalizeDate = (val) => {
+        if (!val) return null;
+        if (val === "0000-00-00") return null;
+        return val;
+      };
+
+      const normalizeTime = (val) => {
+        if (!val) return null;
+        if (val === "00:00:00") return null;
+        return val;
+      };
+
       // ============================
-      // SAFE FIELD RESOLUTION
+      // SAFE FIELD RESOLUTION (IMPORTANT)
       // ============================
+      const isDemo =
+        req.body.isDemo !== undefined ? toBool(req.body.isDemo) : item.isDemo;
+
       const isLive =
-        req.body.isLive !== undefined
-          ? toBool(req.body.isLive)
-          : item.isLive;
+        req.body.isLive !== undefined ? toBool(req.body.isLive) : item.isLive;
 
       const isLiveEnded =
         req.body.isLiveEnded !== undefined
@@ -378,13 +391,19 @@ static async decryptAndPassVideo(req, res) {
           : item.isLiveEnded;
 
       // ============================
+      // RULES
+      // ============================
+      const shouldClearDates = isDemo === true || isLive === false;
+
+      // ============================
       // VALIDATION
       // ============================
+      // Live video AND NOT demo => date/time required
       if (
-        req.body.isLive !== undefined &&
         isLive === true &&
-        (!req.body.DateOfLive && !item.DateOfLive ||
-          !req.body.TimeOfLIve && !item.TimeOfLIve)
+        isDemo === false &&
+        ((!req.body.DateOfLive && !item.DateOfLive) ||
+          (!req.body.TimeOfLIve && !item.TimeOfLIve))
       ) {
         return res.status(400).json({
           success: false,
@@ -427,31 +446,43 @@ static async decryptAndPassVideo(req, res) {
             ? toBool(req.body.isDownloadable)
             : item.isDownloadable,
 
-        isDemo:
-          req.body.isDemo !== undefined
-            ? toBool(req.body.isDemo)
-            : item.isDemo,
-
+        isDemo,
         isLive,
         isLiveEnded,
 
-        // ✅ Clear date/time ONLY when isLive explicitly false
-        DateOfLive:
-          req.body.isLive === false || req.body.isLive === "false"
-            ? null
-            : req.body.DateOfLive ?? item.DateOfLive,
+        // ============================
+        // LIVE DATE/TIME (only for live + not demo)
+        // ============================
+        DateOfLive: shouldClearDates
+          ? null
+          : req.body.DateOfLive !== undefined
+            ? normalizeDate(req.body.DateOfLive)
+            : item.DateOfLive,
 
-        TimeOfLIve:
-          req.body.isLive === false || req.body.isLive === "false"
-            ? null
-            : req.body.TimeOfLIve ?? item.TimeOfLIve,
+        TimeOfLIve: shouldClearDates
+          ? null
+          : req.body.TimeOfLIve !== undefined
+            ? normalizeTime(req.body.TimeOfLIve)
+            : item.TimeOfLIve,
 
-        dateOfClass:
-          req.body.dateOfClass ?? item.dateOfClass,
+        // ============================
+        // CLASS DATE/TIME (optional)
+        // ============================
+        dateOfClass: shouldClearDates
+          ? null
+          : req.body.dateOfClass !== undefined
+            ? normalizeDate(req.body.dateOfClass)
+            : item.dateOfClass,
 
-        TimeOfClass: req.body.TimeOfClass ?? item.TimeOfClass,
+        TimeOfClass: shouldClearDates
+          ? null
+          : req.body.TimeOfClass !== undefined
+            ? normalizeTime(req.body.TimeOfClass)
+            : item.TimeOfClass,
 
-        // ✅ Set LiveEndAt ONLY when live ends
+        // ============================
+        // Live End At
+        // ============================
         LiveEndAt:
           req.body.isLiveEnded === true || req.body.isLiveEnded === "true"
             ? new Date()
@@ -489,6 +520,7 @@ static async decryptAndPassVideo(req, res) {
       return res.status(500).json({
         success: false,
         message: "Update failed",
+        error: error.message,
       });
     }
   }

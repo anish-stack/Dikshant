@@ -50,7 +50,7 @@ export default function SmartVideoPlayer({
       batchId: video?.bacthId ?? "",
       userId: String(userId),
       courseId: String(courseId),
-      token, // ⚠️ consider short-lived token in prod
+      token, 
     }).toString();
 
     const url = `https://www.player.dikshantias.com/?${params}`;

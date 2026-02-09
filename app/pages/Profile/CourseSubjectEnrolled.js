@@ -14,12 +14,13 @@ import useSWR from 'swr';
 import { fetcher } from '../../constant/fetcher';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Layout from '../../components/layout';
+import { useAuthStore } from '../../stores/auth.store';
 
 const { width } = Dimensions.get('window');
 
 export default function CourseSubjectEnrolled({ route, navigation }) {
     const { unlocked, courseId } = route.params || {};
-
+    const { token, userId } = useAuthStore()
     const { data: batchData, isLoading: batchLoading } = useSWR(
         courseId ? `/batchs/${courseId}` : null,
         fetcher,
@@ -58,10 +59,10 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
     });
 
     const handleSubjectPress = (subjectId) => {
-        navigation.navigate('my-course', {
-            unlocked: true,
-            courseId,
-            subjectId,           // ← added
+        navigation.navigate('view-all-videos', {
+
+            id: courseId, token, userId,
+            subjectId,
         });
     };
 
@@ -113,14 +114,7 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
                                 styles.showAllButton,
 
                             ]}
-                            onPress={() => {
-                                // Navigate to full course view (without subjectId)
-                                navigation.navigate('my-course', {
-                                    unlocked: true,
-                                    courseId,
-                                    // do NOT pass subjectId → shows all videos
-                                });
-                            }}
+                            onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId })}
                         >
                             <Text
                                 style={[

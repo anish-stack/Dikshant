@@ -112,20 +112,49 @@ const formatDate = (dateString) => {
 
 // Helper function to extract YouTube video ID
 const getYouTubeVideoId = (url) => {
-    console.log("object url",url);
-
+  console.log("Url", url)
   if (!url || typeof url !== "string") return null;
-  const regex =
-    /(?:youtube\.com\/(?:embed\/|watch\?v=)|youtu\.be\/|youtube\.com\/shorts\/)([^&\n?#]+)/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
+
+  // Remove any leading/trailing whitespace
+  url = url.trim();
+
+  // Handle common patterns
+  const patterns = [
+    // Standard watch
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    // Embed
+    /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+    // Shorts
+    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+    // Live streams (most important addition)
+    /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
+    /youtu\.be\/live\/([a-zA-Z0-9_-]{11})/,           // rare but possible
+    // Very permissive fallback — catches ID anywhere after certain markers
+    /(?:v=|\/)([a-zA-Z0-9_-]{11})(?:[?&/#]|$)/,
+  ];
+
+  for (const regex of patterns) {
+    const match = url.match(regex);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  // Final desperate attempt — just look for 11-char ID
+  const idMatch = url.match(/([a-zA-Z0-9_-]{11})/);
+  return idMatch ? idMatch[1] : null;
 };
 
 // Helper function to get YouTube thumbnail
 const getYouTubeThumbnail = (url) => {
-  console.log("object url",url);
   const videoId = getYouTubeVideoId(url);
-  return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
+  if (!videoId) return null;
+
+  // Try best → good → fallback
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  // Alternatives if maxres fails:
+  // `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+  // `https://img.youtube.com/vi/${videoId}/sddefault.jpg`
 };
 
 export default function CourseDetail() {
@@ -136,7 +165,7 @@ export default function CourseDetail() {
   const [webHeight, setWebHeight] = useState(0);
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
   const TAB_BAR_HEIGHT = isGestureNavigation ? 72 : 56;
-  const { token } = useAuthStore()
+  const { token ,userId } = useAuthStore()
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -144,7 +173,6 @@ export default function CourseDetail() {
   const [playing, setPlaying] = useState(false);
   const [isCourseAlreadyPurchased, setIsCourseAlreadyPurchased] = useState(false)
   const [AlreadyPurchased, setAlreadyPurchased] = useState(null)
-
   // Fetch batch details
   const {
     data: batchData,
@@ -276,10 +304,10 @@ export default function CourseDetail() {
     //   setShowPaymentModal(true);
     //   triggerHaptic();
     // } else {
-      navigation.navigate("enroll-course", {
-        batchId: batchData?.id,
-        userId: 456,
-      });
+    navigation.navigate("enroll-course", {
+      batchId: batchData?.id,
+      userId: 456,
+    });
     // }
   };
 
@@ -303,10 +331,20 @@ export default function CourseDetail() {
   };
 
   const handleVideoPress = (video) => {
+
+    //  video, batchId, userId, token, courseId
+    navigation.navigate("PlayerScreen", {
+      video: video?.secureToken,
+      batchId: video?.batchId ?? "",
+      userId: String(userId),
+      token,
+      courseId: String(batchId),
+    })
+
     triggerHaptic();
-    setCurrentVideo(video);
-    setShowVideoModal(true);
-    setPlaying(true);
+    // setCurrentVideo(video);
+    // setShowVideoModal(true);
+    // setPlaying(true);
   };
 
   const handleCloseVideo = () => {
@@ -764,19 +802,84 @@ export default function CourseDetail() {
                 <Feather name="x" size={22} color={colors.white} />
               </TouchableOpacity>
             </View>
-
             <View style={styles.videoPlayerWrapper}>
               {currentVideo?.url && (
-                <YoutubePlayer
-                  height={width * 0.5625}
-                  width={width}
-                  videoId={getYouTubeVideoId(currentVideo.url)}
-                  play={playing}
-                  onChangeState={onStateChange}
-                  webViewStyle={styles.youtubePlayer}
-                />
+                <View style={{ position: "relative" }}>
+                  <YoutubePlayer
+                    height={width * 0.5625}
+                    width={width}
+                    videoId={getYouTubeVideoId(currentVideo.url)}
+                    play={playing}
+                    onChangeState={onStateChange}
+                    initialPlayerParams={{
+                      controls: 0,
+                      fs: 0,
+                      rel: 0,
+                      iv_load_policy: 3,
+                      modestBranding: 1,
+                    }}
+                  />
+
+                  {/* White overlay (only visual) */}
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: "white",
+                      opacity: 0.12,
+                    }}
+                  />
+
+                  {/* Custom Play/Pause Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setPlaying((prev) => !prev)}
+                    style={{
+                      position: "absolute",
+                      top: "50%",
+                      left: "50%",
+                      transform: [{ translateX: -30 }, { translateY: -30 }],
+                      width: 60,
+                      height: 60,
+                      borderRadius: 30,
+                      backgroundColor: "rgba(0,0,0,0.55)",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      zIndex: 999,
+                    }}
+                  >
+                    <Feather
+                      name={playing ? "pause" : "play"}
+                      size={28}
+                      color="#fff"
+                      style={{ marginLeft: playing ? 0 : 3 }}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Touch blocker (blocks everything else) */}
+                  <Pressable
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: "transparent",
+                      zIndex: 10,
+                    }}
+                    onPress={() => { }}
+                    onLongPress={() => { }}
+                    delayLongPress={999999}
+                  />
+                </View>
               )}
             </View>
+
+
 
             <View style={styles.videoModalFooter}>
               <Feather name="info" size={16} color={colors.textLight} />

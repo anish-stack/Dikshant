@@ -16,7 +16,15 @@ module.exports = (sequelize, DataTypes) => {
       is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
       state: DataTypes.STRING,
       fcm_token: DataTypes.STRING,
+
+      forgetPasswordOtp: DataTypes.STRING,
+timeOfExipreOtp: DataTypes.DATE,
+
+      tempPassword: DataTypes.STRING,
+
+
       fcm_update_at: DataTypes.DATE,
+
       device_id: DataTypes.STRING,
       platform: DataTypes.STRING,
       appVersion: { type: DataTypes.STRING, field: 'app_version' },

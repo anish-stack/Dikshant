@@ -258,8 +258,8 @@ export default function ViewAllVideos({ route, navigation }) {
               {searchQuery.trim()
                 ? 'Try a different search'
                 : isSubjectMode
-                ? 'No videos available for this subject yet'
-                : 'New classes will appear here soon'}
+                  ? 'No videos available for this subject yet'
+                  : 'New classes will appear here soon'}
             </Text>
           </View>
         )}
@@ -316,7 +316,7 @@ export default function ViewAllVideos({ route, navigation }) {
                     <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
                   </View>
 
-                  {item?.dateOfClass && (
+                  {/* {item?.dateOfClass && (
                     <View style={styles.dateTimeRow}>
                       <Ionicons name="calendar-outline" size={14} color="#6b7280" />
                       <Text style={styles.dateText}>
@@ -335,7 +335,7 @@ export default function ViewAllVideos({ route, navigation }) {
                         </>
                       )}
                     </View>
-                  )}
+                  )} */}
                 </View>
 
                 {/* Actions */}
@@ -375,37 +375,37 @@ export default function ViewAllVideos({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f9fafb',
-    },
-    centerContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 32,
-    },
-    loadingText: {
-        marginTop: 16,
-        color: '#6b7280',
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    errorTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1f2937',
-        marginTop: 16,
-        textAlign: 'center',
-    },
-    errorSubtitle: {
-        fontSize: 14,
-        color: '#6b7280',
-        marginTop: 8,
-        textAlign: 'center',
-    },
-header: {
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6b7280',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1f2937',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -439,242 +439,242 @@ header: {
     fontSize: 15,
     color: '#1f2937',
   },
-    // Search Section
-    searchSection: {
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f3f4f6',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 48,
-        gap: 10,
-    },
-    searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: '#1f2937',
-        fontWeight: '500',
-    },
+  // Search Section
+  searchSection: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
 
-    // Filter Section
-    filterSection: {
-        flexDirection: 'row',
-        backgroundColor: '#ffffff',
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e5e7eb',
-        gap: 8,
-    },
-    filterTab: {
-        flex: 1,
-        paddingVertical: 7,
-        paddingHorizontal: 2,
-        borderRadius: 10,
-        backgroundColor: '#f3f4f6',
-        alignItems: 'center',
-    },
-    filterTabActive: {
-        backgroundColor: '#3b82f6',
-    },
-    filterText: {
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#6b7280',
-    },
-    filterTextActive: {
-        color: '#ffffff',
-    },
+  // Filter Section
+  filterSection: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    gap: 8,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 2,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+  },
+  filterTabActive: {
+    backgroundColor: '#3b82f6',
+  },
+  filterText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  filterTextActive: {
+    color: '#ffffff',
+  },
 
-    // Video List
-    listContent: {
-        padding: 12,
-        paddingBottom: 24,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 80,
-        paddingHorizontal: 32,
-    },
-    emptyTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#374151',
-        marginTop: 16,
-    },
-    emptySubtitle: {
-        fontSize: 14,
-        color: '#6b7280',
-        marginTop: 8,
-        textAlign: 'center',
-    },
+  // Video List
+  listContent: {
+    padding: 12,
+    paddingBottom: 24,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
 
-    // Video Card
-    videoCard: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        marginBottom: 12,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    liveCard: {
-        borderColor: '#dc2626',
-        borderWidth: 2,
-        shadowColor: '#dc2626',
-        shadowOpacity: 0.15,
-    },
-    upcomingCard: {
-        opacity: 0.7,
-    },
-    liveTopBar: {
-        backgroundColor: '#dc2626',
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    livePulse: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#ffffff',
-        // Animation would be added with Animated API in production
-    },
-    liveTopText: {
-        color: '#ffffff',
-        fontSize: 12,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-    },
-    cardContent: {
-        flexDirection: 'row',
-        padding: 12,
-        gap: 12,
-    },
+  // Video Card
+  videoCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  liveCard: {
+    borderColor: '#dc2626',
+    borderWidth: 2,
+    shadowColor: '#dc2626',
+    shadowOpacity: 0.15,
+  },
+  upcomingCard: {
+    opacity: 0.7,
+  },
+  liveTopBar: {
+    backgroundColor: '#dc2626',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  livePulse: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    // Animation would be added with Animated API in production
+  },
+  liveTopText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  cardContent: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+  },
 
-    // Thumbnail
-    thumbnailContainer: {
-        position: 'relative',
-    },
-    thumbnail: {
-        width: 100,
-        height: 100,
-        borderRadius: 12,
-        backgroundColor: '#3b82f6',
-    },
-    placeholderThumb: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#3b82f6',
-    },
-    durationBadge: {
-        position: 'absolute',
-        bottom: 6,
-        right: 6,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    durationText: {
-        color: '#ffffff',
-        fontSize: 10,
-        fontWeight: '600',
-    },
+  // Thumbnail
+  thumbnailContainer: {
+    position: 'relative',
+  },
+  thumbnail: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#3b82f6',
+  },
+  placeholderThumb: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3b82f6',
+  },
+  durationBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  durationText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
 
-    // Info Section
-    infoSection: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
-    videoTitle: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#1f2937',
-        lineHeight: 21,
-        marginBottom: 8,
-    },
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 8,
-        gap: 5,
-        marginBottom: 8,
-    },
-    statusText: {
-        fontSize: 12,
-        fontWeight: '700',
-    },
-    dateTimeRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        flexWrap: 'wrap',
-    },
-    dateText: {
-        fontSize: 12,
-        color: '#6b7280',
-        fontWeight: '500',
-    },
-    dateDivider: {
-        fontSize: 12,
-        color: '#d1d5db',
-        marginHorizontal: 2,
-    },
+  // Info Section
+  infoSection: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  videoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+    lineHeight: 21,
+    // marginBottom: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 5,
+    marginBottom: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  dateDivider: {
+    fontSize: 12,
+    color: '#d1d5db',
+    marginHorizontal: 2,
+  },
 
-    // Actions Column
-    actionsColumn: {
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 4,
-    },
-    pdfButton: {
-        position: 'relative',
-        padding: 8,
-        borderRadius: 10,
-        backgroundColor: '#fef2f2',
-        borderWidth: 1,
-        borderColor: '#fecaca',
-    },
-    pdfCountBadge: {
-        position: 'absolute',
-        top: -4,
-        right: -4,
-        backgroundColor: '#dc2626',
-        borderRadius: 10,
-        minWidth: 18,
-        height: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#ffffff',
-    },
-    pdfCountText: {
-        color: '#ffffff',
-        fontSize: 10,
-        fontWeight: '700',
-    },
-    chevron: {
-        marginTop: 8,
-    },
+  // Actions Column
+  actionsColumn: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  pdfButton: {
+    position: 'relative',
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  pdfCountBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#dc2626',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  pdfCountText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  chevron: {
+    marginTop: 8,
+  },
 });

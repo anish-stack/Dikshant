@@ -69,9 +69,9 @@ export default function MyCourses() {
   });
 
   const redirectCourse = (id) => {
-  navigation.navigate("my-course-subjects", { unlocked: true, courseId: id });
+  // navigation.navigate("my-course-subjects", { unlocked: true, courseId: id });
 
-    // navigation.navigate("my-course", { unlocked: true, courseId: id });
+    navigation.navigate("my-course", { unlocked: true, courseId: id });
   };
 
   if (loading) {

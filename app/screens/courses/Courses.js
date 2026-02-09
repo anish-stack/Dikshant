@@ -113,7 +113,7 @@ const HorizontalSection = ({
 const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
   const imageUrl = batch.imageUrl;
   const startDate = batch.startDate ? new Date(batch.startDate) : null;
-  
+
   // Check if this course is purchased
   const purchaseData = purchasedCourses[batch.id];
   const isPurchased = !!purchaseData;
@@ -135,15 +135,12 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
 
   const handlePress = () => {
     if (isPurchased) {
-      // Navigate to my-course if already purchased
-        navigation.navigate("my-course-subjects", { unlocked: true, courseId: batch.id });
 
-      // navigation.navigate("my-course", {
-      //   unlocked: true,
-      //   courseId:batch.id,
-      // });
+      navigation.navigate("my-course", {
+        unlocked: true,
+        courseId: batch.id,
+      });
     } else {
-      // Navigate to course detail if not purchased
       navigation.navigate("CourseDetail", {
         courseId: batch.id,
         batchData: batch,
@@ -258,11 +255,11 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
   );
 };
 
-export default function Course({ refreshing}) {
+export default function Course({ refreshing }) {
   const navigation = useNavigation();
   const [purchasedCourses, setPurchasedCourses] = useState({});
   const [checkingPurchases, setCheckingPurchases] = useState(false);
-  const {token} = useAuthStore()
+  const { token } = useAuthStore()
   // Fetch courses from API
   const { data: coursesResponse, error, isLoading, mutate } = useSWR(
     "/batchs",
@@ -362,9 +359,9 @@ export default function Course({ refreshing}) {
         title="Live Courses"
         data={liveCourses}
         renderItem={({ item }) => (
-          <CourseCard 
-            item={item} 
-            navigation={navigation} 
+          <CourseCard
+            item={item}
+            navigation={navigation}
             token={token}
             purchasedCourses={purchasedCourses}
           />
@@ -381,9 +378,9 @@ export default function Course({ refreshing}) {
         title="Recorded Courses"
         data={recordedCourses}
         renderItem={({ item }) => (
-          <CourseCard 
-            item={item} 
-            navigation={navigation} 
+          <CourseCard
+            item={item}
+            navigation={navigation}
             token={token}
             purchasedCourses={purchasedCourses}
           />
@@ -400,9 +397,9 @@ export default function Course({ refreshing}) {
         title="Offline Courses"
         data={offlineCourses}
         renderItem={({ item }) => (
-          <CourseCard 
-            item={item} 
-            navigation={navigation} 
+          <CourseCard
+            item={item}
+            navigation={navigation}
             token={token}
             purchasedCourses={purchasedCourses}
           />

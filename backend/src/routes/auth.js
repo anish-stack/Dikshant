@@ -13,7 +13,8 @@ router.get("/profile-details", auth, ctrl.getProfile);
 router.get("/refresh-token", ctrl.refreshToken);
 router.get("/logout", auth, ctrl.logout);
 router.post("/update-fcm-token", auth, ctrl.updateFcmToken);
-router.post("/update-password", ctrl.updatePassword);
+router.post("/update-password", ctrl.sendForgotPasswordOtp);
+router.post("/verify-otp-and-change-password", ctrl.verifyForgotPasswordOtpAndUpdatePassword);
 
 router.patch("/users/:userId/toggle-active",auth,role(["admin"]),ctrl.toggleUserActive);
 

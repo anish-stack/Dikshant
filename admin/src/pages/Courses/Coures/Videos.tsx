@@ -482,26 +482,31 @@ export default function CourseVideos() {
                             <div className="text-xs">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                {v.DateOfLive.replace(/-/g, "/")}
+                                {String(v.DateOfLive).replace(/-/g, "/")}
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {v.TimeOfLIve.slice(0, 5)}
+                                {String(v.TimeOfLIve).slice(0, 5)}
                               </div>
                             </div>
-                          ) : (
+                          ) : v.dateOfClass && v.TimeOfClass ? (
                             <div className="text-xs">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                {v.dateOfClass.replace(/-/g, "/")}
+                                {String(v.dateOfClass).replace(/-/g, "/")}
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {v.TimeOfClass.slice(0, 5)}
+                                {String(v.TimeOfClass).slice(0, 5)}
                               </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 italic">
+                              —
                             </div>
                           )}
                         </td>
+
                         <td className="px-3 py-2">
                           <span
                             className={`text-xs px-2 py-1 rounded font-semibold ${

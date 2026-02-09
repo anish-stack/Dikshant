@@ -884,82 +884,102 @@ class OrderController {
   // ────────────────────────────────────────────────
   // ADMIN: REVOKE FREE/ADMIN-ASSIGNED ACCESS
   // ────────────────────────────────────────────────
-  static async adminReverseAssignCourse(req, res) {
-    const { userId, orderId, reason } = req.body;
+static async adminReverseAssignCourse(req, res) {
+  const { userId, orderId, reason } = req.body;
 
-    if (!userId || !orderId) {
-      return res.status(400).json({ success: false, message: "userId and orderId required" });
+  console.log("[adminReverseAssignCourse] REQUEST:", {
+    userId,
+    orderId,
+    reason: reason || "ADMIN_DELETED",
+  });
+
+  if (!userId || !orderId) {
+    return res.status(400).json({
+      success: false,
+      message: "userId and orderId required",
+    });
+  }
+
+  const t = await sequelize.transaction();
+
+  try {
+    const order = await Order.findOne({
+      where: { id: orderId, userId },
+      transaction: t,
+    });
+
+    if (!order) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
     }
 
-    const t = await sequelize.transaction();
+    console.log("[adminReverseAssignCourse] ORDER FOUND:", {
+      orderId: order.id,
+      type: order.type,
+    });
 
-    try {
-      const order = await Order.findOne({
+    // ✅ If batch -> delete child orders first
+    if (order.type === "batch") {
+      const deletedChildCount = await Order.destroy({
         where: {
-          id: orderId,
           userId,
-          amount: 0, // only free/admin assignments
-          enrollmentStatus: "active",
+          parentOrderId: order.id,
+          type: { [Op.in]: ["quiz", "test"] },
         },
         transaction: t,
       });
 
-      if (!order) {
-        await t.rollback();
-        return res.status(404).json({ success: false, message: "Revocable admin order not found" });
-      }
-
-      await order.update(
-        {
-          enrollmentStatus: "cancelled",
-          status: "failed",
-          reason: reason || "ADMIN_REVERSED",
-        },
-        { transaction: t }
-      );
-
-      if (order.type === "batch") {
-        await Order.update(
-          {
-            enrollmentStatus: "cancelled",
-            status: "failed",
-            reason: "BATCH_REVOKED",
-          },
-          {
-            where: {
-              userId,
-              parentOrderId: order.id,
-              type: { [Op.in]: ["quiz", "test"] },
-            },
-            transaction: t,
-          }
-        );
-      }
-
-      await NotificationController.createNotification({
-        userId,
-        title: "Course Access Revoked",
-        message: "Your course access has been revoked by the administrator.",
-        type: "course",
-        relatedId: order.id,
+      console.log("[adminReverseAssignCourse] CHILD ORDERS DELETED:", {
+        deletedChildCount,
       });
-
-      await t.commit();
-
-      await redis.del(`orders:${userId}`);
-      await redis.del(`user:courses:${userId}`);
-
-      return res.json({
-        success: true,
-        message: "Access revoked successfully",
-        order,
-      });
-    } catch (err) {
-      await t.rollback();
-      console.error("[adminReverseAssignCourse] ERROR:", err);
-      return res.status(500).json({ success: false, message: "Revocation failed", error: err.message });
     }
+
+    // ✅ Delete main order
+    await Order.destroy({
+      where: { id: order.id, userId },
+      transaction: t,
+    });
+
+    // Notification
+    await NotificationController.createNotification({
+      userId,
+      title: "Course Access Revoked",
+      message: reason
+        ? `Your course access was revoked by admin. Reason: ${reason}`
+        : "Your course access has been revoked by the administrator.",
+      type: "course",
+      relatedId: orderId,
+    });
+
+    await t.commit();
+
+    await redis.del(`orders:${userId}`);
+    await redis.del(`user:courses:${userId}`);
+
+    console.log("[adminReverseAssignCourse] SUCCESS: ORDER DELETED", {
+      userId,
+      orderId,
+    });
+
+    return res.json({
+      success: true,
+      message: "Order deleted & access revoked successfully",
+    });
+  } catch (err) {
+    await t.rollback();
+    console.error("[adminReverseAssignCourse] ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Revocation failed",
+      error: err.message,
+    });
   }
+}
+
   static async verifyPayment(req, res) {
     console.log("🟢 VERIFY PAYMENT API HIT", { body: req.body });
 
