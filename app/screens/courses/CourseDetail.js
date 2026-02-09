@@ -303,7 +303,6 @@ export default function CourseDetail() {
   };
 
   const handleVideoPress = (video) => {
-    console.log(video)
     triggerHaptic();
     setCurrentVideo(video);
     setShowVideoModal(true);
@@ -771,7 +770,7 @@ export default function CourseDetail() {
                 <YoutubePlayer
                   height={width * 0.5625}
                   width={width}
-                  videoId={getYouTubeVideoId(currentVideo)}
+                  videoId={getYouTubeVideoId(currentVideo.url)}
                   play={playing}
                   onChangeState={onStateChange}
                   webViewStyle={styles.youtubePlayer}

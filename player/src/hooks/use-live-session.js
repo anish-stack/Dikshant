@@ -10,7 +10,7 @@ export default function useLiveSession(video, userId) {
   const [timeToLive, setTimeToLive] = useState("")
   const [viewerCount, setViewerCount] = useState(0)
   const { socket, isConnected } = useSocket()
-
+  console.log(video)
   // Check if live session has ended (2-hour duration)
   useEffect(() => {
     if (!video || !video.isLive) {
@@ -27,25 +27,6 @@ export default function useLiveSession(video, userId) {
       return
     }
 
-    // Check if session ended based on time
-    if (video.DateOfLive && video.TimeOfLIve) {
-      const checkIfEnded = () => {
-        const start = new Date(`${video.DateOfLive} ${video.TimeOfLIve}`)
-        const end = new Date(start.getTime() + 2 * 60 * 60 * 1000) // 2 hours
-        const now = new Date()
-
-        if (now > end) {
-          setHasEnded(true)
-          setCanJoin(false)
-          setIsLive(false)
-          setTimeToLive("✅ Live session ended")
-        }
-      }
-
-      checkIfEnded()
-      const interval = setInterval(checkIfEnded, 60000) // Check every minute
-      return () => clearInterval(interval)
-    }
   }, [video])
 
   // Check live status and timing
@@ -65,7 +46,7 @@ export default function useLiveSession(video, userId) {
     const now = new Date()
     const timeDiff = liveDateTime.getTime() - now.getTime()
     const minutesDiff = Math.floor(timeDiff / (1000 * 60))
-    const sessionDurationMinutes = 120 // 2 hours
+    const sessionDurationMinutes = 600 // 2 hours
     const minutesSinceStart = -minutesDiff
 
     // Session has ended (more than 2 hours since start)

@@ -819,7 +819,7 @@ useEffect(() => {
         <div className="absolute bottom-0 left-0 right-0 h-12 z-45 pointer-events-none" />
 
         {/* Live Badge */}
-        {isLive && (
+        {/* {isLive && (
           <div className="absolute top-2 sm:top-4 left-2 sm:left-4 flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-600 rounded-full text-white text-xs sm:text-sm font-semibold shadow-lg z-50">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
             <span>LIVE</span>
@@ -831,7 +831,7 @@ useEffect(() => {
               </>
             )}
           </div>
-        )}
+        )} */}
       </div>
       {showComments && (
         <div

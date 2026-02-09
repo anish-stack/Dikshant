@@ -28,15 +28,20 @@ function LMSContent() {
   } = useAuth(token);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("comments");
   const [liveCount, setLiveCount] = useState(0);
 
   // Data states
   const [batch, setBatch] = useState(null);
   const [videos, setVideos] = useState([]);
   const [currentVideo, setCurrentVideo] = useState(null);
+
+  const { canJoin, isLive, hasEnded, timeToLive, viewerCount, handleJoinLive } =
+    useLiveSession(currentVideo, userId);
+
+
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [activeTab, setActiveTab] = useState(isLive ? "live" : "comments");
 
   // Video decryption states
   const [playableUrl, setPlayableUrl] = useState(null);
@@ -58,6 +63,12 @@ function LMSContent() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (isLive) {
+      setActiveTab("live")
+    }
+  }, [isLive])
+  
   // Network monitoring
   useEffect(() => {
     const goOnline = () => {
@@ -83,11 +94,7 @@ function LMSContent() {
     };
   }, [isAuthenticated, token, refetch]);
 
-  // Live session hook
-  const { canJoin, isLive, hasEnded, timeToLive, viewerCount, handleJoinLive } =
-    useLiveSession(currentVideo, userId);
 
-  // Access validation
   const validateAccess = () => {
     if (!token || token.length < 20 || !userId) {
       setError({
@@ -100,7 +107,6 @@ function LMSContent() {
     return true;
   };
 
-  // Token refresh helper
   const updateVideoToken = (videoId, newToken) => {
     setVideos((prev) =>
       prev.map((v) => (v.id === videoId ? { ...v, secureToken: newToken } : v))
@@ -162,7 +168,6 @@ function LMSContent() {
     decryptVideo();
   }, [currentVideo, userId, token]);
 
-  // Fetch batch and videos
   useEffect(() => {
     if (!isOnline || !validateAccess()) {
       setLoading(false);
@@ -331,7 +336,7 @@ function LMSContent() {
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
+      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
         <Sidebar
           videos={videos}
           currentVideo={currentVideo}
@@ -341,15 +346,17 @@ function LMSContent() {
         />
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-y-auto bg-slate-50">
-        <header className={`bg-white border-b px-4 py-3 fixed top-0 left-0 right-0 z-40 transition-transform ${scrolled ? "translate-y-0 shadow-md" : "-translate-y-full"} lg:translate-y-0 lg:sticky`}>
+      {/* Main content area - NO SCROLL */}
+      <main className="flex-1 flex flex-col h-screen bg-slate-50 overflow-hidden">
+        {/* Fixed header */}
+        <header className={`flex-shrink-0 bg-white border-b px-4 py-3 transition-transform ${scrolled ? "translate-y-0 shadow-md" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-lg">
                 <Menu className="w-6 h-6" />
               </button>
               <div>
-                <h1 className="text-lg font-bold truncate">{currentVideo?.title || "Loading..."}</h1>
+                {/* <h1 className="text-lg font-bold truncate">{currentVideo?.title || "Loading..."}</h1> */}
                 <p className="text-xs text-slate-500">{batch?.name}</p>
               </div>
             </div>
@@ -362,7 +369,8 @@ function LMSContent() {
           </div>
         </header>
 
-        <div className="w-full bg-black aspect-video max-h-[70vh] relative">
+        {/* Fixed video player */}
+        <div className="flex-shrink-0 w-full bg-black aspect-video">
           {currentVideo && (
             <VideoPlayer
               video={currentVideo}
@@ -371,24 +379,37 @@ function LMSContent() {
               isLive={isLive}
               viewerCount={viewerCount}
               token={token}
-                user={user}
+              user={user}
               userId={userId}
             />
           )}
         </div>
 
-        <div className="flex-1 flex flex-col bg-white border-t">
-          <div className="flex border-b sticky top-0 bg-white z-10 px-4">
-            <button
-              onClick={() => setActiveTab("comments")}
-              className={`px-6 py-3 text-sm font-semibold border-b-2 ${activeTab === "comments" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500"}`}
-            >
-              Comments
-            </button>
-            {(isLive || (currentVideo?.isLive && !hasEnded)) && (
+        {/* Comments/Chat section - THIS IS THE ONLY PART THAT SCROLLS */}
+        <div className="flex-1 flex flex-col bg-white border-t overflow-hidden">
+          {/* Tab bar - fixed */}
+          <div className="flex-shrink-0 flex border-b bg-white px-4">
+            {!isLive && (
+              <button
+                onClick={() => setActiveTab("comments")}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 ${
+                  activeTab === "comments"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-slate-500"
+                }`}
+              >
+                Comments
+              </button>
+            )}
+
+            {isLive && (currentVideo?.isLive && !hasEnded) && (
               <button
                 onClick={() => setActiveTab("live")}
-                className={`px-6 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 ${activeTab === "live" ? "border-red-600 text-red-600" : "border-transparent text-slate-500"}`}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 ${
+                  activeTab === "live"
+                    ? "border-red-600 text-red-600"
+                    : "border-transparent text-slate-500"
+                }`}
               >
                 Live Chat
                 <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
@@ -396,8 +417,9 @@ function LMSContent() {
             )}
           </div>
 
-          <div className="flex-1">
-            {activeTab === "live" ? (
+          {/* Content area - scrollable */}
+          <div className="flex-1 overflow-hidden">
+            {isLive ? (
               <LiveChat
                 user={user}
                 videoId={currentVideo?.id}
@@ -407,7 +429,7 @@ function LMSContent() {
                 inline={true}
               />
             ) : (
-              <div className="p-4">
+              <div className="h-full overflow-y-auto p-4">
                 <CommentsSection video={currentVideo} userId={userId} token={token} />
               </div>
             )}

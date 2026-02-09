@@ -54,6 +54,7 @@ export default function SmartVideoPlayer({
     }).toString();
 
     const url = `https://www.player.dikshantias.com/?${params}`;
+    console.log(url)
     await Linking.openURL(url);
   }, [video, userId, courseId, token]);
 

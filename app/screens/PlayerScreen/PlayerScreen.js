@@ -48,6 +48,7 @@ true;
 const PlayerScreen = ({ route }) => {
   const { settings } = useSettings();
   const { video, batchId, userId, token, courseId } = route.params || {};
+  console.log("route.params",route.params)
 
   const playerUrl = `${"https://www.player.dikshantias.com/"}?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
 
