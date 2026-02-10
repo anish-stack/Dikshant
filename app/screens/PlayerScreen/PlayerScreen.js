@@ -45,7 +45,6 @@ true;
 const PlayerScreen = ({ route, navigation }) => {
   const { settings } = useSettings();
   const { video, batchId, userId, token, courseId, isDemo ,videoId } = route.params || {};
-  console.log(video)
   const playerUrl = `https://www.player.dikshantias.com/?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
 
   const [pageLoaded, setPageLoaded] = useState(false);

@@ -105,7 +105,7 @@ const TutorShowBothChatAndJoinedStudents = () => {
         params: {
           limit: 500, // Fetch last 500 messages
         },
-        timeout: 7000,
+        timeout: 3000,
       });
 
       if (res.data?.success) {
