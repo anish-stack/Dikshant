@@ -332,11 +332,11 @@ function LMSContent() {
         </button>
       )} */}
 
-      {sidebarOpen && (
+      {/* {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
+      )} */}
 
-      <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
+      {/* <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
         <Sidebar
           videos={videos}
           currentVideo={currentVideo}
@@ -344,7 +344,7 @@ function LMSContent() {
           onVideoClick={handleVideoClick}
           onClose={() => setSidebarOpen(false)}
         />
-      </aside>
+      </aside> */}
 
       {/* Main content area - NO SCROLL */}
       <main className="flex-1 flex flex-col h-screen bg-slate-50 overflow-hidden">
@@ -352,9 +352,9 @@ function LMSContent() {
         <header className={`flex-shrink-0 bg-white border-b px-4 py-3 transition-transform ${scrolled ? "translate-y-0 shadow-md" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-lg">
+              {/* <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-lg">
                 <Menu className="w-6 h-6" />
-              </button>
+              </button> */}
               <div>
                 {/* <h1 className="text-lg font-bold truncate">{currentVideo?.title || "Loading..."}</h1> */}
                 <p className="text-xs text-slate-500">{batch?.name}</p>
