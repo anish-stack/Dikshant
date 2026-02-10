@@ -168,7 +168,7 @@ const TutorShowBothChatAndJoinedStudents = () => {
     // Poll every 3 seconds
     const interval = setInterval(() => {
       fetchCompleteChatData();
-    }, 7000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [VIDEO_ID, fetchCompleteChatData]);
@@ -476,7 +476,6 @@ const TutorShowBothChatAndJoinedStudents = () => {
                         <p className="font-medium text-gray-800 dark:text-gray-200">
                           {student.userName}
                         </p>
-                        
                       </div>
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -563,44 +562,48 @@ const TutorShowBothChatAndJoinedStudents = () => {
                 <p>No messages yet {chatSearch && "matching your search"}</p>
               </div>
             ) : (
-              filteredMessages.map((msg) => {
-                const isTeacher = msg.isFromTeacher;
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex ${
-                      isTeacher ? "justify-end" : "justify-start"
-                    }`}
-                  >
+              filteredMessages
+                .filter((msg) => {
+                  const text = String(msg?.message ?? "").trim();
+                  return text && text !== "0";
+                })
+                .map((msg) => {
+                  const isTeacher = !!msg.isFromTeacher;
+                  console.log(isTeacher)
+                  return (
                     <div
-                      className={`max-w-[75%] rounded-xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                        isTeacher
-                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                      }`}
+                      key={msg.id}
+                      className={`flex ${isTeacher ? "justify-end" : "justify-start"}`}
                     >
-                      {!isTeacher && (
-                        <p className="text-xs font-medium opacity-80 mb-1">
-                          {msg.userName}
+                      <div
+                        className={`max-w-[75%] rounded-xl px-6 py-3 text-sm leading-relaxed shadow-sm ${
+                          isTeacher
+                            ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        }`}
+                      >
+                        {!isTeacher && (
+                         <>
+                         {msg.userName}
+                         </>
+                        )}
+
+                        {isTeacher && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs font-bold">ADMIN</span>
+                            <span>👨‍🏫</span>
+                          </div>
+                        )}
+
+                        <p className="break-words">{msg.message}</p>
+
+                        <p className="text-xs mt-2 opacity-70 text-right">
+                          {formatTime(msg.createdAt)}
                         </p>
-                      )}
-
-                      {isTeacher && (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="text-xs font-bold">ADMIN</span>
-                          <span>👨‍🏫</span>
-                        </div>
-                      )}
-
-                      <p className="break-words">{msg.message}</p>
-
-                      <p className="text-xs mt-2 opacity-70 text-right">
-                        {formatTime(msg.createdAt)}
-                      </p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
             )}
           </div>
 
