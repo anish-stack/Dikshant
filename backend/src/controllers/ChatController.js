@@ -106,19 +106,19 @@ static async saveJoin({ videoId, userId }) {
     });
     console.log(existingJoin)
 
-    if (existingJoin) {
-      console.log("🟨 [JOIN] Already joined (rejoined)", {
-        videoId,
-        userId,
-        joinId: existingJoin.id,
-      });
+    // if (existingJoin) {
+    //   console.log("🟨 [JOIN] Already joined (rejoined)", {
+    //     videoId,
+    //     userId,
+    //     joinId: existingJoin.id,
+    //   });
 
-      return {
-        success: true,
-        data: existingJoin.get({ plain: true }),
-        rejoined: true,
-      };
-    }
+    //   return {
+    //     success: true,
+    //     data: existingJoin.get({ plain: true }),
+    //     rejoined: true,
+    //   };
+    // }
 
     const userFetch = await User.findByPk(userId);
     const userName = userFetch?.name || "User";
@@ -171,19 +171,19 @@ static async saveJoinApi(req, res) {
       order: [["createdAt", "ASC"]],
     });
 
-    if (existingJoin) {
-      console.log("🟨 [JOIN API] Already joined (rejoined)", {
-        videoId,
-        userId,
-        joinId: existingJoin.id,
-      });
+    // if (existingJoin) {
+    //   console.log("🟨 [JOIN API] Already joined (rejoined)", {
+    //     videoId,
+    //     userId,
+    //     joinId: existingJoin.id,
+    //   });
 
-      return res.json({
-        success: true,
-        data: existingJoin.get({ plain: true }),
-        rejoined: true,
-      });
-    }
+    //   return res.json({
+    //     success: true,
+    //     data: existingJoin.get({ plain: true }),
+    //     rejoined: true,
+    //   });
+    // }
 
     const userFetch = await User.findByPk(userId);
     const userName = userFetch?.name || "User";
@@ -389,71 +389,61 @@ static async saveLeave({ videoId, userId, userName }) {
   // GET UNIQUE JOINED STUDENTS COUNT
   // ============================
 
-  static async getUsersChatStatus(req, res) {
-    try {
-      const { videoId } = req.params;
+static async getUsersChatStatus(req, res) {
+  try {
+    const { videoId } = req.params;
 
-      if (!videoId) {
-        return res.status(400).json({
-          success: false,
-          message: "videoId required",
-        });
-      }
-
-      const events = await ChatMessage.findAll({
-        where: {
-          videoId,
-          messageType: ["join", "leave"],
-        },
-        order: [["createdAt", "ASC"]],
-        raw: true,
-      });
-
-      const usersMap = {};
-
-      for (const event of events) {
-        const uid = event.userId;
-
-        if (!usersMap[uid]) {
-          usersMap[uid] = {
-            userId: uid,
-            userName: event.userName,
-            joinCount: 0,
-            leaveCount: 0,
-            latestStatus: null,
-            lastActionAt: null,
-          };
-        }
-
-        if (event.messageType === "join") {
-          usersMap[uid].joinCount += 1;
-          usersMap[uid].latestStatus = "joined";
-        }
-
-        if (event.messageType === "leave") {
-          usersMap[uid].leaveCount += 1;
-          usersMap[uid].latestStatus = "left";
-        }
-
-        usersMap[uid].lastActionAt = event.createdAt;
-      }
-
-      const result = Object.values(usersMap);
-
-      return res.json({
-        success: true,
-        videoId,
-        totalUsers: result.length,
-        users: result,
-      });
-    } catch (error) {
-      console.error("getUsersChatStatus error:", error);
-      return res.status(500).json({
+    if (!videoId) {
+      return res.status(400).json({
         success: false,
-        message: "Failed to fetch users chat status",
+        message: "videoId required",
       });
     }
+
+    // ✅ Fetch only join/leave events
+    const events = await ChatMessage.findAll({
+      where: {
+        videoId,
+        // messageType: ["join", "leave"],
+      },
+      order: [["createdAt", "DESC"]], // 🔥 latest first
+      raw: true,
+    });
+
+    const usersMap = {};
+
+    // Since DESC, first time user comes = latest event
+    for (const event of events) {
+      const uid = event.userId;
+
+      if (!usersMap[uid]) {
+        usersMap[uid] = {
+          userId: uid,
+          userName: event.userName,
+          latestStatus: event.messageType === "join" ? "joined" : "left",
+          lastActionAt: event.createdAt,
+        };
+      }
+    }
+
+    const result = Object.values(usersMap);
+
+    return res.json({
+      success: true,
+      videoId,
+      events,
+      totalUsers: result.length,
+      users: result,
+    });
+  } catch (error) {
+    console.error("❌ getUsersChatStatus error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users chat status",
+    });
   }
+}
+
 
   static async getAllChatsaMessageFromVideo(req, res) {
     try {
