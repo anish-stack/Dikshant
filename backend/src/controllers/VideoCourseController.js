@@ -364,20 +364,47 @@ class VideoCourseController {
       const toBool = (val) =>
         val === true || val === "true" || val === 1 || val === "1";
 
+      const toIntOrNull = (val) => {
+        if (val === undefined || val === null || val === "") return null;
+        const n = Number(val);
+        return Number.isFinite(n) ? n : null;
+      };
+
       const normalizeDate = (val) => {
-        if (!val) return null;
-        if (val === "0000-00-00") return null;
+        if (val === undefined) return undefined; // important (means: not provided)
+        if (!val || val === "null" || val === "0000-00-00") return null;
         return val;
       };
 
       const normalizeTime = (val) => {
-        if (!val) return null;
-        if (val === "00:00:00") return null;
+        if (val === undefined) return undefined;
+        if (!val || val === "null" || val === "00:00:00") return null;
         return val;
       };
 
+      const trimOrUndefined = (val) => {
+        if (val === undefined || val === null) return undefined;
+        if (typeof val !== "string") return val;
+        return val.trim();
+      };
+
       // ============================
-      // SAFE FIELD RESOLUTION (IMPORTANT)
+      // FIX: accept both keys
+      // ============================
+      const incomingDateOfLive =
+        req.body.DateOfLive ?? req.body.dateOfLive ?? req.body.dateOfLive;
+
+      const incomingTimeOfLive =
+        req.body.TimeOfLive ?? req.body.TimeOfLIve ?? req.body.timeOfLive;
+
+      const incomingDateOfClass =
+        req.body.dateOfClass ?? req.body.DateOfClass;
+
+      const incomingTimeOfClass =
+        req.body.TimeOfClass ?? req.body.timeOfClass;
+
+      // ============================
+      // RESOLVE FINAL BOOL FLAGS
       // ============================
       const isDemo =
         req.body.isDemo !== undefined ? toBool(req.body.isDemo) : item.isDemo;
@@ -393,22 +420,31 @@ class VideoCourseController {
       // ============================
       // RULES
       // ============================
-      const shouldClearDates = isDemo === true || isLive === false;
+      // Demo video OR not live => live dates not needed
+      const shouldClearDates = isLive === false;
 
       // ============================
       // VALIDATION
       // ============================
-      // Live video AND NOT demo => date/time required
-      if (
-        isLive === true &&
-        isDemo === false &&
-        ((!req.body.DateOfLive && !item.DateOfLive) ||
-          (!req.body.TimeOfLIve && !item.TimeOfLIve))
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "DateOfLive and TimeOfLIve are required when isLive is true",
-        });
+      // If Live AND not demo => Date + Time required
+      if (isLive === true && isDemo === false) {
+        const finalDate = incomingDateOfLive ?? item.DateOfLive;
+        const finalTime =
+          incomingTimeOfLive ?? item.TimeOfLive ?? item.TimeOfLIve;
+
+        if (!finalDate || finalDate === "null") {
+          return res.status(400).json({
+            success: false,
+            message: "DateOfLive is required when isLive is true and isDemo is false",
+          });
+        }
+
+        if (!finalTime || finalTime === "null") {
+          return res.status(400).json({
+            success: false,
+            message: "TimeOfLive is required when isLive is true and isDemo is false",
+          });
+        }
       }
 
       // ============================
@@ -424,21 +460,21 @@ class VideoCourseController {
       }
 
       // ============================
-      // UPDATE PAYLOAD
+      // BUILD UPDATE PAYLOAD
       // ============================
       const updateData = {
-        title: req.body.title?.trim() ?? item.title,
+        title: trimOrUndefined(req.body.title) ?? item.title,
         videoSource: req.body.videoSource ?? item.videoSource,
-        url: req.body.url?.trim() ?? item.url,
+        url: trimOrUndefined(req.body.url) ?? item.url,
 
         batchId:
           req.body.batchId !== undefined
-            ? Number(req.body.batchId)
+            ? toIntOrNull(req.body.batchId)
             : item.batchId,
 
         subjectId:
           req.body.subjectId !== undefined
-            ? Number(req.body.subjectId)
+            ? toIntOrNull(req.body.subjectId)
             : item.subjectId,
 
         isDownloadable:
@@ -451,43 +487,53 @@ class VideoCourseController {
         isLiveEnded,
 
         // ============================
-        // LIVE DATE/TIME (only for live + not demo)
+        // LIVE DATE/TIME
         // ============================
         DateOfLive: shouldClearDates
           ? null
-          : req.body.DateOfLive !== undefined
-            ? normalizeDate(req.body.DateOfLive)
+          : normalizeDate(incomingDateOfLive) !== undefined
+            ? normalizeDate(incomingDateOfLive)
             : item.DateOfLive,
+
+        // IMPORTANT: update both fields to be safe
+        TimeOfLive: shouldClearDates
+          ? null
+          : normalizeTime(incomingTimeOfLive) !== undefined
+            ? normalizeTime(incomingTimeOfLive)
+            : item.TimeOfLive,
 
         TimeOfLIve: shouldClearDates
           ? null
-          : req.body.TimeOfLIve !== undefined
-            ? normalizeTime(req.body.TimeOfLIve)
+          : normalizeTime(incomingTimeOfLive) !== undefined
+            ? normalizeTime(incomingTimeOfLive)
             : item.TimeOfLIve,
 
         // ============================
-        // CLASS DATE/TIME (optional)
+        // CLASS DATE/TIME
         // ============================
         dateOfClass: shouldClearDates
           ? null
-          : req.body.dateOfClass !== undefined
-            ? normalizeDate(req.body.dateOfClass)
+          : normalizeDate(incomingDateOfClass) !== undefined
+            ? normalizeDate(incomingDateOfClass)
             : item.dateOfClass,
 
         TimeOfClass: shouldClearDates
           ? null
-          : req.body.TimeOfClass !== undefined
-            ? normalizeTime(req.body.TimeOfClass)
+          : normalizeTime(incomingTimeOfClass) !== undefined
+            ? normalizeTime(incomingTimeOfClass)
             : item.TimeOfClass,
 
         // ============================
-        // Live End At
+        // LIVE END AT
         // ============================
         LiveEndAt:
-          req.body.isLiveEnded === true || req.body.isLiveEnded === "true"
+          req.body.isLiveEnded !== undefined && toBool(req.body.isLiveEnded) === true
             ? new Date()
             : item.LiveEndAt,
 
+        // ============================
+        // STATUS
+        // ============================
         status:
           req.body.status !== undefined
             ? req.body.status === "active" || req.body.status === true

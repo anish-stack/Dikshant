@@ -42,52 +42,231 @@ class ChatController {
     }
   }
 
+  static async saveMessageApi(req, res) {
+  try {
+    const { videoId, userId, userName, message, isFromTeacher, meta } = req.body;
+
+    if (!videoId || !userId || !userName || !message) {
+      return res.status(400).json({
+        success: false,
+        message: "videoId, userId, userName, message are required",
+      });
+    }
+
+    const saved = await ChatMessage.create({
+      videoId,
+      userId,
+      userName,
+      message,
+      messageType: "message",
+      isFromTeacher: isFromTeacher || false,
+      meta: meta || null,
+    });
+
+    return res.json({
+      success: true,
+      data: saved.get({ plain: true }),
+    });
+  } catch (error) {
+    console.error("saveMessageApi error:", error);
+
+    // fallback return (same style as your function)
+    return res.status(200).json({
+      success: false,
+      fallback: {
+        id: `fallback-${Date.now()}`,
+        videoId: req.body?.videoId,
+        userId: req.body?.userId,
+        userName: req.body?.userName,
+        message: req.body?.message,
+        messageType: "message",
+        isFromTeacher: req.body?.isFromTeacher || false,
+        meta: req.body?.meta || null,
+        createdAt: new Date(),
+      },
+    });
+  }
+}
+
   // ============================
   // SAVE JOIN
   // ============================
-  static async saveJoin({ videoId, userId, userName }) {
-    try {
-      const existingJoin = await ChatMessage.findOne({
-        where: {
-          videoId,
-          userId,
-          messageType: "join",
-        },
-        order: [["createdAt", "ASC"]],
-      });
+static async saveJoin({ videoId, userId }) {
+  try {
+    if (!videoId || !userId) {
+      console.log("🟥 [JOIN] Missing fields", { videoId, userId });
+      return { success: false, message: "videoId and userId are required" };
+    }
 
-      if (existingJoin) {
-        return {
-          success: true,
-          data: existingJoin.get({ plain: true }),
-          rejoined: true,
-        };
-      }
+    console.log("🟦 [JOIN] Request", { videoId, userId });
 
-      const joinEvent = await ChatMessage.create({
+    const existingJoin = await ChatMessage.findOne({
+      where: { videoId, userId, messageType: "join" },
+      order: [["createdAt", "ASC"]],
+    });
+    console.log(existingJoin)
+
+    if (existingJoin) {
+      console.log("🟨 [JOIN] Already joined (rejoined)", {
         videoId,
         userId,
-        userName,
-        message: `${userName} joined the chat`,
-        messageType: "join",
+        joinId: existingJoin.id,
       });
 
       return {
         success: true,
-        data: joinEvent.get({ plain: true }),
-        rejoined: false,
+        data: existingJoin.get({ plain: true }),
+        rejoined: true,
       };
-    } catch (error) {
-      console.error("saveJoin error:", error.message);
-      return { success: false };
     }
+
+    const userFetch = await User.findByPk(userId);
+    const userName = userFetch?.name || "User";
+
+    const joinEvent = await ChatMessage.create({
+      videoId,
+      userId,
+      userName,
+      message: `${userName} joined the chat`,
+      messageType: "join",
+    });
+
+    console.log("🟩 [JOIN] Join saved", {
+      videoId,
+      userId,
+      joinId: joinEvent.id,
+      userName,
+    });
+
+    return {
+      success: true,
+      data: joinEvent.get({ plain: true }),
+      rejoined: false,
+    };
+  } catch (error) {
+    console.error("❌ [JOIN] saveJoin error:", error);
+    return { success: false };
   }
+}
+
+
+static async saveJoinApi(req, res) {
+  try {
+    const { videoId, userId } = req.body;
+
+    // ✅ Clean debug log (optional)
+    console.log("🟦 [JOIN API]", { videoId, userId });
+
+    if (!videoId || !userId) {
+      console.log("🟥 [JOIN API] Missing fields", { videoId, userId });
+
+      return res.status(400).json({
+        success: false,
+        message: "videoId and userId are required",
+      });
+    }
+
+    const existingJoin = await ChatMessage.findOne({
+      where: { videoId, userId, messageType: "join" },
+      order: [["createdAt", "ASC"]],
+    });
+
+    if (existingJoin) {
+      console.log("🟨 [JOIN API] Already joined (rejoined)", {
+        videoId,
+        userId,
+        joinId: existingJoin.id,
+      });
+
+      return res.json({
+        success: true,
+        data: existingJoin.get({ plain: true }),
+        rejoined: true,
+      });
+    }
+
+    const userFetch = await User.findByPk(userId);
+    const userName = userFetch?.name || "User";
+
+    const joinEvent = await ChatMessage.create({
+      videoId,
+      userId,
+      userName,
+      message: `${userName} joined the chat`,
+      messageType: "join",
+    });
+
+    console.log("🟩 [JOIN API] Join saved", {
+      videoId,
+      userId,
+      joinId: joinEvent.id,
+      userName,
+    });
+
+    return res.json({
+      success: true,
+      data: joinEvent.get({ plain: true }),
+      rejoined: false,
+    });
+  } catch (error) {
+    console.error("❌ [JOIN API] saveJoin error:", error);
+    return res.status(500).json({ success: false });
+  }
+}
 
   // ============================
   // SAVE LEAVE
   // ============================
-  static async saveLeave({ videoId, userId, userName }) {
+static async saveLeave({ videoId, userId, userName }) {
+  try {
+    if (!videoId || !userId) {
+      return { success: false, message: "videoId and userId are required" };
+    }
+    // ✅ userName optional, fallback User model se
+    let finalName = userName;
+
+    if (!finalName) {
+      const userFetch = await User.findByPk(userId);
+      finalName = userFetch?.name || "User";
+    }
+
+    const leaveEvent = await ChatMessage.create({
+      videoId,
+      userId,
+      userName: finalName,
+      message: `${finalName} left the chat`,
+      messageType: "leave",
+    });
+        console.log(`${finalName} left the chat`)
+
+
+    return {
+      success: true,
+      data: leaveEvent.get({ plain: true }),
+    };
+  } catch (error) {
+    console.error("saveLeave error:", error);
+    return { success: false };
+  }
+}
+
+
+  static async saveLeaveApi(req, res) {
     try {
+      const { videoId, userId } = req.body;
+
+      if (!videoId || !userId) {
+        return res.status(400).json({
+          success: false,
+          message: "videoId and userId are required",
+        });
+      }
+
+      // Fetch user
+      const userFetch = await User.findByPk(userId);
+      const userName = userFetch?.name || "User";
+
+      // Create leave event
       const leaveEvent = await ChatMessage.create({
         videoId,
         userId,
@@ -96,13 +275,13 @@ class ChatController {
         messageType: "leave",
       });
 
-      return {
+      return res.json({
         success: true,
         data: leaveEvent.get({ plain: true }),
-      };
+      });
     } catch (error) {
-      console.error("saveLeave error:", error.message);
-      return { success: false };
+      console.error("saveLeave error:", error);
+      return res.status(500).json({ success: false });
     }
   }
 

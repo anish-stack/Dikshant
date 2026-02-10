@@ -330,9 +330,9 @@ function LMSContent() {
         >
           <Menu className="w-6 h-6" />
         </button>
-      )}
+      )} */}
 
-      {sidebarOpen && (
+      {/* {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)} />
       )} */}
 
@@ -352,9 +352,9 @@ function LMSContent() {
         <header className={`flex-shrink-0 bg-white border-b px-4 py-3 transition-transform ${scrolled ? "translate-y-0 shadow-md" : ""}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-lg">
+              {/* <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 hover:bg-slate-100 rounded-lg">
                 <Menu className="w-6 h-6" />
-              </button>
+              </button> */}
               <div>
                 {/* <h1 className="text-lg font-bold truncate">{currentVideo?.title || "Loading..."}</h1> */}
                 <p className="text-xs text-slate-500">{batch?.name}</p>

@@ -9,16 +9,29 @@ export default function useLiveSession(video, userId) {
   const [hasEnded, setHasEnded] = useState(false)
   const [timeToLive, setTimeToLive] = useState("")
   const [viewerCount, setViewerCount] = useState(0)
+
   const { socket, isConnected } = useSocket()
-  console.log(video)
-  // Check if live session has ended (2-hour duration)
-  useEffect(() => {
-    if (!video || !video.isLive) {
+
+  // ✅ Only depend on isLiveEnded (no time logic)
+  const checkLiveStatus = () => {
+    if (!video) {
+      setCanJoin(false)
+      setIsLive(false)
       setHasEnded(false)
+      setTimeToLive("")
       return
     }
 
-    // If explicitly marked as ended
+    // Not live video
+    if (!video.isLive) {
+      setCanJoin(false)
+      setIsLive(false)
+      setHasEnded(false)
+      setTimeToLive("")
+      return
+    }
+
+    // Live ended (from DB)
     if (video.isLiveEnded === true) {
       setHasEnded(true)
       setCanJoin(false)
@@ -27,91 +40,23 @@ export default function useLiveSession(video, userId) {
       return
     }
 
-  }, [video])
-
-  // Check live status and timing
-  const checkLiveStatus = () => {
-    if (!video || !video.isLive) {
-      setCanJoin(false)
-      setIsLive(false)
-      return
-    }
-
-    if (!video.DateOfLive || !video.TimeOfLIve) {
-      setCanJoin(false)
-      return
-    }
-
-    const liveDateTime = new Date(`${video.DateOfLive} ${video.TimeOfLIve}`)
-    const now = new Date()
-    const timeDiff = liveDateTime.getTime() - now.getTime()
-    const minutesDiff = Math.floor(timeDiff / (1000 * 60))
-    const sessionDurationMinutes = 600 // 2 hours
-    const minutesSinceStart = -minutesDiff
-
-    // Session has ended (more than 2 hours since start)
-    if (minutesSinceStart > sessionDurationMinutes) {
-      setHasEnded(true)
-      setCanJoin(false)
-      setIsLive(false)
-      setTimeToLive("✅ Live session ended")
-      return
-    }
-
-    // Can join: 5 minutes before start until end of session
-    if (minutesDiff <= 5 && minutesSinceStart <= sessionDurationMinutes) {
-      setCanJoin(true)
-
-      if (minutesDiff <= 0) {
-        // Live is ongoing
-        setIsLive(true)
-        setTimeToLive("🔴 LIVE NOW")
-      } else {
-        // Joining window is open but not started yet
-        setIsLive(false)
-        setTimeToLive(`⏰ Starts in ${minutesDiff} minute${minutesDiff > 1 ? "s" : ""}`)
-      }
-    } else if (minutesDiff > 5) {
-      // Too early to join
-      setCanJoin(false)
-      setIsLive(false)
-
-      // Format the time
-      const hours = liveDateTime.getHours()
-      const minutes = liveDateTime.getMinutes()
-      const ampm = hours >= 12 ? "PM" : "AM"
-      const displayHours = hours % 12 || 12
-      const displayMinutes = minutes.toString().padStart(2, "0")
-
-      if (minutesDiff > 1440) {
-        // More than a day away
-        const days = Math.floor(minutesDiff / 1440)
-        setTimeToLive(`⏱️ Starts in ${days} day${days > 1 ? "s" : ""}`)
-      } else if (minutesDiff > 60) {
-        // More than an hour away
-        const hours = Math.floor(minutesDiff / 60)
-        setTimeToLive(`⏱️ Starts in ${hours} hour${hours > 1 ? "s" : ""}`)
-      } else {
-        setTimeToLive(`⏱️ Starts at ${displayHours}:${displayMinutes} ${ampm}`)
-      }
-    }
+    // Live active
+    setHasEnded(false)
+    setCanJoin(true) // if live is enabled & not ended
+    setIsLive(true)
+    setTimeToLive("🔴 LIVE NOW")
   }
 
-  // Run live status check
+  // ✅ Run check every 30 seconds
   useEffect(() => {
     if (!video) return
 
-    // Check if already ended
-    if (video.isLiveEnded === true) {
-      setHasEnded(true)
-      setCanJoin(false)
-      setIsLive(false)
-      setTimeToLive("✅ Live session ended")
-      return
-    }
-
     checkLiveStatus()
-    const interval = setInterval(checkLiveStatus, 60000) // Check every minute
+
+    const interval = setInterval(() => {
+      checkLiveStatus()
+    }, 30000) // 30 sec
+
     return () => clearInterval(interval)
   }, [video])
 
@@ -129,13 +74,13 @@ export default function useLiveSession(video, userId) {
 
     const handleLiveUpdate = (data) => {
       if (data.videoId === video.id) {
-        setIsLive(data.isLive)
         setViewerCount(data.viewerCount)
 
-        // Server says live has ended
+        // If server says ended
         if (data.hasEnded) {
           setHasEnded(true)
           setCanJoin(false)
+          setIsLive(false)
           setTimeToLive("✅ Live session ended")
         }
       }
@@ -155,7 +100,7 @@ export default function useLiveSession(video, userId) {
   // Join live session
   const handleJoinLive = () => {
     if (!canJoin) {
-      alert("You can only join 5 minutes before the live session starts.")
+      alert("Live session is not available.")
       return
     }
 

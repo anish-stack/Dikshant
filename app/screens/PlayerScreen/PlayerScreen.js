@@ -50,7 +50,7 @@ const PlayerScreen = ({ route }) => {
   const { video, batchId, userId, token, courseId, isDemo} = route.params || {};
 
   const playerUrl = `${"https://www.player.dikshantias.com/"}?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
-
+  console.log("",playerUrl)
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
   const [hasError, setHasError] = useState(false);

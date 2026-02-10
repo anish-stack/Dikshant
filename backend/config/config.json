@@ -10,20 +10,20 @@
     "logging": false
   },
   "test": {
-    "username": "u748895167_database",
-    "password": "Dikshant@Database@1234",
-    "database": "u748895167_database",
-    "host": "srv674.hstgr.io",
+    "username": "u905431022_dikshant",
+    "password": "~ZwAVN/$9v6",
+    "database": "u905431022_dikshant",
+    "host": "82.25.121.158",
     "port": 3306,
     "dialect": "mysql",
     "timezone": "+05:30",
     "logging": false
   },
   "production": {
-    "username": "u748895167_database",
-    "password": "Dikshant@Database@1234",
-    "database": "u748895167_database",
-    "host": "srv674.hstgr.io",
+    "username": "u905431022_dikshant",
+    "password": "~ZwAVN/$9v6",
+    "database": "u905431022_dikshant",
+    "host": "82.25.121.158",
     "port": 3306,
     "dialect": "mysql",
     "timezone": "+05:30",

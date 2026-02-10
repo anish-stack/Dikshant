@@ -112,7 +112,6 @@ const formatDate = (dateString) => {
 
 // Helper function to extract YouTube video ID
 const getYouTubeVideoId = (url) => {
-  console.log("Url", url)
   if (!url || typeof url !== "string") return null;
 
   // Remove any leading/trailing whitespace

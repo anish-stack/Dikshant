@@ -55,6 +55,7 @@ import AllAtempts from "./pages/Quiz/AllAtempts";
 import ResultQuiz from "./pages/Quiz/ResultQuiz";
 import AppAssets from "./pages/AppAssets/AppAssets";
 import AllCategories from "./pages/app_categories/AllCategories";
+import TutorShowBothChatAndJoinedStudents from "./pages/Courses/Coures/TutorShowBothChatAndJoinedStudents";
 
 export default function App() {
   return (
@@ -176,6 +177,10 @@ export default function App() {
           {/* 🔓 PUBLIC ROUTES */}
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
+
+          <Route path="/stats-of-class/:id" element={<TutorShowBothChatAndJoinedStudents />} />
+
+
 
           {/* ❌ NOT FOUND */}
           <Route path="*" element={<NotFound />} />
