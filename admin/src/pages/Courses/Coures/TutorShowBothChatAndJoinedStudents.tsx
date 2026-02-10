@@ -476,9 +476,7 @@ const TutorShowBothChatAndJoinedStudents = () => {
                         <p className="font-medium text-gray-800 dark:text-gray-200">
                           {student.userName}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          ID: {student.userId}
-                        </p>
+                        
                       </div>
                       <span
                         className={`px-2.5 py-1 rounded-full text-xs font-medium ${
