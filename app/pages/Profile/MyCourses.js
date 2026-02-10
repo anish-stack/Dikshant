@@ -40,10 +40,10 @@ export default function MyCourses() {
   const fetchCourses = async () => {
     try {
       const res = await api.get(`/Orders/user/${user.id}`);
-    
+
       if (res.data) {
-        const batch = res.data.filter((i)=> i.type === 'batch')
-        setCourses(batch  || []);
+        const batch = res.data.filter((i) => i.type === 'batch')
+        setCourses(batch || []);
       }
     } catch (err) {
       console.log("Error:", err);
@@ -58,7 +58,7 @@ export default function MyCourses() {
     fetchCourses();
   }, [user?.id]);
 
-  const myCourses =courses
+  const myCourses = courses
 
 
   const filteredCourses = myCourses.filter((order) => {
@@ -68,10 +68,12 @@ export default function MyCourses() {
     return true;
   });
 
-  const redirectCourse = (id) => {
-  // navigation.navigate("my-course-subjects", { unlocked: true, courseId: id });
+  const redirectCourse = (batch, id) => {
+    const url = batch.category === "online" ? "my-course" : "my-course-subjects"
 
-    navigation.navigate("my-course", { unlocked: true, courseId: id });
+    // navigation.navigate("my-course-subjects", { unlocked: true, courseId: id });
+
+    navigation.navigate(url, { unlocked: true, courseId: id });
   };
 
   if (loading) {
@@ -138,7 +140,7 @@ export default function MyCourses() {
                   key={order.id}
                   style={styles.courseCard}
                   activeOpacity={0.85}
-                  onPress={() => redirectCourse(batch.id)}
+                  onPress={() => redirectCourse(batch, batch.id)}
                 >
                   <View style={styles.cardHeader}>
                     <View style={[

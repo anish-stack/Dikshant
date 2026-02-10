@@ -745,7 +745,7 @@ export default function CourseDetail() {
 
           <TouchableOpacity
             style={styles.enrollButton}
-            onPress={() => navigation.navigate("my-course", {
+            onPress={() => navigation.navigate(batchData?.category === "online" ? "my-course":"my-course-subjects", {
               unlocked: isCourseAlreadyPurchased,
               courseId: batchId || AlreadyPurchased?.orderId,
             })}

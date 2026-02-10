@@ -509,11 +509,26 @@ export default function CourseVideos() {
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-2">
-                          <a target="_blank" href={`/stats-of-class/${v?.id}`}>
-                            Check Live
-                          </a>
-                        </td>
+                   <td className="px-3 py-2 flex gap-2">
+  <a
+    target="_blank"
+    rel="noreferrer"
+    href={`/stats-of-class/${v?.id}`}
+    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition"
+  >
+    Admin Check Live
+  </a>
+
+  <a
+    target="_blank"
+    rel="noreferrer"
+    href={`/live-class-monitor/${v?.id}`}
+    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition"
+  >
+    Share Live Monitor
+  </a>
+</td>
+
 
                         <td className="px-3 py-2">
                           <span

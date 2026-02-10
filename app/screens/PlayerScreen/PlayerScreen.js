@@ -46,7 +46,7 @@ const PlayerScreen = ({ route, navigation }) => {
   const { settings } = useSettings();
   const { video, batchId, userId, token, courseId, isDemo ,videoId } = route.params || {};
   const playerUrl = `https://www.player.dikshantias.com/?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
-
+  // console.log(route.params)
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -67,7 +67,7 @@ const PlayerScreen = ({ route, navigation }) => {
       console.log("✅ Joined chat successfully", data);
       setHasJoined(true);
     } catch (err) {
-      console.warn("Join chat failed:", err?.message);
+      console.warn("Join chat failed:", err?.response.data);
     }
   }, [video, userId, hasJoined]);
 
@@ -123,6 +123,8 @@ const PlayerScreen = ({ route, navigation }) => {
         await leaveChat();
         // Proceed with the original navigation action
         navigation.dispatch(e.data.action);
+      }else{
+        navigation.goBack()
       }
       // else → user stays, no navigation happens
     });

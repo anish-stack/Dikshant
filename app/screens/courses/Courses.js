@@ -135,8 +135,8 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
 
   const handlePress = () => {
     if (isPurchased) {
-
-      navigation.navigate("my-course", {
+      const url = batch.category === "online" ? "my-course" : "my-course-subjects"
+      navigation.navigate(url, {
         unlocked: true,
         courseId: batch.id,
       });

@@ -210,6 +210,7 @@ export default function VideoList({
         batchId: video?.batchId ?? "",
         userId: String(userId),
         token,
+        videoId:video?.id,
         courseId: String(courseId),
       })
 

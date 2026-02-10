@@ -170,12 +170,12 @@ export default function CoursePage() {
     const handlePress = () => {
       if (isPurchased) {
         // Navigate to my-course if already purchased
-        navigation.navigate("my-course-subjects", { unlocked: true, courseId: item.id });
-
-        // navigation.navigate("my-course", {
-        //   unlocked: true,
-        //   courseId: item.id,
-        // });
+        // navigation.navigate("my-course-subjects", { unlocked: true, courseId: item.id });
+        const url = item.category === "online" ? "my-course" : "my-course-subjects"
+        navigation.navigate(url, {
+          unlocked: true,
+          courseId: item.id,
+        });
       } else {
         // Navigate to course detail if not purchased
         navigation.navigate("CourseDetail", {
