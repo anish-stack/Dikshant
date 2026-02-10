@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -7,10 +7,17 @@ import {
   Text,
   TouchableOpacity,
   AppState,
+  BackHandler,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+import axios from "axios";
 import { useSettings } from "../../hooks/useSettings";
+
+const API_BASE = "https://www.app.api.dikshantias.com/api/chat";
+const JOIN_API = `${API_BASE}/Student-join-api`;
+const LEAVE_API = `${API_BASE}/Student-Leave-api`;
 
 const MIN_LOADING_TIME = 3500;
 
@@ -18,7 +25,6 @@ const injectedConsoleJS = `
 (function () {
   if (window.__consoleInjected) return;
   window.__consoleInjected = true;
-
   function send(type, args) {
     window.ReactNativeWebView.postMessage(
       JSON.stringify({
@@ -29,43 +35,180 @@ const injectedConsoleJS = `
       })
     );
   }
-
-  console.log = function () {
-    send('log', arguments);
-  };
-
-  console.warn = function () {
-    send('warn', arguments);
-  };
-
-  console.error = function () {
-    send('error', arguments);
-  };
+  console.log = function () { send('log', arguments); };
+  console.warn = function () { send('warn', arguments); };
+  console.error = function () { send('error', arguments); };
 })();
 true;
 `;
 
-const PlayerScreen = ({ route }) => {
+const PlayerScreen = ({ route, navigation }) => {
   const { settings } = useSettings();
-  const { video, batchId, userId, token, courseId, isDemo} = route.params || {};
+  const { video, batchId, userId, token, courseId, isDemo ,videoId } = route.params || {};
+  console.log(video)
+  const playerUrl = `https://www.player.dikshantias.com/?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
 
-  const playerUrl = `${"http://192.168.1.22:5174/"}?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
-  console.log("",playerUrl)
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [hasJoined, setHasJoined] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const webViewRef = useRef(null);
+  const appStateRef = useRef(AppState.currentState);
 
-  /* ⏱ Minimum loader time */
+  // ─── Join / Leave Functions ─────────────────────────────────────────
+  const joinChat = useCallback(async () => {
+    if (!video || !userId || hasJoined) return;
+
+    try {
+      const payload = { videoId: videoId, userId: String(userId) };
+      const { data } = await axios.post(JOIN_API, payload, { timeout: 7000 });
+      console.log("✅ Joined chat successfully", data);
+      setHasJoined(true);
+    } catch (err) {
+      console.warn("Join chat failed:", err?.message);
+    }
+  }, [video, userId, hasJoined]);
+
+  const leaveChat = useCallback(async () => {
+    if (!hasJoined) return;
+
+    try {
+      const payload = { videoId: videoId, userId: String(userId) };
+      await axios.post(LEAVE_API, payload, { timeout: 7000 });
+      console.log("✅ Left chat successfully");
+      setHasJoined(false);
+    } catch (err) {
+      console.warn("Leave chat failed:", err?.message);
+    }
+  }, [hasJoined, video, userId]);
+
+  // ─── Confirmation Alert before leaving the screen ───────────────────
+  const showLeaveConfirmation = useCallback(() => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        "Class has not ended yet",
+        "Do you want to leave the class?",
+        [
+          {
+            text: "No, Stay",
+            style: "cancel",
+            onPress: () => resolve(false),
+          },
+          {
+            text: "Yes, Leave",
+            style: "destructive",
+            onPress: () => resolve(true),
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+  }, []);
+
+  // ─── Prevent back navigation without confirmation ───────────────────
+  useEffect(() => {
+    // React Navigation back/swipe/header back
+    const unsubscribe = navigation.addListener("beforeRemove", async (e) => {
+      // If not joined → allow normal navigation
+      if (!hasJoined) return;
+
+      // Prevent immediate navigation
+      e.preventDefault();
+
+      const userWantsToLeave = await showLeaveConfirmation();
+
+      if (userWantsToLeave) {
+        await leaveChat();
+        // Proceed with the original navigation action
+        navigation.dispatch(e.data.action);
+      }
+      // else → user stays, no navigation happens
+    });
+
+    // Android hardware back button
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", async () => {
+      if (!hasJoined) {
+        return false; // default behavior: go back
+      }
+
+      const userWantsToLeave = await showLeaveConfirmation();
+
+      if (userWantsToLeave) {
+        await leaveChat();
+        navigation.goBack();
+        return true; // event handled
+      }
+
+      return true; // prevent back if user cancels
+    });
+
+    return () => {
+      unsubscribe();
+      backHandler.remove();
+    };
+  }, [navigation, hasJoined, showLeaveConfirmation, leaveChat]);
+
+  // ─── Auto join on mount / params change ─────────────────────────────
+  useEffect(() => {
+    if (video && userId) {
+      joinChat();
+    }
+
+    // Safety cleanup on unmount
+    return () => {
+      leaveChat();
+    };
+  }, [video, userId, joinChat, leaveChat]);
+
+  // ─── App state handling (background/foreground) ─────────────────────
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // Came to foreground → re-join if needed
+        if (video && userId && !hasJoined) {
+          joinChat();
+        }
+      } else if (
+        nextAppState.match(/inactive|background/) &&
+        hasJoined
+      ) {
+        // Going to background → leave
+        leaveChat();
+      }
+
+      appStateRef.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [video, userId, hasJoined, joinChat, leaveChat]);
+
+  // ─── Pause video when app backgrounds ───────────────────────────────
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
+        webViewRef.current?.injectJavaScript(`
+          const v = document.querySelector("video");
+          if (v) { v.pause(); }
+          true;
+        `);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  // ─── Minimum loading timer ──────────────────────────────────────────
   useEffect(() => {
     const timer = setTimeout(() => setMinTimePassed(true), MIN_LOADING_TIME);
     return () => clearTimeout(timer);
   }, []);
 
-  /* ✨ Shimmer animation */
+  // ─── Shimmer animation ──────────────────────────────────────────────
   useEffect(() => {
     Animated.loop(
       Animated.timing(shimmerAnim, {
@@ -74,9 +217,9 @@ const PlayerScreen = ({ route }) => {
         useNativeDriver: true,
       })
     ).start();
-  }, []);
+  }, [shimmerAnim]);
 
-  /* 👁 Hide loader only when BOTH ready */
+  // ─── Hide loader when ready ─────────────────────────────────────────
   useEffect(() => {
     if (pageLoaded && minTimePassed) {
       Animated.timing(fadeAnim, {
@@ -85,29 +228,14 @@ const PlayerScreen = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
-  }, [pageLoaded, minTimePassed]);
+  }, [pageLoaded, minTimePassed, fadeAnim]);
 
-  /* ⏸ Pause video on app background */
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state !== "active") {
-        webViewRef.current?.injectJavaScript(`
-          const v = document.querySelector("video");
-          if(v){ v.pause(); }
-          true;
-        `);
-      }
-    });
-    return () => sub.remove();
-  }, []);
-
-  /* 🔁 Retry handler */
+  // ─── Retry handler ──────────────────────────────────────────────────
   const handleRetry = () => {
     setHasError(false);
     setPageLoaded(false);
     setMinTimePassed(false);
     fadeAnim.setValue(1);
-
     setTimeout(() => setMinTimePassed(true), MIN_LOADING_TIME);
     webViewRef.current?.reload();
   };
@@ -115,7 +243,7 @@ const PlayerScreen = ({ route }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.container}>
-        {/* 🔥 WEBVIEW */}
+        {/* WebView */}
         {!hasError && (
           <WebView
             ref={webViewRef}
@@ -123,28 +251,29 @@ const PlayerScreen = ({ route }) => {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             allowsFullscreenVideo={true}
-            allowsInlineMediaPlayback={true}                    // Crucial for iOS
-            mediaPlaybackRequiresUserAction={false}             // Allows autoplay/unmute on iOS
-            androidLayerType="hardware"                         // Fixes black screen on Android
-            mixedContentMode="compatibility"                    // Helps with HTTP on Android
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            androidLayerType="hardware"
+            mixedContentMode="compatibility"
             thirdPartyCookiesEnabled={true}
             injectedJavaScriptBeforeContentLoaded={injectedConsoleJS}
             onLoadEnd={() => setPageLoaded(true)}
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
-              console.warn('WebView error: ', nativeEvent);
+              console.warn("WebView error:", nativeEvent);
               setHasError(true);
             }}
             onHttpError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
-              console.warn('HTTP error: ', nativeEvent.statusCode);
+              console.warn("HTTP error:", nativeEvent.statusCode);
             }}
-            onMessage={(event) => { /* your existing handler */ }}
+            onMessage={(event) => {
+              // Handle console messages or other webview messages if needed
+            }}
           />
-
         )}
 
-        {/* 🔥 LOADER + SKELETON */}
+        {/* Loader + Skeleton */}
         {(!pageLoaded || !minTimePassed) && !hasError && (
           <Animated.View style={[styles.loaderOverlay, { opacity: fadeAnim }]}>
             <Animated.View
@@ -180,12 +309,11 @@ const PlayerScreen = ({ route }) => {
                 },
               ]}
             />
-
             <ActivityIndicator size="large" color="#1976D2" />
           </Animated.View>
         )}
 
-        {/* ❌ ERROR UI */}
+        {/* Error Screen */}
         {hasError && (
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>⚠️ Player Load Failed</Text>

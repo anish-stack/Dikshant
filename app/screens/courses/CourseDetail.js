@@ -337,6 +337,7 @@ export default function CourseDetail() {
       batchId: video?.batchId ?? "",
       userId: String(userId),
       token,
+      videoId:video?.id,
       courseId: String(batchId),
     })
 

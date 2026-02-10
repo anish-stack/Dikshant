@@ -379,6 +379,9 @@ export default function CourseVideos() {
                       Schedule
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
+                      Preview Class
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
                       Status
                     </th>
                     <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
@@ -505,6 +508,11 @@ export default function CourseVideos() {
                               —
                             </div>
                           )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <a target="_blank" href={`/stats-of-class/${v?.id}`}>
+                            Check Live
+                          </a>
                         </td>
 
                         <td className="px-3 py-2">

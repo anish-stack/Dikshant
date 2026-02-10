@@ -64,7 +64,7 @@ const Stack = createNativeStackNavigator();
 
 export default function AppRouter({ navigationRef }) {
   const linking = {
-    prefixes: ["http://192.168.1.22:5174"],
+    prefixes: ["https://www.player.dikshantias.com"],
     config: {
       screens: {
         Home: "app/open-home",
