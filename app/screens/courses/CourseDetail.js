@@ -159,12 +159,18 @@ const getYouTubeThumbnail = (url) => {
 export default function CourseDetail() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { courseId: batchId } = route.params || {};
+  const {
+    courseId: batchId,
+    batchData: passedBatchData,
+    isAlreadyPurchased: passedPurchased,
+    isExpired: passedExpired,
+    expiryMessage: passedExpiryMessage,
+  } = route.params || {};
   const insets = useSafeAreaInsets();
   const [webHeight, setWebHeight] = useState(0);
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
   const TAB_BAR_HEIGHT = isGestureNavigation ? 72 : 56;
-  const { token ,userId } = useAuthStore()
+  const { token, userId } = useAuthStore()
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [showVideoModal, setShowVideoModal] = useState(false);
@@ -172,6 +178,15 @@ export default function CourseDetail() {
   const [playing, setPlaying] = useState(false);
   const [isCourseAlreadyPurchased, setIsCourseAlreadyPurchased] = useState(false)
   const [AlreadyPurchased, setAlreadyPurchased] = useState(null)
+
+  const [purchaseStatus, setPurchaseStatus] = useState({
+    purchased: passedPurchased ?? false,
+    canAccess: passedExpired !== true, // invert: if passedExpired=true → canAccess=false
+    message: passedExpiryMessage || null,
+  });
+
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
   // Fetch batch details
   const {
     data: batchData,
@@ -203,7 +218,6 @@ export default function CourseDetail() {
 
   const FetchCourseAlreadyPurchased = async () => {
     try {
-      console.log("🔍 Checking if batch already purchased:", batchId);
 
       const response = await axios.get(
         `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
@@ -219,6 +233,13 @@ export default function CourseDetail() {
       );
 
 
+      if (response.data?.success) {
+        setPurchaseStatus({
+          purchased: response.data.purchased || false,
+          canAccess: response.data.canAccess ?? true,
+          message: response.data.message || null,
+        });
+      }
       if (response.data?.purchased) {
         setAlreadyPurchased(response.data)
         setIsCourseAlreadyPurchased(true);
@@ -242,6 +263,9 @@ export default function CourseDetail() {
   }, [batchId])
 
 
+  const isActive = purchaseStatus?.purchased && purchaseStatus?.canAccess;
+  const isExpired = purchaseStatus?.purchased && !purchaseStatus?.canAccess;
+
 
   const { demoVideos, lockedVideos } = useMemo(() => {
     try {
@@ -252,6 +276,24 @@ export default function CourseDetail() {
       return { demoVideos: [], lockedVideos: [] };
     }
   }, [videos]);
+
+
+  const handleActionPress = () => {
+    if (isActive) {
+      const screen = batchData?.category === "online" ? "my-course" : "my-course-subjects";
+      navigation.navigate(screen, {
+        unlocked: true,
+        courseId: batchId,
+      });
+    } else {
+      // Enroll or Renew → same screen
+      navigation.navigate("enroll-course", {
+        batchId: batchData?.id || passedBatchData?.id,
+        userId: userId || 456,
+        isRenewal: isExpired,
+      });
+    }
+  };
 
   // Safe price calculations with null checks
   const hasDiscount = useMemo(() => {
@@ -337,7 +379,7 @@ export default function CourseDetail() {
       batchId: video?.batchId ?? "",
       userId: String(userId),
       token,
-      videoId:video?.id,
+      videoId: video?.id,
       courseId: String(batchId),
     })
 
@@ -433,6 +475,7 @@ export default function CourseDetail() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+
         {/* Hero Image */}
         {batchData?.imageUrl && (
           <View style={styles.hero}>
@@ -447,11 +490,25 @@ export default function CourseDetail() {
                 <Text style={styles.discountTagText}>{discountPercent}% OFF</Text>
               </View>
             )}
+
           </View>
         )}
 
+        {isExpired && (
+          <View style={styles.expiryBanner}>
+            <Feather name="alert-triangle" size={18} color={colors.danger} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.expiryTitle}>Access Expired</Text>
+              <Text style={styles.expiryMessage}>
+                {purchaseStatus?.message || passedExpiryMessage ||
+                  "Your previous access has ended. Renew to continue."}
+              </Text>
+            </View>
+          </View>
+        )}
         {/* Course Info Card */}
         <View style={styles.infoCard}>
+
           <Text style={styles.courseTitle}>{batchData?.name || "Course Title"}</Text>
 
           {batchData?.program?.name && (
@@ -486,6 +543,7 @@ export default function CourseDetail() {
             </View>
           </View>
         </View>
+
 
 
         {batchData?.longDescription && (
@@ -729,8 +787,43 @@ export default function CourseDetail() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      <View
+        style={[
+          styles.enrollContainer,
+          {
+
+            height: TAB_BAR_HEIGHT + (isGestureNavigation ? insets.bottom : 0),
+            paddingBottom: isGestureNavigation ? insets.bottom : 0,
+          },
+        ]}
+      >
+        {isActive ? (
+          <TouchableOpacity style={styles.enrollButton} onPress={handleActionPress}>
+            <Text style={styles.enrollButtonText}>Continue Learning</Text>
+            <Feather name="arrow-right" size={20} color={colors.white} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.priceAndButtonRow}>
+            <View style={styles.enrollPriceInfo}>
+              <Text style={styles.enrollPriceLabel}>
+                {isExpired ? "Renewal Price" : "Total Price"}
+              </Text>
+              <Text style={styles.enrollPriceValue}>
+                ₹{formatCurrency(finalPrice ?? 0)}
+              </Text>
+            </View>
+
+            <TouchableOpacity style={styles.enrollButton} onPress={handleActionPress}>
+              <Text style={styles.enrollButtonText}>
+                {isExpired ? "Renew Now" : "Enroll Now"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
       {/* Fixed Enroll Button */}
-      {isCourseAlreadyPurchased ? (
+      {/* {isCourseAlreadyPurchased ? (
         <View
           style={[
             styles.enrollContainer,
@@ -745,7 +838,7 @@ export default function CourseDetail() {
 
           <TouchableOpacity
             style={styles.enrollButton}
-            onPress={() => navigation.navigate(batchData?.category === "online" ? "my-course":"my-course-subjects", {
+            onPress={() => navigation.navigate(batchData?.category === "online" ? "my-course" : "my-course-subjects", {
               unlocked: isCourseAlreadyPurchased,
               courseId: batchId || AlreadyPurchased?.orderId,
             })}
@@ -781,7 +874,7 @@ export default function CourseDetail() {
             <Feather name="arrow-right" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
-      )}
+      )} */}
 
       {/* Video Modal */}
       <Modal
@@ -1818,5 +1911,130 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 15,
     fontWeight: "600",
+  },
+
+  // ────────────────────────────────────────────────
+  // Renewal & Expiry Specific Styles
+  // ────────────────────────────────────────────────
+
+  expiryBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',           // light red background
+    padding: 14,
+    borderRadius: 12,
+  },
+
+  expiryIcon: {
+    marginRight: 12,
+  },
+
+  expiryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.danger,
+    marginBottom: 4,
+  },
+
+  expiryMessage: {
+    fontSize: 13,
+    color: '#7f1d1d',                    // darker red text
+    lineHeight: 18,
+  },
+
+  // ─── Action Button (Enroll / Renew / Continue) ───
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginVertical: 8,
+    width: '100%',
+  },
+
+  actionButtonActive: {
+    backgroundColor: colors.success,      // green for active access
+  },
+
+  actionButtonRenew: {
+    backgroundColor: colors.warning,      // orange/yellow for renewal
+  },
+
+  actionButtonEnroll: {
+    backgroundColor: colors.primary,      // red for fresh enroll
+  },
+
+  actionButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 10,
+  },
+
+  // ─── Bottom Fixed Container Adjustments ───
+  enrollContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+
+  priceAndButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+
+  enrollPriceInfo: {
+    flex: 1,
+  },
+
+  enrollPriceLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+
+  enrollPriceValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+
+  // ─── Small status tags (optional, for info card) ───
+  statusTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  statusTagActive: {
+    backgroundColor: colors.success + '20', // light green
+  },
+
+  statusTagExpired: {
+    backgroundColor: colors.danger + '20',  // light red
+  },
+
+  statusTagText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });

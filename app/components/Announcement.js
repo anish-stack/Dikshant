@@ -7,7 +7,7 @@ import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
-const Announcement = ({refreshing}) => {
+const Announcement = ({ refreshing }) => {
   const navigation = useNavigation()
   const [announcements, setAnnouncements] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -63,17 +63,13 @@ const Announcement = ({refreshing}) => {
   }
 
   if (announcements.length === 0) {
-    return (
-      <View style={styles.container}>
-        <Text>No announcements available</Text>
-      </View>
-    );
+    return null
   }
 
   const current = announcements[currentIndex];
 
   return (
-    <TouchableOpacity onPress={()=> navigation.navigate("annouce-details",{id:current.id})} activeOpacity={0.9} style={styles.container}>
+    <TouchableOpacity onPress={() => navigation.navigate("annouce-details", { id: current.id })} activeOpacity={0.9} style={styles.container}>
       <View style={styles.card}>
         <Animated.View
           style={[
@@ -86,7 +82,7 @@ const Announcement = ({refreshing}) => {
             <Text style={styles.message}>{current.message}</Text>
           </View>
 
-          <TouchableOpacity onPress={()=> navigation.navigate("annouce-details",{id:current.id})} style={[styles.actionButton, { backgroundColor: "#1976D2" }]}>
+          <TouchableOpacity onPress={() => navigation.navigate("annouce-details", { id: current.id })} style={[styles.actionButton, { backgroundColor: "#1976D2" }]}>
             <Text style={styles.buttonText}>
               <FontAwesome name="arrow-right" />
             </Text>

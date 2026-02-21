@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
     razorpayOrderId: DataTypes.STRING,
     razorpayPaymentId: DataTypes.STRING,
     razorpaySignature: DataTypes.STRING,
+
     reason: DataTypes.STRING,
     status: DataTypes.ENUM("pending", "success", "failed"),
     paymentDate: DataTypes.DATE,

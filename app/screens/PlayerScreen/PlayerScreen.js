@@ -15,7 +15,7 @@ import { WebView } from "react-native-webview";
 import axios from "axios";
 import { useSettings } from "../../hooks/useSettings";
 
-const API_BASE = "https://www.app.api.dikshantias.com/api/chat";
+const API_BASE = "http://192.168.1.7:5001/api/chat";
 const JOIN_API = `${API_BASE}/Student-join-api`;
 const LEAVE_API = `${API_BASE}/Student-Leave-api`;
 
@@ -44,9 +44,9 @@ true;
 
 const PlayerScreen = ({ route, navigation }) => {
   const { settings } = useSettings();
-  const { video, batchId, userId, token, courseId, isDemo ,videoId } = route.params || {};
+  const { video, batchId, userId, token, courseId, isDemo, videoId } = route.params || {};
   const playerUrl = `https://www.player.dikshantias.com/?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
-  // console.log(route.params)
+
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -59,110 +59,102 @@ const PlayerScreen = ({ route, navigation }) => {
 
   // ─── Join / Leave Functions ─────────────────────────────────────────
   const joinChat = useCallback(async () => {
-    if (!video || !userId || hasJoined) return;
+    if (!videoId || !userId || hasJoined) return;
 
     try {
-      const payload = { videoId: videoId, userId: String(userId) };
+      const payload = { videoId, userId: String(userId) };
       const { data } = await axios.post(JOIN_API, payload, { timeout: 7000 });
       console.log("✅ Joined chat successfully", data);
       setHasJoined(true);
     } catch (err) {
-      console.warn("Join chat failed:", err?.response.data);
+      console.warn("Join chat failed:", err?.response?.data || err.message);
     }
-  }, [video, userId, hasJoined]);
+  }, [videoId, userId, hasJoined]);
 
   const leaveChat = useCallback(async () => {
     if (!hasJoined) return;
 
     try {
-      const payload = { videoId: videoId, userId: String(userId) };
+      const payload = { videoId, userId: String(userId) };
       await axios.post(LEAVE_API, payload, { timeout: 7000 });
       console.log("✅ Left chat successfully");
       setHasJoined(false);
     } catch (err) {
       console.warn("Leave chat failed:", err?.message);
     }
-  }, [hasJoined, video, userId]);
+  }, [hasJoined, videoId, userId]);
 
-  // ─── Confirmation Alert before leaving the screen ───────────────────
+  // ─── Confirmation Alert ─────────────────────────────────────────────
   const showLeaveConfirmation = useCallback(() => {
     return new Promise((resolve) => {
       Alert.alert(
         "Class has not ended yet",
         "Do you want to leave the class?",
         [
-          {
-            text: "No, Stay",
-            style: "cancel",
-            onPress: () => resolve(false),
-          },
-          {
-            text: "Yes, Leave",
-            style: "destructive",
-            onPress: () => resolve(true),
-          },
+          { text: "No, Stay", style: "cancel", onPress: () => resolve(false) },
+          { text: "Yes, Leave", style: "destructive", onPress: () => resolve(true) },
         ],
         { cancelable: false }
       );
     });
   }, []);
 
+  // ─── Centralized canLeave function ──────────────────────────────────
+  const attemptLeave = useCallback(async () => {
+    if (!hasJoined) return true; // can leave immediately
+
+    const userConfirmed = await showLeaveConfirmation();
+    if (userConfirmed) {
+      await leaveChat();
+      return true;
+    }
+    return false;
+  }, [hasJoined, showLeaveConfirmation, leaveChat]);
+
   // ─── Prevent back navigation without confirmation ───────────────────
   useEffect(() => {
-    // React Navigation back/swipe/header back
+    // React Navigation back (header / swipe / goBack)
     const unsubscribe = navigation.addListener("beforeRemove", async (e) => {
-      // If not joined → allow normal navigation
-      if (!hasJoined) return;
+      const canProceed = await attemptLeave();
 
-      // Prevent immediate navigation
-      e.preventDefault();
-
-      const userWantsToLeave = await showLeaveConfirmation();
-
-      if (userWantsToLeave) {
-        await leaveChat();
-        // Proceed with the original navigation action
-        navigation.dispatch(e.data.action);
-      }else{
-        navigation.goBack()
+      if (!canProceed) {
+        e.preventDefault();
+        return;
       }
-      // else → user stays, no navigation happens
+
+      // If we reach here → user confirmed leave or no join → allow navigation
+      // no need to dispatch manually in most cases
     });
 
     // Android hardware back button
     const backHandler = BackHandler.addEventListener("hardwareBackPress", async () => {
-      if (!hasJoined) {
-        return false; // default behavior: go back
-      }
+      const canProceed = await attemptLeave();
 
-      const userWantsToLeave = await showLeaveConfirmation();
-
-      if (userWantsToLeave) {
-        await leaveChat();
+      if (canProceed) {
         navigation.goBack();
-        return true; // event handled
+        return true; // we handled it
       }
 
-      return true; // prevent back if user cancels
+      return true; // we handled (prevented) it
     });
 
     return () => {
       unsubscribe();
       backHandler.remove();
     };
-  }, [navigation, hasJoined, showLeaveConfirmation, leaveChat]);
+  }, [navigation, attemptLeave]);
 
   // ─── Auto join on mount / params change ─────────────────────────────
   useEffect(() => {
-    if (video && userId) {
+    if (video && videoId && userId) {
       joinChat();
     }
 
-    // Safety cleanup on unmount
+    // Cleanup on unmount
     return () => {
       leaveChat();
     };
-  }, [video, userId, joinChat, leaveChat]);
+  }, [video, videoId, userId, joinChat, leaveChat]);
 
   // ─── App state handling (background/foreground) ─────────────────────
   useEffect(() => {
@@ -171,15 +163,15 @@ const PlayerScreen = ({ route, navigation }) => {
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // Came to foreground → re-join if needed
-        if (video && userId && !hasJoined) {
+        // Foreground → try re-join
+        if (video && videoId && userId && !hasJoined) {
           joinChat();
         }
       } else if (
         nextAppState.match(/inactive|background/) &&
         hasJoined
       ) {
-        // Going to background → leave
+        // Background → leave
         leaveChat();
       }
 
@@ -187,7 +179,7 @@ const PlayerScreen = ({ route, navigation }) => {
     });
 
     return () => subscription.remove();
-  }, [video, userId, hasJoined, joinChat, leaveChat]);
+  }, [video, videoId, userId, hasJoined, joinChat, leaveChat]);
 
   // ─── Pause video when app backgrounds ───────────────────────────────
   useEffect(() => {
@@ -195,7 +187,7 @@ const PlayerScreen = ({ route, navigation }) => {
       if (state !== "active") {
         webViewRef.current?.injectJavaScript(`
           const v = document.querySelector("video");
-          if (v) { v.pause(); }
+          if (v) v.pause();
           true;
         `);
       }
@@ -268,8 +260,8 @@ const PlayerScreen = ({ route, navigation }) => {
               const { nativeEvent } = syntheticEvent;
               console.warn("HTTP error:", nativeEvent.statusCode);
             }}
-            onMessage={(event) => {
-              // Handle console messages or other webview messages if needed
+            onMessage={() => {
+              // console messages already handled via injected js
             }}
           />
         )}
@@ -333,6 +325,7 @@ const PlayerScreen = ({ route, navigation }) => {
 
 export default PlayerScreen;
 
+// styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

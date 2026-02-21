@@ -384,7 +384,7 @@ export default function App() {
 
   return (
     <SocketProvider userId={user?.id}>
-      <AppRouter 
+      <AppRouter
         navigationRef={navigationRef}
         handleNotificationData={handleNotificationData}
       />

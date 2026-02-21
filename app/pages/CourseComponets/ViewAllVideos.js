@@ -158,12 +158,14 @@ export default function ViewAllVideos({ route, navigation }) {
       Alert.alert('Not Available Yet', 'This class has not started.');
       return;
     }
+    // , , , , , isDemo ,
 
     navigation.navigate('PlayerScreen', {
       video: video.secureToken,
       batchId: video?.batchId ?? batchId,
       userId: String(user.id),
       token,
+      videoId: video?.id,
       courseId: String(batchId),
     });
   };

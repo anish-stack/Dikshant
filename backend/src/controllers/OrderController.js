@@ -1205,53 +1205,85 @@ static async adminReverseAssignCourse(req, res) {
     }
   }
 
-  static async userOrders(req, res) {
-    try {
-      const userId = req.params.userId;
+static async userOrders(req, res) {
+  try {
+    const userId = req.params.userId;
 
-      const orders = await Order.findAll({
-        where: { userId, status: "success" },
-        order: [["createdAt", "DESC"]],
-      });
+    const orders = await Order.findAll({
+      where: { userId, status: "success" },
+      order: [["createdAt", "DESC"]],
+    });
 
-      const finalOrders = await Promise.all(
-        orders.map(async (order) => {
-          if (order.type !== "batch") return order.toJSON();
+    const now = new Date(); // server current time
 
-          const batch = await Batch.findOne({
-            where: { id: order.itemId },
-            include: [{ model: Program, as: "program", attributes: ["id", "name", "slug"] }],
-          });
+    const finalOrders = await Promise.all(
+      orders.map(async (order) => {
+        const orderJson = order.toJSON();
 
-          if (!batch) return { ...order.toJSON(), batch: null, subjects: [] };
+        if (order.type !== "batch") {
+          return orderJson;
+        }
 
-          let subjectIds = [];
-          try {
-            subjectIds = JSON.parse(batch.subjectId || "[]");
-          } catch {
-            subjectIds = [];
-          }
+        const batch = await Batch.findOne({
+          where: { id: order.itemId },
+          include: [{ model: Program, as: "program", attributes: ["id", "name", "slug"] }],
+        });
 
-          const subjects = await Subject.findAll({
-            where: { id: subjectIds },
-            attributes: ["id", "name", "slug", "description"],
-          });
+        if (!batch) {
+          return { ...orderJson, batch: null, subjects: [], expiryDate: null, isExpired: false };
+        }
 
-          return {
-            ...order.toJSON(),
-            batch: batch.toJSON(),
-            subjects,
-          };
-        })
-      );
+        let subjectIds = [];
+        try {
+          subjectIds = JSON.parse(batch.subjectId || "[]");
+        } catch {
+          subjectIds = [];
+        }
 
-      return res.json(finalOrders);
-    } catch (err) {
-      console.error("[userOrders] ERROR:", err);
-      return res.status(500).json({ success: false, message: "Error fetching orders" });
-    }
+        const subjects = await Subject.findAll({
+          where: { id: subjectIds },
+          attributes: ["id", "name", "slug", "description"],
+        });
+
+        // ─── Expiry logic ────────────────────────────────────────────────
+        let expiryDate = null;
+        let isExpired = false;
+
+        const isBatchIncluded = order.reason === "BATCH_INCLUDED";
+
+        if (!isBatchIncluded && Number.isInteger(order.accessValidityDays) && order.accessValidityDays > 0) {
+          const created = new Date(order.createdAt);
+          expiryDate = new Date(created);
+          expiryDate.setDate(created.getDate() + order.accessValidityDays);
+
+          // Normalize to end of day (optional but common for validity)
+          // expiryDate.setHours(23, 59, 59, 999);
+
+          isExpired = now > expiryDate;
+        }
+
+        // You could also add fallback using batch.endDate if you want:
+        // if (!expiryDate && batch.endDate) {
+        //   expiryDate = new Date(batch.endDate);
+        //   isExpired = now > expiryDate;
+        // }
+
+        return {
+          ...orderJson,
+          batch: batch.toJSON(),
+          subjects,
+          expiryDate: expiryDate ? expiryDate.toISOString() : null,
+          isExpired,
+        };
+      })
+    );
+
+    return res.json(finalOrders);
+  } catch (err) {
+    console.error("[userOrders] ERROR:", err);
+    return res.status(500).json({ success: false, message: "Error fetching orders" });
   }
-  // ALL ORDERS (ADMIN)
+}
   static async allOrders(req, res) {
     try {
       const orders = await Order.findAll();
@@ -1263,7 +1295,6 @@ static async adminReverseAssignCourse(req, res) {
     }
   }
 
-  // GET ORDER BY ID
   static async getOrderById(req, res) {
     try {
       const orderId = req.params.orderId;
@@ -1280,77 +1311,146 @@ static async adminReverseAssignCourse(req, res) {
     }
   }
 
-  static async alreadyPurchased(req, res) {
-    try {
-      const userId = req.user?.id || req.query.userId;
-      const { itemId, type } = req.query;
+static async alreadyPurchased(req, res) {
+  try {
+    const userId = req.user?.id || req.query.userId;
+    const { itemId, type } = req.query;
 
-      if (!userId || !itemId || !type) {
-        return res.status(400).json({ success: false, message: "userId, itemId and type required" });
-      }
+    if (!userId || !itemId || !type) {
+      return res.status(400).json({ success: false, message: "userId, itemId and type required" });
+    }
 
-      const order = await Order.findOne({
-        where: {
-          userId,
-          itemId,
-          type,
-          status: "success",
-          enrollmentStatus: "active",
-        },
+    const order = await Order.findOne({
+      where: {
+        userId,
+        itemId,
+        type,
+        status: "success",
+        enrollmentStatus: "active",
+      },
+    });
+
+    if (!order) {
+      return res.json({ success: true, purchased: false });
+    }
+
+    const response = {
+      success: true,
+      purchased: true,
+      orderId: order.id,
+      paymentDate: order.paymentDate,
+      totalAmount: order.totalAmount,
+      couponCode: order.couponCode,
+    };
+
+    // ────────────────────────────────────────────────
+    //   Access control logic (batch / course specific)
+    // ────────────────────────────────────────────────
+    let canAccess = true;
+    let expiryMessage = null;
+
+    if (type === "batch") {
+      const now = new Date();
+
+      // 1. Load batch to get endDate (if exists)
+      const batch = await Batch.findByPk(order.itemId, {
+        attributes: ["id", "endDate", "name"], // minimal fields
       });
 
-      if (!order) {
-        return res.json({ success: true, purchased: false });
+      const isBatchIncluded = order.reason === "BATCH_INCLUDED";
+
+      let expiryDate = null;
+      let expirySource = null; // for message clarity (personal / batch)
+
+      // Priority 1: Personal access validity days (only if not batch-included)
+      if (!isBatchIncluded && Number.isInteger(order.accessValidityDays) && order.accessValidityDays > 0) {
+        const created = new Date(order.createdAt);
+        expiryDate = new Date(created);
+        expiryDate.setDate(created.getDate() + order.accessValidityDays);
+        expiryDate.setHours(23, 59, 59, 999);
+        expirySource = "personal";
+      }
+      // Priority 2: Fallback to batch.endDate (if no personal validity or batch-included)
+      else if (batch && batch.endDate) {
+        expiryDate = new Date(batch.endDate);
+        expirySource = "batch";
       }
 
-      const response = {
-        success: true,
-        purchased: true,
-        orderId: order.id,
-        paymentDate: order.paymentDate,
-        totalAmount: order.totalAmount,
-        couponCode: order.couponCode,
+      // Final check
+      if (expiryDate && now > expiryDate) {
+        canAccess = false;
+
+        const formattedExpiry = expiryDate.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+
+        if (expirySource === "personal") {
+          expiryMessage = `Assigned course validity expired on ${formattedExpiry}`;
+        } else if (expirySource === "batch") {
+          expiryMessage = `Batch access expired on ${formattedExpiry}`;
+        } else {
+          expiryMessage = "Course access has expired";
+        }
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    //   Quiz logic (unchanged)
+    // ────────────────────────────────────────────────
+    if (type === "quiz") {
+      const limit = order.quiz_limit ?? 3;
+      const used = order.quiz_attempts_used ?? 0;
+      const remaining = Math.max(limit - used, 0);
+
+      response.quizLimit = limit;
+      response.quizAttemptsUsed = used;
+      response.remainingAttempts = remaining;
+      response.canAttempt = remaining > 0;
+
+      if (!response.canAttempt) {
+        response.message = "Quiz attempt limit reached";
+      }
+    }
+
+    // ────────────────────────────────────────────────
+    //   Test series logic (unchanged)
+    // ────────────────────────────────────────────────
+    if (type === "test") {
+      const testSeries = await TestSeries.findByPk(itemId);
+      if (!testSeries) {
+        return res.status(404).json({ success: false, message: "Test series not found" });
+      }
+
+      const now = new Date();
+      const expired = testSeries.expirSeries && new Date(testSeries.expirSeries) < now;
+
+      response.testSeries = {
+        id: testSeries.id,
+        title: testSeries.title,
+        expirSeries: testSeries.expirSeries,
       };
 
-      if (type === "quiz") {
-        const limit = order.quiz_limit ?? 3;
-        const used = order.quiz_attempts_used ?? 0;
-        const remaining = Math.max(limit - used, 0);
-
-        response.quizLimit = limit;
-        response.quizAttemptsUsed = used;
-        response.remainingAttempts = remaining;
-        response.canAttempt = remaining > 0;
-        if (!response.canAttempt) response.message = "Quiz attempt limit reached";
+      canAccess = !expired;
+      if (expired) {
+        expiryMessage = "Test series access has expired";
       }
-
-      if (type === "test") {
-        const testSeries = await TestSeries.findByPk(itemId);
-        if (!testSeries) {
-          return res.status(404).json({ success: false, message: "Test series not found" });
-        }
-
-        const now = new Date();
-        const expired = testSeries.expirSeries && new Date(testSeries.expirSeries) < now;
-
-        response.testSeries = {
-          id: testSeries.id,
-          title: testSeries.title,
-          expirSeries: testSeries.expirSeries,
-        };
-        response.canAccess = !expired;
-        if (expired) response.message = "Test series access has expired";
-      }
-
-      return res.json(response);
-    } catch (err) {
-      console.error("[alreadyPurchased] ERROR:", err);
-      return res.status(500).json({ success: false, message: "Failed to check purchase status" });
     }
+
+    // Apply final access status (shared across batch, test, etc.)
+    response.canAccess = canAccess;
+
+    if (!canAccess && expiryMessage) {
+      response.message = expiryMessage;
+    }
+
+    return res.json(response);
+  } catch (err) {
+    console.error("[alreadyPurchased] ERROR:", err);
+    return res.status(500).json({ success: false, message: "Failed to check purchase status" });
   }
-
-
-
+}
   // GET USER'S QUIZ ORDERS WITH FULL QUIZ DETAILS & ATTEMPT INFO
   static async getUserQuizOrders(req, res) {
     try {

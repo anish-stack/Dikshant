@@ -10,6 +10,7 @@ import {
   Image,
   Dimensions,
   ScrollView,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import useSWR from "swr";
@@ -29,110 +30,99 @@ export default function CoursePage() {
   const navigation = useNavigation();
   const route = useRoute();
   const { filter } = route.params || {};
-  const { token } = useAuthStore()
+  const { token } = useAuthStore();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMode, setSelectedMode] = useState(filter ? filter : "all");
+  const [selectedMode, setSelectedMode] = useState(filter || "all");
   const [priceRange, setPriceRange] = useState("all");
   const [limit, setLimit] = useState(20);
   const [page, setPage] = useState(1);
-  const [purchasedCourses, setPurchasedCourses] = useState({});
+  const [purchaseStatus, setPurchaseStatus] = useState({}); // batchId → {purchased, canAccess, message?}
   const [checkingPurchases, setCheckingPurchases] = useState(false);
 
-  const { data: response, error, isLoading } = useSWR(`/batchs?limit=${limit}&page=${page}`, fetcher);
+  const { data: response, error, isLoading } = useSWR(
+    `/batchs?limit=${limit}&page=${page}`,
+    fetcher
+  );
 
   const batches = useMemo(() => response?.items || [], [response]);
-  const batchPages = response?.pages
-  console.log(batchPages)
+  const totalPages = response?.pages || 1;
 
-  // Check purchase status for all courses
-  const checkPurchaseStatus = async (batchIds) => {
+  // Fetch purchase + access status for visible batches
+  const checkPurchaseAndAccess = async (batchIds) => {
     if (!token || batchIds.length === 0) return;
 
     setCheckingPurchases(true);
-    const purchaseMap = {};
+    const statusMap = { ...purchaseStatus };
 
     try {
-      const checkPromises = batchIds.map(async (batchId) => {
+      const promises = batchIds.map(async (batchId) => {
         try {
-          const response = await axios.get(
+          const res = await axios.get(
             `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
             {
-              params: {
-                type: "batch",
-                itemId: batchId,
-              },
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
+              params: { type: "batch", itemId: batchId },
+              headers: { Authorization: `Bearer ${token}` },
             }
           );
 
-          if (response.data?.purchased) {
-            purchaseMap[batchId] = response.data;
+          if (res.data?.success) {
+            statusMap[batchId] = {
+              purchased: res.data.purchased || false,
+              canAccess: res.data.canAccess ?? true,
+              message: res.data.message || null,
+            };
           }
-        } catch (error) {
-          console.error(`Error checking purchase for batch ${batchId}:`, error);
+        } catch (err) {
+          console.warn(`Failed to check batch ${batchId}:`, err?.response?.data || err);
         }
       });
 
-      await Promise.all(checkPromises);
-      setPurchasedCourses(purchaseMap);
-    } catch (error) {
-      console.error("Error checking purchase statuses:", error);
+      await Promise.all(promises);
+      setPurchaseStatus(statusMap);
+    } catch (err) {
+      console.error("Bulk purchase check failed:", err);
     } finally {
       setCheckingPurchases(false);
     }
   };
 
-  // Check purchase status when batches load
   useEffect(() => {
     if (batches.length > 0 && token) {
-      const batchIds = batches.map(batch => batch.id);
-      checkPurchaseStatus(batchIds);
+      const ids = batches.map((b) => b.id);
+      checkPurchaseAndAccess(ids);
     }
   }, [batches, token]);
 
   const filteredBatches = useMemo(() => {
-    let filtered = [...batches];
+    let list = [...batches];
 
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
         (b) =>
-          b.name?.toLowerCase().includes(query) ||
-          b.shortDescription?.toLowerCase().includes(query) ||
-          b.program?.name?.toLowerCase().includes(query)
+          b.name?.toLowerCase().includes(q) ||
+          b.shortDescription?.toLowerCase().includes(q) ||
+          b.program?.name?.toLowerCase().includes(q)
       );
     }
 
     if (selectedMode !== "all") {
-      filtered = filtered.filter((b) => b.category === selectedMode);
+      list = list.filter((b) => b.category === selectedMode);
     }
 
     if (priceRange !== "all") {
-      filtered = filtered.filter((b) => {
-        const price = b.batchDiscountPrice || b.batchPrice;
-        switch (priceRange) {
-          case "under20k":
-            return price < 20000;
-          case "20k-50k":
-            return price >= 20000 && price <= 50000;
-          case "above50k":
-            return price > 50000;
-          default:
-            return true;
-        }
+      list = list.filter((b) => {
+        const p = b.batchDiscountPrice || b.batchPrice || 0;
+        if (priceRange === "under20k") return p < 20000;
+        if (priceRange === "20k-50k") return p >= 20000 && p <= 50000;
+        if (priceRange === "above50k") return p > 50000;
+        return true;
       });
     }
 
-    return filtered;
+    return list;
   }, [batches, searchQuery, selectedMode, priceRange]);
-
-  const paginatedBatches = filteredBatches;
-
-
-  const totalPages = Math.ceil(filteredBatches.length / limit);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -143,53 +133,54 @@ export default function CoursePage() {
 
   const hasFilters = searchQuery || selectedMode !== "all" || priceRange !== "all";
 
-  const getFilterIcon = (category) => {
-    switch (category) {
-      case "online":
-        return "wifi";
-      case "offline":
-        return "map-pin";
-      case "recorded":
-        return "video";
-      default:
-        return "grid";
+  const getFilterIcon = (cat) => {
+    switch (cat) {
+      case "online": return "wifi";
+      case "offline": return "map-pin";
+      case "recorded": return "video";
+      default: return "grid";
+    }
+  };
+
+  const handleCoursePress = (batch) => {
+    const status = purchaseStatus[batch.id] || {};
+    const { purchased, canAccess, message } = status;
+    const isPurchased = !!status.purchased;
+    if (purchased && canAccess) {
+      // Go to classroom
+      const screen = batch.category === "online" ? "my-course" : "my-course-subjects";
+      navigation.navigate(screen, {
+        unlocked: true,
+        courseId: batch.id,
+      });
+    } else {
+      // Go to detail / purchase flow
+      navigation.navigate("CourseDetail", {
+        courseId: batch.id,
+        batchData: batch,
+        isAlreadyPurchased: isPurchased,
+        isExpired: isPurchased && !status.canAccess,
+        expiryMessage: status.message || null,
+      });
     }
   };
 
   const renderBatchCard = ({ item }) => {
-    const price = item.batchDiscountPrice || item.batchPrice;
-    const originalPrice = item.batchDiscountPrice ? item.batchPrice : null;
-    const discountPercent = originalPrice
-      ? Math.round(((originalPrice - price) / originalPrice) * 100)
-      : 0;
+    const price = item.batchDiscountPrice || item.batchPrice || 0;
+    const original = item.batchDiscountPrice ? item.batchPrice : null;
+    const discount = original ? Math.round(((original - price) / original) * 100) : 0;
 
-    // Check if course is purchased
-    const purchaseData = purchasedCourses[item.id];
-    const isPurchased = !!purchaseData;
-
-    const handlePress = () => {
-      if (isPurchased) {
-        // Navigate to my-course if already purchased
-        // navigation.navigate("my-course-subjects", { unlocked: true, courseId: item.id });
-        const url = item.category === "online" ? "my-course" : "my-course-subjects"
-        navigation.navigate(url, {
-          unlocked: true,
-          courseId: item.id,
-        });
-      } else {
-        // Navigate to course detail if not purchased
-        navigation.navigate("CourseDetail", {
-          courseId: item.id,
-          batchData: item,
-        });
-      }
-    };
+    const status = purchaseStatus[item.id] || {};
+    const isPurchased = status.purchased === true;
+    const canAccess = status.canAccess !== false; // default true if missing
+    const expired = isPurchased && !canAccess;
 
     return (
       <TouchableOpacity
-        style={styles.card}
-        onPress={handlePress}
-        activeOpacity={0.8}
+        style={[styles.card, expired]}
+        onPress={() => handleCoursePress(item)}
+        activeOpacity={expired ? 1 : 0.8}
+      // disabled={expired && isPurchased}
       >
         <View style={styles.imageContainer}>
           <Image
@@ -198,53 +189,51 @@ export default function CoursePage() {
             resizeMode="cover"
           />
 
-          {/* Subscribed Badge - Top Priority */}
-          {isPurchased ? (
+          {expired ? (
+            <View style={styles.expiredBadge}>
+              <Feather name="alert-triangle" size={12} color="#ffffff" />
+              <Text style={styles.expiredText}>EXPIRED</Text>
+            </View>
+          ) : isPurchased ? (
             <View style={styles.subscribedBadge}>
               <Feather name="check-circle" size={10} color="#ffffff" />
               <Text style={styles.subscribedText}>SUBSCRIBED</Text>
             </View>
-          ) : (
-            /* Discount Badge - Only show if not subscribed */
-            discountPercent > 0 && (
-              <View style={styles.discountBadge}>
-                <Text style={styles.discountText}>{discountPercent}% OFF</Text>
-              </View>
-            )
-          )}
+          ) : discount > 0 ? (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountText}>{discount}% OFF</Text>
+            </View>
+          ) : null}
 
           <View style={styles.categoryBadge}>
-            <Feather
-              name={getFilterIcon(item.category)}
-              size={10}
-              color="#ffffff"
-            />
+            <Feather name={getFilterIcon(item.category)} size={10} color="#ffffff" />
             <Text style={styles.categoryText}>
-              {item.category === "recorded" ? "Recorded" :
-                item.category.charAt(0).toUpperCase() + item.category.slice(1)}
+              {item.category === "recorded" ? "Recorded" : item.category.charAt(0).toUpperCase() + item.category.slice(1)}
             </Text>
           </View>
         </View>
 
         <View style={styles.cardContent}>
-          <Text style={styles.programTag}>{item.program.name}</Text>
+          <Text style={styles.programTag}>{item.program?.name || "—"}</Text>
           <Text style={styles.title} numberOfLines={2}>
-            {item.name}
+            {item.name || "Untitled Course"}
           </Text>
 
-          {isPurchased ? (
+          {expired ? (
+            <Text style={styles.expiredMessage}>
+              {status.message || "Access expired"}
+            </Text>
+          ) : isPurchased ? (
             <View style={styles.accessButtonSmall}>
               <Feather name="play-circle" size={12} color="#22c55e" />
-              <Text style={styles.accessButtonTextSmall}>Go To ClassRoom</Text>
+              <Text style={styles.accessButtonTextSmall}>Go To Classroom</Text>
             </View>
           ) : (
             <View style={styles.priceRow}>
               <View style={styles.priceContainer}>
                 <Text style={styles.price}>₹{price.toLocaleString("en-IN")}</Text>
-                {originalPrice && (
-                  <Text style={styles.originalPrice}>
-                    ₹{originalPrice.toLocaleString("en-IN")}
-                  </Text>
+                {original && (
+                  <Text style={styles.originalPrice}>₹{original.toLocaleString("en-IN")}</Text>
                 )}
               </View>
               {item.isEmi && (
@@ -262,7 +251,8 @@ export default function CoursePage() {
   return (
     <Layout>
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header, Search, Filters, Results Header — unchanged */}
+
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Explore Courses</Text>
           <Text style={styles.headerSubtitle}>
@@ -270,7 +260,6 @@ export default function CoursePage() {
           </Text>
         </View>
 
-        {/* Search Bar */}
         <View style={styles.searchSection}>
           <View style={styles.searchContainer}>
             <Feather name="search" size={16} color="#9ca3af" />
@@ -289,42 +278,25 @@ export default function CoursePage() {
           </View>
         </View>
 
-        {/* Filter Tabs */}
         <View style={styles.filtersSection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersContainer}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
             {[
               { id: "all", label: "All", icon: "grid" },
               { id: "online", label: "Live", icon: "wifi" },
               { id: "offline", label: "Offline", icon: "map-pin" },
-              { id: "recorded", label: "Recorded", icon: "video" }
-            ].map((filter) => (
+              { id: "recorded", label: "Recorded", icon: "video" },
+            ].map((f) => (
               <TouchableOpacity
-                key={filter.id}
-                style={[
-                  styles.filterTab,
-                  selectedMode === filter.id && styles.filterTabActive
-                ]}
-                onPress={() => setSelectedMode(filter.id)}
-                activeOpacity={0.7}
+                key={f.id}
+                style={[styles.filterTab, selectedMode === f.id && styles.filterTabActive]}
+                onPress={() => setSelectedMode(f.id)}
               >
-                <Feather
-                  name={filter.icon}
-                  size={14}
-                  color={selectedMode === filter.id ? "#ffffff" : "#6b7280"}
-                />
-                <Text style={[
-                  styles.filterTabText,
-                  selectedMode === filter.id && styles.filterTabTextActive
-                ]}>
-                  {filter.label}
+                <Feather name={f.icon} size={14} color={selectedMode === f.id ? "#fff" : "#6b7280"} />
+                <Text style={[styles.filterTabText, selectedMode === f.id && styles.filterTabTextActive]}>
+                  {f.label}
                 </Text>
               </TouchableOpacity>
             ))}
-
             {hasFilters && (
               <TouchableOpacity style={styles.clearFilter} onPress={clearFilters}>
                 <Feather name="x" size={14} color="#ef4444" />
@@ -334,29 +306,17 @@ export default function CoursePage() {
           </ScrollView>
         </View>
 
-        {/* Results Header */}
         <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>
-            {filteredBatches.length} results
-          </Text>
+          <Text style={styles.resultsCount}>{filteredBatches.length} results</Text>
           <View style={styles.limitSelector}>
             <Text style={styles.limitLabel}>Show: </Text>
             {LIMIT_OPTIONS.map((opt) => (
               <TouchableOpacity
                 key={opt}
-                style={[
-                  styles.limitOption,
-                  limit === opt && styles.limitOptionActive
-                ]}
-                onPress={() => {
-                  setLimit(opt);
-                  setPage(1);
-                }}
+                style={[styles.limitOption, limit === opt && styles.limitOptionActive]}
+                onPress={() => { setLimit(opt); setPage(1); }}
               >
-                <Text style={[
-                  styles.limitText,
-                  limit === opt && styles.limitTextActive
-                ]}>
+                <Text style={[styles.limitText, limit === opt && styles.limitTextActive]}>
                   {opt}
                 </Text>
               </TouchableOpacity>
@@ -364,19 +324,18 @@ export default function CoursePage() {
           </View>
         </View>
 
-        {/* Course Grid */}
-        {isLoading ? (
+        {isLoading || checkingPurchases ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#ef4444" />
-            <Text style={styles.loadingText}>Loading courses...</Text>
+            <Text style={styles.loadingText}>
+              {checkingPurchases ? "Checking access..." : "Loading courses..."}
+            </Text>
           </View>
-        ) : paginatedBatches.length === 0 ? (
+        ) : filteredBatches.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Feather name="search" size={48} color="#d1d5db" />
             <Text style={styles.emptyTitle}>No courses found</Text>
-            <Text style={styles.emptySubtitle}>
-              Try adjusting your search or filters
-            </Text>
+            <Text style={styles.emptySubtitle}>Try adjusting your search or filters</Text>
             {hasFilters && (
               <TouchableOpacity style={styles.resetButton} onPress={clearFilters}>
                 <Text style={styles.resetButtonText}>Reset Filters</Text>
@@ -385,7 +344,7 @@ export default function CoursePage() {
           </View>
         ) : (
           <FlatList
-            data={paginatedBatches}
+            data={filteredBatches}
             renderItem={renderBatchCard}
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
@@ -395,37 +354,29 @@ export default function CoursePage() {
           />
         )}
 
-        {/* Pagination */}
-        {batchPages > 1 && (
+        {totalPages > 1 && (
           <View style={styles.pagination}>
             <TouchableOpacity
               onPress={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              style={[
-                styles.pageButton,
-                page === 1 && styles.pageButtonDisabled
-              ]}
+              style={[styles.pageButton, page === 1 && styles.pageButtonDisabled]}
             >
-              <Feather name="chevron-left" size={16} color="#ffffff" />
+              <Feather name="chevron-left" size={16} color="#fff" />
               <Text style={styles.pageButtonText}>Prev</Text>
             </TouchableOpacity>
 
             <View style={styles.pageIndicator}>
               <Text style={styles.pageText}>{page}</Text>
-              <Text style={styles.pageTotal}>of {batchPages}</Text>
+              <Text style={styles.pageTotal}> / {totalPages}</Text>
             </View>
 
             <TouchableOpacity
-              onPress={() => setPage((p) => Math.min(batchPages, p + 1))}
-              disabled={page === batchPages}
-
-              style={[
-                styles.pageButton,
-                page === totalPages && styles.pageButtonDisabled
-              ]}
+              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              style={[styles.pageButton, page >= totalPages && styles.pageButtonDisabled]}
             >
               <Text style={styles.pageButtonText}>Next</Text>
-              <Feather name="chevron-right" size={16} color="#ffffff" />
+              <Feather name="chevron-right" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
         )}
@@ -433,7 +384,6 @@ export default function CoursePage() {
     </Layout>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -805,6 +755,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#0f172a",
+  },
+  cardExpired: {
+    opacity: 0.65,
+    backgroundColor: "#f8f8f8",
+  },
+  expiredBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    backgroundColor: "#ef4444",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  expiredText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: 4,
+  },
+  expiredMessage: {
+    fontSize: 13,
+    color: "#ef4444",
+    fontWeight: "500",
+    marginTop: 6,
+  },
+
+  subscribedBadge: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    backgroundColor: "#22c55e",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  subscribedText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+    marginLeft: 4,
   },
   pageTotal: {
     fontSize: 11,
