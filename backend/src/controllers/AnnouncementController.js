@@ -31,22 +31,34 @@ class AnnouncementController {
 
   // GET ALL
   static async findAll(req, res) {
-    try {
-      // const cache = await redis.get("announcements");
+ try {
+      // ✅ Secure admin check (recommended way)
+      const isAdmin = req.query.isAdmin === "true";
 
-      // if (cache) return res.json(JSON.parse(cache));
+      const whereCondition = isAdmin
+        ? {}
+        : {
+            publishDate: {
+              [Op.lte]: new Date(),
+            },
+          };
 
-      const items = await Announcement.findAll({
-        order: [["publishDate", "DESC"]]
+      const announcements = await Announcement.findAll({
+        where: whereCondition,
+        order: [["publishDate", "DESC"]],
       });
 
-      // await redis.set("announcements", JSON.stringify(items), "EX", 60);
-
-      return res.json(items);
+      return res.status(200).json({
+        success: true,
+        data: announcements,
+      });
 
     } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Error fetching announcements", error });
+      console.error("Error fetching announcements:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching announcements",
+      });
     }
   }
 
@@ -55,16 +67,10 @@ class AnnouncementController {
   // GET ONE
   static async findOne(req, res) {
     try {
-      // const cacheKey = `announcement:${req.params.id}`;
-      // const cache = await redis.get(cacheKey);
-
-      // if (cache) return res.json(JSON.parse(cache));
-
+   
       const item = await Announcement.findByPk(req.params.id);
 
       if (!item) return res.status(404).json({ message: "Announcement not found" });
-
-      // await redis.set(cacheKey, JSON.stringify(item), "EX", 300);
 
       return res.json(item);
 
