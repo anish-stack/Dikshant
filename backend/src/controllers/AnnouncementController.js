@@ -48,10 +48,7 @@ class AnnouncementController {
         order: [["publishDate", "DESC"]],
       });
 
-      return res.status(200).json({
-        success: true,
-        data: announcements,
-      });
+      return res.json(announcements);
 
     } catch (error) {
       console.error("Error fetching announcements:", error);
