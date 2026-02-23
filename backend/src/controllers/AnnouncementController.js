@@ -2,6 +2,7 @@
 
 const { Announcement } = require("../models");
 const redis = require("../config/redis");
+const { Op } = require("sequelize");
 
 class AnnouncementController {
 
