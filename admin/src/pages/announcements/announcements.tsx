@@ -97,7 +97,7 @@ export default function Announcements() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const editorRef = useRef<JoditEditor>(null);
+  const editorRef = useRef(null);
 
   const joditConfig = useMemo(
     () => ({
