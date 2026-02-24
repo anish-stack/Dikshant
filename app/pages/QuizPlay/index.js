@@ -7,6 +7,7 @@ import {
     StyleSheet,
     Alert,
     BackHandler,
+    ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native'; // ← YE ADD KARNA
@@ -15,9 +16,10 @@ import QuestionCard from './components/QuestionCard';
 import OptionsList from './components/OptionsList';
 import SubmitButton from './components/SubmitButton';
 import { useQuizStore } from '../../stores/useQuizStore';
-
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function QuizPlay({ route, navigation }) {
     const { quizId } = route.params;
+    const insets = useSafeAreaInsets();
 
     const {
         fetchQuiz,
@@ -138,8 +140,18 @@ export default function QuizPlay({ route, navigation }) {
                 totalQuestions={quiz.totalQuestions}
                 timeRemaining={timeRemaining}
             />
-
-            <QuestionCard question={currentQuestion} />
+           <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{
+        paddingHorizontal: 16,
+        paddingTop: 20,
+        paddingBottom: 120 + insets.bottom, 
+        flexGrow: 1,
+      }}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+    <QuestionCard question={currentQuestion} />
 
             <OptionsList
                 options={currentQuestion.options}
@@ -175,6 +187,9 @@ export default function QuizPlay({ route, navigation }) {
                     disabled={loading}
                 />
             )}
+            </ScrollView>
+
+        
         </View>
     );
 }

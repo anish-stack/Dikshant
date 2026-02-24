@@ -85,65 +85,67 @@ export default function Greet({refreshing}) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 2
+    paddingHorizontal: 14,
+    paddingVertical: 10, // 🔥 less padding
+    marginBottom: 2,
   },
 
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
 
   loadingText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14, // 🔥 smaller
     fontFamily: "Geist",
   },
 
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
 
   greetingContainer: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 10,
   },
 
   greeting: {
-    fontSize: 22,
-    fontWeight: "800",
+    fontSize: 18, // 🔥 reduced from 22
+    fontWeight: "700",
     color: "#fff",
     fontFamily: "Geist",
-    lineHeight: 28,
+    lineHeight: 22,
+    textShadowColor: "rgba(0,0,0,0.2)", // 🔥 softer shadow
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   goal: {
-    fontSize: 15,
+    fontSize: 13, // 🔥 smaller
     color: "#ffebee",
-    marginTop: 6,
+    marginTop: 4,
     fontFamily: "Geist-Medium",
-    opacity: 0.9,
+    opacity: 0.85,
   },
 
   bulbButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    width: 42, // 🔥 smaller
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     justifyContent: "center",
     alignItems: "center",
-    backdropFilter: "blur(10px)",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
+    borderColor: "rgba(255, 255, 255, 0.12)",
   },
 
   bulbIcon: {
-    textShadowColor: "rgba(0, 0, 0, 0.3)",
+    textShadowColor: "rgba(0, 0, 0, 0.2)",
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 2,
   },
 });

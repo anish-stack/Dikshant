@@ -80,7 +80,12 @@ testSeriesIds: {
     Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
     Batch.belongsToMany(models.Subject, { through: "batch_subjects" });
 
-
+ Batch.belongsToMany(models.Announcement, {
+    through: "AnnouncementBatches",
+    as: "announcements",
+    foreignKey: "batchId",
+    otherKey: "announcementId",
+  });
     // Add this line:
     Batch.hasMany(models.Order, {
       foreignKey: 'itemId',

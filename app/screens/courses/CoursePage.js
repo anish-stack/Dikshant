@@ -214,10 +214,11 @@ export default function CoursePage() {
         </View>
 
         <View style={styles.cardContent}>
-          <Text style={styles.programTag}>{item.program?.name || "—"}</Text>
           <Text style={styles.title} numberOfLines={2}>
             {item.name || "Untitled Course"}
           </Text>
+                    <Text style={styles.programTag}>{item.program?.name || "—"}</Text>
+
 
           {expired ? (
             <Text style={styles.expiredMessage}>

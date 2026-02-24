@@ -281,6 +281,7 @@ class QuizController {
       const offset = (page - 1) * limit;
       const search = req.query.search || "";
 
+      console.log("Get All Quizzes Query:", req.query);
       // 👮 Admin check
       const displayIn = req.query.displayIn || "Quiz"
       const isAdmin = req.query.is_admin === "true";

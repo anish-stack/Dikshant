@@ -102,7 +102,7 @@ class BannerController {
       if (!item) return res.status(404).json({ message: "Banner not found" });
 
       let imageUrl = item.imageUrl;
-
+   
       if (req.file) {
         if (item.imageUrl) await deleteFromS3(item.imageUrl);
         imageUrl = await uploadToS3(req.file, "banners");
