@@ -13,6 +13,8 @@ app.use(
     origin: [
       "https://www.app.admin.dikshantias.com",
       "https://app.admin.dikshantias.com",
+      "https://www.player.dikshantias.com",
+      "https://player.dikshantias.com",
       "http://localhost:3000",
       "http://localhost:5173",
       "http://localhost:3001"

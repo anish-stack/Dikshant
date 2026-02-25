@@ -151,6 +151,7 @@ class VideoCourseController {
 
 static async FindByBatchId(req, res) {
   try {
+    
     const isAdmin = req.query.admin === "true";
     const { id } = req.params;
 
