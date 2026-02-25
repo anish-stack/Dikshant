@@ -8,12 +8,18 @@ const redis = require('./config/redis');
 const app = express();
 
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "https://www.app.admin.dikshantias.com",
+      "https://app.admin.dikshantias.com",
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:3001"
+    ],
+    credentials: true
+  })
+);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
