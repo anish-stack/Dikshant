@@ -230,7 +230,6 @@ static async create(req, res) {
         subjectIds = [];
       }
 
-      console.log("FINAL subjectIds:", subjectIds);
 
       const subjectsList = subjectIds.length
         ? await Subject.findAll({

@@ -5,6 +5,7 @@ const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
 const { encryptVideoPayload, decryptVideoToken } = require("../utils/videoCrypto");
+const { Op } = require("sequelize");
 // const NotificationController = require("./NotificationController");
 
 class VideoCourseController {
@@ -147,129 +148,126 @@ class VideoCourseController {
     }
   }
 
-  static async FindByBathId(req, res) {
-    try {
-      const isAdmin = req.query.admin === "true";
-      const { id } = req.params;
 
-      let items = await VideoCourse.findAll({
-        where: { batchId: id },
-        order: [["createdAt", "ASC"]],
-      });
+static async FindByBatchId(req, res) {
+  try {
+    const isAdmin = req.query.admin === "true";
+    const { id } = req.params;
 
-      if (items.length === 0) {
-        return res.json({
-          success: true,
-          data: [],
-        });
-      }
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search ? req.query.search.trim() : null;
+    const offset = (page - 1) * limit;
 
-      const response = await Promise.all(
-        items.map(async (video) => {
+    // ✅ Base where condition
+    let whereCondition = {
+      batchId: id,
+    };
 
-          // // ✅ DEMO VIDEO: direct url (no token)
-          // if (video.isDemo === true) {
-          //   return {
-          //     id: video.id,
-          //     title: video.title,
-          //     imageUrl: video.imageUrl,
-          //     videoSource: video.videoSource,
+    // ✅ Apply search only for admin
+    if (isAdmin && search) {
+      whereCondition.title = {
+        [Op.like]: `%${search}%`,
+      };
+    }
 
-          //     batchId: video.batchId,
-          //     subjectId: video.subjectId,
+    let queryOptions = {
+      where: whereCondition,
+      order: [["createdAt", "ASC"]],
+    };
 
-          //     isDownloadable: video.isDownloadable,
-          //     isDemo: video.isDemo,
-          //     status: video.status,
+    if (isAdmin) {
+      queryOptions.limit = limit;
+      queryOptions.offset = offset;
+    }
 
-          //     isLive: video.isLive,
-          //     isLiveEnded: video.isLiveEnded,
-          //     LiveEndAt: video.LiveEndAt,
-          //     DateOfLive: video.DateOfLive,
-          //     TimeOfLIve: video.TimeOfLIve,
+    const { rows: items, count } = await VideoCourse.findAndCountAll(queryOptions);
 
-          //     dateOfClass: video.dateOfClass,
-          //     TimeOfClass: video.TimeOfClass,
-
-          //     createdAt: video.createdAt,
-
-          //     // ✅ direct url for demo (even non-admin)
-          //     url: video.url,
-
-          //     // demo video has no secureToken
-          //     secureToken: null,
-          //   };
-          // }
-
-          // ================================
-          // 🔒 NON-DEMO VIDEO: token required
-          // ================================
-          let secureToken = video.secureToken;
-
-          if (!secureToken) {
-            secureToken = encryptVideoPayload({
-              videoId: video.id,
-              batchId: video.batchId,
-              videoSource: video.videoSource,
-              exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-            });
-
-            try {
-              await video.update({ secureToken });
-              console.log(`Generated & saved secureToken for video ID: ${video.id}`);
-            } catch (updateErr) {
-              console.error(
-                `Failed to save secureToken for video ${video.id}:`,
-                updateErr
-              );
-            }
-          }
-
-          return {
-            id: video.id,
-            title: video.title,
-            imageUrl: video.imageUrl,
-            videoSource: video.videoSource,
-
-            batchId: video.batchId,
-            subjectId: video.subjectId,
-
-            isDownloadable: video.isDownloadable,
-            isDemo: video.isDemo,
-            status: video.status,
-
-            isLive: video.isLive,
-            isLiveEnded: video.isLiveEnded,
-            LiveEndAt: video.LiveEndAt,
-            DateOfLive: video.DateOfLive,
-            TimeOfLIve: video.TimeOfLIve,
-
-            dateOfClass: video.dateOfClass,
-            TimeOfClass: video.TimeOfClass,
-
-            createdAt: video.createdAt,
-
-            // 🔒 guaranteed stable token
-            secureToken,
-
-            // ✅ Admin gets raw URL
-            ...(isAdmin ? { url: video.url } : {}),
-          };
-        })
-      );
-
+    if (items.length === 0) {
       return res.json({
         success: true,
-        data: response,
-      });
-    } catch (error) {
-      console.error("FindByBathId error:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Server error",
+        data: [],
+        ...(isAdmin && {
+          pagination: {
+            total: count,
+            page,
+            limit,
+            totalPages: Math.ceil(count / limit),
+          },
+        }),
       });
     }
+
+    const response = await Promise.all(
+      items.map(async (video) => {
+        let secureToken = video.secureToken;
+
+        if (!secureToken) {
+          secureToken = encryptVideoPayload({
+            videoId: video.id,
+            batchId: video.batchId,
+            videoSource: video.videoSource,
+            exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+          });
+
+          try {
+            await video.update({ secureToken });
+          } catch (err) {
+            console.error(`Token save failed for video ${video.id}`, err);
+          }
+        }
+
+        return {
+          id: video.id,
+          title: video.title,
+          imageUrl: video.imageUrl,
+          videoSource: video.videoSource,
+
+          batchId: video.batchId,
+          subjectId: video.subjectId,
+
+          isDownloadable: video.isDownloadable,
+          isDemo: video.isDemo,
+          status: video.status,
+
+          isLive: video.isLive,
+          isLiveEnded: video.isLiveEnded,
+          LiveEndAt: video.LiveEndAt,
+          DateOfLive: video.DateOfLive,
+          TimeOfLIve: video.TimeOfLIve,
+
+          dateOfClass: video.dateOfClass,
+          TimeOfClass: video.TimeOfClass,
+
+          createdAt: video.createdAt,
+
+          secureToken,
+          ...(isAdmin ? { url: video.url } : {}),
+        };
+      })
+    );
+
+    return res.json({
+      success: true,
+      data: response,
+      ...(isAdmin && {
+        pagination: {
+          total: count,
+          page,
+          limit,
+          totalPages: Math.ceil(count / limit),
+        },
+      }),
+    });
+
+  } catch (error) {
+    console.error("FindByBatchId error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
+}
 
   static async decryptAndPassVideo(req, res) {
     try {

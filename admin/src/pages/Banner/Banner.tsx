@@ -380,7 +380,7 @@ export default function BannerManagement() {
 
       {/* Create / Edit Modal */}
       {(createModal) && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[999999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto">
             <div className="p-6 sm:p-8">
               <div className="flex justify-between items-center mb-6">

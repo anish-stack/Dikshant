@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import {
   Play,
@@ -18,12 +18,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Upload,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-const API_URL = "https://www.app.api.dikshantias.com/api/videocourses";
+const API_URL = "https://www.app.api.dikshantias.com/api/videocourses"; // ← updated to your local
 const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
-const ITEMS_PER_PAGE = 10;
 
 interface Subject {
   id: number;
@@ -64,31 +65,50 @@ interface FormData {
   status: boolean;
 }
 
-const getCurrentDate = () => {
-  const d = new Date();
-  return d.toISOString().split("T")[0]; // YYYY-MM-DD
-};
+interface PaginationInfo {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
-const getCurrentTime = () => {
-  const d = new Date();
-  return d.toTimeString().slice(0, 5); // HH:mm
-};
+const LIMIT_OPTIONS = [10, 20, 30, 50, 100];
+
+const getCurrentDate = () => new Date().toISOString().split("T")[0];
+const getCurrentTime = () => new Date().toTimeString().slice(0, 5);
 
 export default function CourseVideos() {
   const { id } = useParams<{ id: string }>();
   const batchId = id ? Number(id) : null;
+
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read from URL or defaults
+  const initialPage = Number(searchParams.get("page")) || 1;
+  const initialLimit = Number(searchParams.get("limit")) || 10;
+  const initialSearch = searchParams.get("search") || "";
+
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    total: 0,
+    page: initialPage,
+    limit: initialLimit,
+    totalPages: 1,
+  });
+
+  const [search, setSearch] = useState(initialSearch);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
+
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [deleteVideo, setDeleteVideo] = useState<VideoItem | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [playing, setPlaying] = useState<VideoItem | null>(null);
+
   const [form, setForm] = useState<FormData>({
     title: "",
     videoSource: "youtube",
@@ -96,52 +116,70 @@ export default function CourseVideos() {
     isLive: false,
     DateOfLive: getCurrentDate(),
     TimeOfLIve: getCurrentTime(),
-    subjectId: "",
     dateOfClass: "",
     TimeOfClass: "",
+    subjectId: "",
     isDownloadable: false,
     isDemo: false,
     status: true,
   });
 
-  const navigate = useNavigate();
+  // Sync URL when page / limit / search changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set("page", pagination.page.toString());
+    params.set("limit", pagination.limit.toString());
+    if (search.trim()) params.set("search", search.trim());
+    setSearchParams(params, { replace: true });
+  }, [pagination.page, pagination.limit, search, setSearchParams]);
 
-  const fetchVideos = React.useCallback(async () => {
+  const fetchVideos = useCallback(async () => {
+    if (!batchId) return;
+
     try {
       setLoading(true);
       setError(false);
 
+      const params = {
+        admin: true,
+        page: pagination.page,
+        limit: pagination.limit,
+        search: search.trim() || undefined,
+      };
+
       const [videoRes, subjectRes] = await Promise.all([
-        axios.get(`${API_URL}/batch/${batchId}?admin=true`),
+        axios.get(`${API_URL}/batch/${batchId}`, { params }),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
 
       setVideos(videoRes.data.data || []);
       setSubjects(subjectRes.data.subjects || []);
-    } catch (error) {
-      console.error(error);
+
+      // Update pagination from backend response
+      if (videoRes.data.pagination) {
+        setPagination((prev) => ({
+          ...prev,
+          total: videoRes.data.pagination.total,
+          page: videoRes.data.pagination.page,
+          limit: videoRes.data.pagination.limit,
+          totalPages: videoRes.data.pagination.totalPages,
+        }));
+      }
+    } catch (err) {
+      console.error(err);
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [batchId]);
+  }, [batchId, pagination.page, pagination.limit, search]);
 
   useEffect(() => {
     fetchVideos();
   }, [fetchVideos]);
 
-  // Search and pagination
-  const filtered = videos.filter((v) =>
-    v.title.toLowerCase().includes(search.toLowerCase()),
-  );
-  const total = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated = filtered.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
-  );
-
+  // When search changes → reset to page 1
   useEffect(() => {
-    setPage(1);
+    setPagination((prev) => ({ ...prev, page: 1 }));
   }, [search]);
 
   // Modal handlers
@@ -152,11 +190,11 @@ export default function CourseVideos() {
       videoSource: "youtube",
       url: "",
       isLive: false,
-      DateOfLive: "",
-      TimeOfLIve: "",
-      subjectId: "",
+      DateOfLive: getCurrentDate(),
+      TimeOfLIve: getCurrentTime(),
       dateOfClass: "",
       TimeOfClass: "",
+      subjectId: "",
       isDownloadable: false,
       isDemo: false,
       status: true,
@@ -174,8 +212,8 @@ export default function CourseVideos() {
       url: v.url,
       subjectId: v.subjectId.toString(),
       isDownloadable: v.isDownloadable,
-      dateOfClass: v.dateOfClass,
-      TimeOfClass: v.TimeOfClass,
+      dateOfClass: v.dateOfClass || "",
+      TimeOfClass: v.TimeOfClass || "",
       isDemo: v.isDemo,
       isLive: v.isLive || false,
       DateOfLive: v.DateOfLive || "",
@@ -187,15 +225,14 @@ export default function CourseVideos() {
     setShowModal(true);
   };
 
-  // Actions
   const toggleStatus = async (v: VideoItem) => {
     const newStatus = v.status === "active" ? "inactive" : "active";
     try {
       await axios.put(`${API_URL}/${v.id}`, { status: newStatus });
       setVideos((prev) =>
         prev.map((item) =>
-          item.id === v.id ? { ...item, status: newStatus } : item,
-        ),
+          item.id === v.id ? { ...item, status: newStatus } : item
+        )
       );
     } catch (err) {
       console.error(err);
@@ -203,12 +240,13 @@ export default function CourseVideos() {
   };
 
   const endLiveSession = async (v: VideoItem) => {
+    if (v.isLiveEnded) return;
     try {
       await axios.put(`${API_URL}/${v.id}`, { isLiveEnded: true });
       setVideos((prev) =>
         prev.map((item) =>
-          item.id === v.id ? { ...item, isLiveEnded: true } : item,
-        ),
+          item.id === v.id ? { ...item, isLiveEnded: true } : item
+        )
       );
     } catch (err) {
       console.error(err);
@@ -221,6 +259,7 @@ export default function CourseVideos() {
       await axios.delete(`${API_URL}/${deleteVideo.id}`);
       setVideos((prev) => prev.filter((v) => v.id !== deleteVideo.id));
       setDeleteVideo(null);
+      fetchVideos(); // refresh list
     } catch (err) {
       console.error(err);
     }
@@ -232,16 +271,15 @@ export default function CourseVideos() {
       alert("Please set date and time for live video");
       return;
     }
-
-    const data = new FormData();
-    data.append("title", form.title);
-    data.append("videoSource", form.videoSource);
-    data.append("url", form.url);
     if (!batchId) {
       alert("Invalid batch ID");
       return;
     }
 
+    const data = new FormData();
+    data.append("title", form.title);
+    data.append("videoSource", form.videoSource);
+    data.append("url", form.url);
     data.append("batchId", String(batchId));
     data.append("subjectId", form.subjectId);
     data.append("isDownloadable", String(form.isDownloadable));
@@ -260,22 +298,24 @@ export default function CourseVideos() {
 
     try {
       if (editId) {
-        await axios.put(`${API_URL}/${editId}`, data);
+        await axios.put(`${API_URL}/${editId}`, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        await axios.post(API_URL, data);
+        await axios.post(API_URL, data, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
       setShowModal(false);
       fetchVideos();
     } catch (err) {
       console.error(err);
+      alert("Failed to save video");
     }
   };
 
-  // YouTube embed
   const getYTEmbed = (url: string) => {
-    const match = url.match(
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/,
-    );
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
     return match ? `https://www.youtube.com/embed/${match[1]}` : null;
   };
 
@@ -293,6 +333,24 @@ export default function CourseVideos() {
     return <video src={v.url} controls className="w-full h-full" />;
   };
 
+  // Jump to page
+  const handleJumpToPage = (e: React.FormEvent) => {
+    e.preventDefault();
+    const input = (e.target as HTMLFormElement).jumpPage as HTMLInputElement;
+    const pageNum = Number(input.value);
+    if (pageNum >= 1 && pageNum <= pagination.totalPages) {
+      setPagination((prev) => ({ ...prev, page: pageNum }));
+    }
+  };
+
+  if (!batchId) {
+    return (
+      <div className="text-center py-12 text-red-600">
+        Invalid batch ID in URL
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6">
       {/* Header */}
@@ -300,10 +358,10 @@ export default function CourseVideos() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Course Videos
+              Course Videos – Batch {batchId}
             </h1>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Manage batch videos
+              Manage videos with server-side pagination & search
             </p>
           </div>
           <button
@@ -317,23 +375,44 @@ export default function CourseVideos() {
       </div>
 
       <div className="max-w-7xl mx-auto">
-        {/* Search */}
-        {!loading && !error && (
-          <div className="mb-5">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search videos..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
+        {/* Controls: Search + Limit */}
+        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-5">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search videos..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+            />
           </div>
-        )}
 
-        {/* Loading */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+              Show:
+            </label>
+            <select
+              value={pagination.limit}
+              onChange={(e) =>
+                setPagination((prev) => ({
+                  ...prev,
+                  limit: Number(e.target.value),
+                  page: 1,
+                }))
+              }
+              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+            >
+              {LIMIT_OPTIONS.map((lim) => (
+                <option key={lim} value={lim}>
+                  {lim}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Loading / Error */}
         {loading && (
           <div className="text-center py-12">
             <div className="inline-block animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
@@ -343,12 +422,11 @@ export default function CourseVideos() {
           </div>
         )}
 
-        {/* Error */}
-        {!loading && error && (
+        {error && !loading && (
           <div className="text-center py-12 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
             <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Failed to load videos. Please refresh.
+              Failed to load videos. Please try again.
             </p>
           </div>
         )}
@@ -393,26 +471,24 @@ export default function CourseVideos() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {paginated.length === 0 ? (
+                  {videos.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={10}
                         className="px-3 py-8 text-center text-gray-500 dark:text-gray-400"
                       >
-                        {search ? "No videos found" : "No videos yet"}
+                        {search ? "No matching videos found" : "No videos yet"}
                       </td>
                     </tr>
                   ) : (
-                    paginated.map((v) => (
+                    videos.map((v) => (
                       <tr
                         key={v.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
                       >
                         <td className="px-3 py-2">
                           <img
-                            src={
-                              v.imageUrl || "https://via.placeholder.com/50x30"
-                            }
+                            src={v.imageUrl || "https://via.placeholder.com/50x30"}
                             alt={v.title}
                             className="w-12 h-7 object-cover rounded"
                           />
@@ -422,35 +498,29 @@ export default function CourseVideos() {
                             <p className="font-medium text-gray-900 dark:text-white line-clamp-1">
                               {v.title}
                             </p>
-
                             <div className="flex gap-1 mt-0.5 flex-wrap">
                               {v.isDemo && (
                                 <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
                                   Demo
                                 </span>
                               )}
-
                               {v.isDownloadable && (
                                 <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
                                   DL
                                 </span>
                               )}
-
                               {v.isLive && (
                                 <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
                                   <span className="w-1 h-1 bg-purple-600 rounded-full animate-pulse"></span>
                                   Live
                                 </span>
                               )}
-
                               {v.isLiveEnded && (
                                 <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded flex items-center gap-0.5">
                                   <span className="w-1 h-1 bg-red-600 rounded-full"></span>
                                   Live Ended
                                 </span>
                               )}
-
-                              {/* ✅ DEFAULT: Recorded */}
                               {!v.isLive && !v.isLiveEnded && !v.isDemo && (
                                 <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
                                   Recorded
@@ -461,74 +531,70 @@ export default function CourseVideos() {
                         </td>
 
                         <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                          {subjects.find((s) => s.id === v.subjectId)?.name ||
-                            "—"}
+                          {subjects.find((s) => s.id === v.subjectId)?.name || "—"}
                         </td>
-                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+
+                        <td className="px-3 py-2">
                           <button
-                            onClick={() =>
-                              navigate(`/view-comments-joined/${v.id}`)
-                            }
-                            className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 rounded transition"
-                            title="View Joined Students "
+                            onClick={() => navigate(`/view-comments-joined/${v.id}`)}
+                            className="px-3 py-1.5 text-xs bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 rounded transition"
                           >
                             View Comments
                           </button>
                         </td>
+
                         <td className="px-3 py-2">
                           <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 rounded font-medium">
                             {v.videoSource.toUpperCase()}
                           </span>
                         </td>
+
                         <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
                           {v.isLive && v.DateOfLive && v.TimeOfLIve ? (
                             <div className="text-xs">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                {String(v.DateOfLive).replace(/-/g, "/")}
+                                {v.DateOfLive.replace(/-/g, "/")}
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {String(v.TimeOfLIve).slice(0, 5)}
+                                {v.TimeOfLIve.slice(0, 5)}
                               </div>
                             </div>
                           ) : v.dateOfClass && v.TimeOfClass ? (
                             <div className="text-xs">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                {String(v.dateOfClass).replace(/-/g, "/")}
+                                {v.dateOfClass.replace(/-/g, "/")}
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 <Clock className="w-3 h-3" />
-                                {String(v.TimeOfClass).slice(0, 5)}
+                                {v.TimeOfClass.slice(0, 5)}
                               </div>
                             </div>
                           ) : (
-                            <div className="text-xs text-gray-400 italic">
-                              —
-                            </div>
+                            "—"
                           )}
                         </td>
-                   <td className="px-3 py-2 flex gap-2">
-  <a
-    target="_blank"
-    rel="noreferrer"
-    href={`/stats-of-class/${v?.id}`}
-    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition"
-  >
-    Admin Check Live
-  </a>
 
-  <a
-    target="_blank"
-    rel="noreferrer"
-    href={`/live-class-monitor/${v?.id}`}
-    className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition"
-  >
-    Share Live Monitor
-  </a>
-</td>
-
+                        <td className="px-3 py-2 flex gap-2 flex-wrap">
+                          <a
+                            target="_blank"
+                            rel="noreferrer"
+                            href={`/stats-of-class/${v.id}`}
+                            className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-full hover:bg-indigo-700"
+                          >
+                            Admin Check Live
+                          </a>
+                          <a
+                            target="_blank"
+                            rel="noreferrer"
+                            href={`/live-class-monitor/${v.id}`}
+                            className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-full hover:bg-emerald-700"
+                          >
+                            Share Live Monitor
+                          </a>
+                        </td>
 
                         <td className="px-3 py-2">
                           <span
@@ -538,104 +604,94 @@ export default function CourseVideos() {
                                 : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                             }`}
                           >
-                            {v.status.charAt(0).toUpperCase() +
-                              v.status.slice(1)}
+                            {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
                           </span>
                         </td>
 
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 text-center">
                           <button
                             onClick={() =>
                               navigate(
-                                `/upload-pdf?batch=${batchId}&video=${v.id}&title=${v.title
-                                  .trim()
-                                  .toLowerCase()
-                                  .replace(/\s+/g, "-")}`,
+                                `/upload-pdf?batch=${batchId}&video=${v.id}&title=${encodeURIComponent(
+                                  v.title.trim().toLowerCase().replace(/\s+/g, "-")
+                                )}`
                               )
                             }
-                            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded transition"
-                            title="Upload Pdf"
+                            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 rounded"
+                            title="Upload PDF"
                           >
-                            <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                           </button>
                         </td>
 
                         <td className="px-3 py-2">
-                          <div className="flex justify-center gap-1">
+                          <div className="flex justify-center gap-1 flex-wrap">
                             <button
                               onClick={() => setPlaying(v)}
-                              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 rounded transition"
+                              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 rounded"
                               title="Play"
                             >
-                              <Play className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                              <Play className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                             </button>
+
                             {v.isLive && (
                               <>
                                 <button
-                                  onClick={() => {
-                                    if (!v.isLiveEnded) endLiveSession(v);
-                                  }}
+                                  onClick={() => !v.isLiveEnded && endLiveSession(v)}
                                   disabled={v.isLiveEnded}
-                                  title={
+                                  className={`p-1.5 rounded text-xs font-medium ${
                                     v.isLiveEnded
-                                      ? "Live already ended"
-                                      : "End Live Session"
-                                  }
-                                  className={`
-    p-1.5 rounded transition
-    ${
-      v.isLiveEnded
-        ? "bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-60"
-        : "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-900/50"
-    }
-  `}
+                                      ? "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
+                                      : "bg-yellow-100 dark:bg-yellow-900/40 hover:bg-yellow-200"
+                                  }`}
                                 >
-                                  End Live
+                                  {v.isLiveEnded ? "Ended" : "End Live"}
                                 </button>
 
                                 <button
                                   onClick={() => navigate(`/view-chat/${v.id}`)}
-                                  type="button"
-                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 rounded transition"
+                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 rounded"
                                   title="View Chats"
                                 >
-                                  <MessageSquare className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                  <MessageSquare className="w-4 h-4 text-cyan-600" />
                                 </button>
+
                                 <button
-                                  onClick={() =>
-                                    navigate(`/view-studnets-joined/${v.id}`)
-                                  }
-                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 rounded transition"
-                                  title="View Joined Students "
+                                  onClick={() => navigate(`/view-studnets-joined/${v.id}`)}
+                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 rounded"
+                                  title="View Joined Students"
                                 >
-                                  <Eye className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                                  <Eye className="w-4 h-4 text-cyan-600" />
                                 </button>
                               </>
                             )}
+
                             <button
                               onClick={() => openEdit(v)}
-                              className="p-1.5 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 rounded transition"
+                              className="p-1.5 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 rounded"
                               title="Edit"
                             >
-                              <Edit2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              <Edit2 className="w-4 h-4 text-blue-600" />
                             </button>
+
                             <button
                               onClick={() => toggleStatus(v)}
-                              className="p-1.5 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 dark:hover:bg-orange-900/50 rounded transition"
+                              className="p-1.5 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 rounded"
                               title={v.status === "active" ? "Hide" : "Show"}
                             >
                               {v.status === "active" ? (
-                                <Eye className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                                <Eye className="w-4 h-4 text-orange-600" />
                               ) : (
-                                <EyeOff className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                                <EyeOff className="w-4 h-4 text-orange-600" />
                               )}
                             </button>
+
                             <button
                               onClick={() => setDeleteVideo(v)}
-                              className="p-1.5 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 rounded transition"
+                              className="p-1.5 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 rounded"
                               title="Delete"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                              <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
                         </td>
@@ -646,41 +702,71 @@ export default function CourseVideos() {
               </table>
             </div>
 
-            {/* Pagination */}
-            {filtered.length > 0 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  {(page - 1) * ITEMS_PER_PAGE + 1}–
-                  {Math.min(page * ITEMS_PER_PAGE, filtered.length)} of{" "}
-                  {filtered.length}
-                </p>
-                <div className="flex gap-1">
+            {/* Pagination Controls */}
+            {pagination.total > 0 && (
+              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
+                <div className="text-gray-600 dark:text-gray-400">
+                  Showing {(pagination.page - 1) * pagination.limit + 1} –{" "}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+                  {pagination.total}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap justify-center">
                   <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => setPagination((p) => ({ ...p, page: 1 }))}
+                    disabled={pagination.page === 1}
+                    className="p-2 rounded border disabled:opacity-40"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronsLeft className="w-5 h-5" />
                   </button>
-                  {Array.from({ length: total }, (_, i) => i + 1).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPage(p)}
-                      className={`px-2 py-1 text-xs rounded border transition ${
-                        page === p
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
+
                   <button
-                    onClick={() => setPage((p) => Math.min(total, p + 1))}
-                    disabled={page === total}
-                    className="p-1 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() =>
+                      setPagination((p) => ({ ...p, page: p.page - 1 }))
+                    }
+                    disabled={pagination.page === 1}
+                    className="p-2 rounded border disabled:opacity-40"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <form onSubmit={handleJumpToPage} className="flex items-center gap-2">
+                    <span>Page</span>
+                    <input
+                      type="number"
+                      name="jumpPage"
+                      min={1}
+                      max={pagination.totalPages}
+                      defaultValue={pagination.page}
+                      className="w-16 px-2 py-1 text-center border rounded dark:bg-gray-800 dark:border-gray-600"
+                    />
+                    <span>of {pagination.totalPages}</span>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+                    >
+                      Go
+                    </button>
+                  </form>
+
+                  <button
+                    onClick={() =>
+                      setPagination((p) => ({ ...p, page: p.page + 1 }))
+                    }
+                    disabled={pagination.page === pagination.totalPages}
+                    className="p-2 rounded border disabled:opacity-40"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setPagination((p) => ({ ...p, page: p.totalPages }))
+                    }
+                    disabled={pagination.page === pagination.totalPages}
+                    className="p-2 rounded border disabled:opacity-40"
+                  >
+                    <ChevronsRight className="w-5 h-5" />
                   </button>
                 </div>
               </div>
@@ -689,10 +775,10 @@ export default function CourseVideos() {
         )}
       </div>
 
-      {/* Video Player */}
+      {/* Video Player Modal */}
       {playing && (
         <div
-          className="fixed inset-0 bg-black/95 z-[999999] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/95 z-[999999999] flex items-center justify-center p-4"
           onClick={() => setPlaying(null)}
         >
           <div
@@ -701,7 +787,7 @@ export default function CourseVideos() {
           >
             <button
               onClick={() => setPlaying(null)}
-              className="absolute top-2 right-2 z-10 w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center transition"
+              className="absolute top-2 right-2 z-10 w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center"
             >
               <X className="w-5 h-5 text-white" />
             </button>
