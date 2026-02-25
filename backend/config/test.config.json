@@ -10,20 +10,20 @@
     "logging": false
   },
   "test": {
-    "username": "u905431022_dikshant",
+    "username": "u748895167_dikshant",
     "password": "~ZwAVN/$9v6",
-    "database": "u905431022_dikshant",
-    "host": "82.25.121.158",
+    "database": "u748895167_dikshant",
+    "host": "82.25.121.123",
     "port": 3306,
     "dialect": "mysql",
     "timezone": "+05:30",
     "logging": false
   },
   "production": {
-    "username": "u905431022_dikshant",
+    "username": "u748895167_dikshant",
     "password": "~ZwAVN/$9v6",
-    "database": "u905431022_dikshant",
-    "host": "82.25.121.158",
+    "database": "u748895167_dikshant",
+    "host": "82.25.121.123",
     "port": 3306,
     "dialect": "mysql",
     "timezone": "+05:30",
