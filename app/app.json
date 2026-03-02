@@ -8,7 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/playstore-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -32,7 +32,7 @@
       "package": "in.kaksya.dikshant",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/playstore-icon.png",
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./google-services.json",
@@ -62,7 +62,7 @@
       ],
       "edgeToEdgeEnabled": true,
       "notification": {
-        "icon": "./assets/adaptive-icon.png",
+        "icon": "./assets/playstore-icon.png",
         "color": "#FB2B37",
         "priority": "max",
         "channels": [
@@ -114,7 +114,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/playstore-icon.png"
     },
     "plugins": [
       "expo-font",

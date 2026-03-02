@@ -872,7 +872,10 @@ exports.getAllProfile = async (req, res) => {
 
     /** 2️⃣ Fetch Orders of All Users */
     const orders = await Order.findAll({
-      where: { userId: userIds },
+      where: { 
+        userId: userIds,
+        status:"success"
+      },
       order: [["createdAt", "DESC"]],
     });
 
