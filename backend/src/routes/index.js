@@ -45,4 +45,8 @@ router.use("/testseries-bundles", require("./testSeriesBundle.routes"));
 router.use("/quiz-bundles", require("./quizesBundle.routes"));
 
 
+router.use("/admin", require("./admin.order.routes"));
+
+
+
 module.exports = router;

@@ -47,6 +47,7 @@ export default function EnrollCourse() {
   const navigation = useNavigation();
   const { batchId } = route.params || {};
   const { user, token } = useAuthStore();
+  console.log(token)
 
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
@@ -70,7 +71,6 @@ export default function EnrollCourse() {
   );
 
   const coupons = couponsData || [];
-
   // Filter valid and active coupons
   const validCoupons = coupons.filter(
     (coupon) => coupon.isActive && new Date(coupon.validTill) > new Date()

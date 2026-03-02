@@ -63,6 +63,8 @@ import EditTestSeriesBundle from "./pages/TestSeries/Bundle/EditTestSeriesBundle
 import AllQuizBundle from "./pages/Quiz/Bundle/AllQuizBundle";
 import CreateQuizBundle from "./pages/Quiz/Bundle/CreateQuizBundle";
 import EditQuizBundle from "./pages/Quiz/Bundle/EditQuizBundle";
+import Transactions from "./pages/Payments/transactions";
+import Coupons from "./pages/Payments/coupons";
 
 export default function App() {
   return (
@@ -75,18 +77,14 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               <Route index path="/" element={<Home />} />
-
               {/* Others */}
               <Route path="/profile" element={<UserProfiles />} />
               <Route path="/calendar" element={<Calendar />} />
               <Route path="/blank" element={<Blank />} />
-
               {/* Forms */}
               <Route path="/form-elements" element={<FormElements />} />
-
               {/* Tables */}
               <Route path="/basic-tables" element={<BasicTables />} />
-
               {/* UI */}
               <Route path="/alerts" element={<Alerts />} />
               <Route path="/avatars" element={<Avatars />} />
@@ -94,12 +92,10 @@ export default function App() {
               <Route path="/buttons" element={<Buttons />} />
               <Route path="/images" element={<Images />} />
               <Route path="/videos" element={<Videos />} />
-
               {/* Programs */}
               <Route path="/all-programs" element={<AllPrograms />} />
               <Route path="/programs" element={<ViewEdit />} />
               <Route path="/programs-add" element={<AddProgram />} />
-
               {/* Courses */}
               <Route path="/all-courses" element={<AllCourses />} />
               <Route path="/all-courses/view/:id" element={<ViewCourse />} />
@@ -109,9 +105,7 @@ export default function App() {
                 path="/all-courses/add-video/:id"
                 element={<CourseVideos />}
               />
-
               {/* Test series Bundle */}
-
               <Route
                 path="/all-test-series-bundle"
                 element={<AllTestSeriesBundle />}
@@ -124,12 +118,7 @@ export default function App() {
                 path="/edit-test-series-bundle/:id"
                 element={<EditTestSeriesBundle />}
               />
-
-
-                      <Route
-                path="/all-quiz-bundles"
-                element={<AllQuizBundle />}
-              />
+              <Route path="/all-quiz-bundles" element={<AllQuizBundle />} />
               <Route
                 path="/create-quiz-bundle"
                 element={<CreateQuizBundle />}
@@ -138,30 +127,23 @@ export default function App() {
                 path="/edit-quiz-bundle/:id"
                 element={<EditQuizBundle />}
               />
-
               {/* scholarship-apply */}
               <Route path="/scholarship-apply" element={<ScholarshipApply />} />
               <Route path="/scholarship" element={<Scholarship />} />
-
               {/* end-notification */}
               <Route path="/send-notification" element={<SendNotification />} />
-
               {/* Subjects */}
               <Route path="/all-subject" element={<AllSubject />} />
               <Route path="/all-faqs" element={<FAQPage />} />
               <Route path="/all-doubts" element={<DoubtsAdmin />} />
-
               {/* Announcements */}
               <Route path="/announcements" element={<Announcements />} />
-
               {/* Banners */}
               <Route path="/app-baners" element={<Banner />} />
               {/* settings */}
               <Route path="/setting" element={<Settings />} />
-
               {/* Pdf */}
               <Route path="/upload-pdf" element={<Uploadpdf />} />
-
               {/* Test Series */}
               <Route path="/all-test-series" element={<AllTestSeries />} />
               <Route path="/testseries/:id" element={<ViewTestSeries />} />
@@ -173,7 +155,6 @@ export default function App() {
                 path="/admin/testseries/new"
                 element={<CreateTestSeries />}
               />
-
               <Route
                 path="admin/testseries/submissions/:id"
                 element={<ViewSubmission />}
@@ -183,17 +164,13 @@ export default function App() {
                 element={<ViewPurchase />}
               />
               <Route path="admin/testseries/result/:id" element={<Result />} />
-
               <Route path="/all-attemps" element={<AllAtempts />} />
               <Route
                 path="/admin/quiz-attempts/:id/result"
                 element={<ResultQuiz />}
               />
-
               <Route path="/app-assets" element={<AppAssets />} />
-
               <Route path="/app-Categories" element={<AllCategories />} />
-
               {/* admin/testseries/purchases */}
               {/* Quizes */}
               <Route path="/all-quizzes" element={<AllQuizzesPage />} />
@@ -211,6 +188,9 @@ export default function App() {
                 path="/view-comments-joined/:id"
                 element={<ViewComments />}
               />
+              
+              <Route path="/payments/transactions" element={<Transactions />} />
+              <Route path="/payments/coupons" element={<Coupons />} />
 
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />
