@@ -127,7 +127,7 @@ function LMSContent() {
         setVideoSource(null);
 
         const res = await axios.post(
-          `https://www.app.api.dikshantias.com/api/videocourses/decrypt/batch/${userId}`,
+          `http://192.168.1.11:5001/api/videocourses/decrypt/batch/${userId}`,
           { token: currentVideo.secureToken },
           {
             headers: {
@@ -185,11 +185,11 @@ function LMSContent() {
         const timeout = setTimeout(() => controller.abort(), 10000);
 
         const [batchRes, videosRes] = await Promise.all([
-          fetch(`https://www.app.api.dikshantias.com/api/batchs/${courseId}`, {
+          fetch(`http://192.168.1.11:5001/api/batchs/${courseId}`, {
             signal: controller.signal,
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`https://www.app.api.dikshantias.com/api/videocourses/batch/${courseId}`, {
+          fetch(`http://192.168.1.11:5001/api/videocourses/batch/${courseId}`, {
             signal: controller.signal,
             headers: { Authorization: `Bearer ${token}` },
           }),

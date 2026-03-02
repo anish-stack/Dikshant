@@ -149,45 +149,217 @@ class VideoCourseController {
   }
 
 
-static async FindByBatchId(req, res) {
-  try {
-    
-    const isAdmin = req.query.admin === "true";
-    const { id } = req.params;
+  static async FindByBatchId(req, res) {
+    try {
+      const isAdmin = req.query.admin === "true";
+      const { id } = req.params;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search ? req.query.search.trim() : null;
+      const offset = (page - 1) * limit;
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search ? req.query.search.trim() : null;
-    const offset = (page - 1) * limit;
+      // -----------------------------
+      // 1) Primary fetch: by batchId
+      // -----------------------------
+      let whereCondition = { batchId: id };
 
-    // ✅ Base where condition
-    let whereCondition = {
-      batchId: id,
-    };
+      // ✅ Apply search only for admin
+      if (isAdmin && search) {
+        whereCondition.title = { [Op.like]: `%${search}%` };
+      }
 
-    // ✅ Apply search only for admin
-    if (isAdmin && search) {
-      whereCondition.title = {
-        [Op.like]: `%${search}%`,
+      const buildQueryOptions = (where) => {
+        const queryOptions = {
+          where,
+          order: [["createdAt", "ASC"]],
+        };
+
+        if (isAdmin) {
+          queryOptions.limit = limit;
+          queryOptions.offset = offset;
+        }
+
+        return queryOptions;
       };
-    }
 
-    let queryOptions = {
-      where: whereCondition,
-      order: [["createdAt", "ASC"]],
-    };
+      let result = await VideoCourse.findAndCountAll(buildQueryOptions(whereCondition));
+      const normalizeSubjectIds = (raw) => {
+        if (raw == null) return [];
 
-    if (isAdmin) {
-      queryOptions.limit = limit;
-      queryOptions.offset = offset;
-    }
+        let val = raw;
 
-    const { rows: items, count } = await VideoCourse.findAndCountAll(queryOptions);
+        // Step 1: Handle common string-wrapped cases
+        if (typeof val === 'string') {
+          let s = val.trim();
 
-    if (items.length === 0) {
+          // Case: '"[51]"' or "'[51]'" → remove outer quotes
+          if (
+            (s.startsWith('"') && s.endsWith('"')) ||
+            (s.startsWith("'") && s.endsWith("'"))
+          ) {
+            s = s.slice(1, -1).trim();
+          }
+
+          // Now try to parse as JSON
+          try {
+            val = JSON.parse(s);
+          } catch (_) {
+            // If not JSON, keep as string (e.g. "51")
+            val = s;
+          }
+        }
+
+        // Step 2: Flatten if nested arrays or weird structures
+        const flatten = (arr) => {
+          return arr.reduce((acc, item) => {
+            if (Array.isArray(item)) {
+              acc.push(...flatten(item));
+            } else {
+              acc.push(item);
+            }
+            return acc;
+          }, []);
+        };
+
+        if (Array.isArray(val)) {
+          val = flatten(val);
+        } else {
+          val = [val];
+        }
+
+        // Step 3: Clean to numbers only, dedupe
+        const numbers = [...new Set(
+          val
+            .map((x) => {
+              if (x == null) return null;
+              if (typeof x === 'string') x = x.trim();
+              const n = Number(x);
+              return Number.isFinite(n) ? n : null;
+            })
+            .filter((x) => x !== null)
+        )];
+
+        return numbers;
+      };
+      // ---------------------------------------------------
+      // 2) Fallback: if no videos in this batchId
+      //    fetch by subjectIds from Batch.subjectId (JSON)
+      // ---------------------------------------------------
+      if (result.rows.length === 0) {
+        const batch = await Batch.findByPk(id);
+
+        // If batch not found, return empty (or 404 if you want)
+        if (!batch) {
+          return res.json({
+            success: true,
+            data: [],
+            ...(isAdmin && {
+              pagination: { total: 0, page, limit, totalPages: 0 },
+            }),
+          });
+        }
+
+        // Batch.subjectId can be array or single value
+        let subjectIds = normalizeSubjectIds(batch.subjectId);
+
+
+
+        // If no subject ids, return empty
+        if (subjectIds.length === 0) {
+          return res.json({
+            success: true,
+            data: [],
+            ...(isAdmin && {
+              pagination: { total: 0, page, limit, totalPages: 0 },
+            }),
+          });
+        }
+
+        // Build fallback where (any batch) by subjectId list
+        const fallbackWhere = {
+          subjectId: { [Op.in]: subjectIds },
+        };
+
+        // ✅ Apply admin search on title in fallback as well
+        if (isAdmin && search) {
+          fallbackWhere.title = { [Op.like]: `%${search}%` };
+        }
+
+        result = await VideoCourse.findAndCountAll(buildQueryOptions(fallbackWhere));
+      }
+
+      const { rows: items, count } = result;
+
+      if (!items || items.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          ...(isAdmin && {
+            pagination: {
+              total: count || 0,
+              page,
+              limit,
+              totalPages: Math.ceil((count || 0) / limit),
+            },
+          }),
+        });
+      }
+
+      // -----------------------------
+      // 3) Map response + secureToken
+      // -----------------------------
+      const response = await Promise.all(
+        items.map(async (video) => {
+          let secureToken = video.secureToken;
+
+          if (!secureToken) {
+            secureToken = encryptVideoPayload({
+              videoId: video.id,
+              batchId: video.batchId,
+              videoSource: video.videoSource,
+              exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+            });
+
+            try {
+              await video.update({ secureToken });
+            } catch (err) {
+              console.error(`Token save failed for video ${video.id}`, err);
+            }
+          }
+
+          return {
+            id: video.id,
+            title: video.title,
+            imageUrl: video.imageUrl,
+            videoSource: video.videoSource,
+
+            batchId: video.batchId,
+            subjectId: video.subjectId,
+
+            isDownloadable: video.isDownloadable,
+            isDemo: video.isDemo,
+            status: video.status,
+
+            isLive: video.isLive,
+            isLiveEnded: video.isLiveEnded,
+            LiveEndAt: video.LiveEndAt,
+            DateOfLive: video.DateOfLive,
+            TimeOfLIve: video.TimeOfLIve,
+
+            dateOfClass: video.dateOfClass,
+            TimeOfClass: video.TimeOfClass,
+
+            createdAt: video.createdAt,
+            secureToken,
+
+            ...(isAdmin ? { url: video.url } : {}),
+          };
+        })
+      );
+
       return res.json({
         success: true,
-        data: [],
+        data: response,
         ...(isAdmin && {
           pagination: {
             total: count,
@@ -197,79 +369,15 @@ static async FindByBatchId(req, res) {
           },
         }),
       });
+
+    } catch (error) {
+      console.error("FindByBatchId error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
+      });
     }
-
-    const response = await Promise.all(
-      items.map(async (video) => {
-        let secureToken = video.secureToken;
-
-        if (!secureToken) {
-          secureToken = encryptVideoPayload({
-            videoId: video.id,
-            batchId: video.batchId,
-            videoSource: video.videoSource,
-            exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-          });
-
-          try {
-            await video.update({ secureToken });
-          } catch (err) {
-            console.error(`Token save failed for video ${video.id}`, err);
-          }
-        }
-
-        return {
-          id: video.id,
-          title: video.title,
-          imageUrl: video.imageUrl,
-          videoSource: video.videoSource,
-
-          batchId: video.batchId,
-          subjectId: video.subjectId,
-
-          isDownloadable: video.isDownloadable,
-          isDemo: video.isDemo,
-          status: video.status,
-
-          isLive: video.isLive,
-          isLiveEnded: video.isLiveEnded,
-          LiveEndAt: video.LiveEndAt,
-          DateOfLive: video.DateOfLive,
-          TimeOfLIve: video.TimeOfLIve,
-
-          dateOfClass: video.dateOfClass,
-          TimeOfClass: video.TimeOfClass,
-
-          createdAt: video.createdAt,
-
-          secureToken,
-          ...(isAdmin ? { url: video.url } : {}),
-        };
-      })
-    );
-
-    return res.json({
-      success: true,
-      data: response,
-      ...(isAdmin && {
-        pagination: {
-          total: count,
-          page,
-          limit,
-          totalPages: Math.ceil(count / limit),
-        },
-      }),
-    });
-
-  } catch (error) {
-    console.error("FindByBatchId error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
   }
-}
-
   static async decryptAndPassVideo(req, res) {
     try {
       const { token } = req.body;

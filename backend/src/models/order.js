@@ -6,9 +6,9 @@ module.exports = (sequelize, DataTypes) => {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
     userId: DataTypes.INTEGER,
-    type: DataTypes.ENUM("batch", "test", "quiz"),
+    type: DataTypes.ENUM("batch", "test", "quiz","quiz_bundle","test_series_bundle"),
     itemId: DataTypes.INTEGER,
-
+   parentOrderId: { type: DataTypes.INTEGER, allowNull: true },
     amount: DataTypes.FLOAT,
     discount: DataTypes.FLOAT,
     gst: DataTypes.FLOAT,
@@ -19,7 +19,7 @@ module.exports = (sequelize, DataTypes) => {
     razorpaySignature: DataTypes.STRING,
 
     reason: DataTypes.STRING,
-    status: DataTypes.ENUM("pending", "success", "failed"),
+    status: DataTypes.ENUM("pending", "success", "failed","verifying"),
     paymentDate: DataTypes.DATE,
     accessValidityDays: DataTypes.INTEGER,
     quiz_limit: DataTypes.INTEGER,
@@ -46,10 +46,13 @@ module.exports = (sequelize, DataTypes) => {
       as: 'Quizzes',
       constraints: false
     });
+    Order.belongsTo(models.QuizesBundle, { foreignKey: 'itemId', as: 'quizBundle', constraints: false });
+    Order.belongsTo(models.TestSeriesBundle, { foreignKey: 'itemId', as: 'testSeriesBundle', constraints: false });
     Order.belongsTo(models.User, {
       foreignKey: 'userId',
       as: 'user'
     });
+    Order.belongsTo(models.Order, { foreignKey: 'parentOrderId', as: 'parentOrder', constraints: false });
   };
 
   return Order;

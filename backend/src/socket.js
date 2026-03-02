@@ -12,7 +12,7 @@ const roomUsersMap = new Map();
 function initSocket(server) {
   io = new Server(server, {
     cors: {
-      origin: "*",
+    origin: true,
       methods: ["GET", "POST"]
     }
   });

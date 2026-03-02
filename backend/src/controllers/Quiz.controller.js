@@ -19,7 +19,6 @@ class QuizController {
     try {
       const file = req.file;
 
-      console.log("Req Body:", req.body);
 
       /* =========================
          NORMALIZE BODY

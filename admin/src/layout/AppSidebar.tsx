@@ -46,7 +46,11 @@ const navItems: NavItem[] = [
     icon: <ListIcon />,
     subItems: [
       { name: "All Quizzes", path: "/all-quizzes", pro: false },
+      { name: "All Quizzes Bundle", path: "/all-quiz-bundles", pro: false },
+
       { name: "All Test Series", path: "/all-test-series", pro: false },
+      { name: "All Test Series Bundle", path: "/all-test-series-bundle", pro: false },
+
     ],
   },
   {

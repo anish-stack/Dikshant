@@ -62,7 +62,7 @@ const EditTestSeries = () => {
         }
       } catch (err) {
         toast.error("Failed to load test series");
-        navigate("all-test-series");
+        navigate("/all-test-series");
       } finally {
         setLoading(false);
       }
@@ -104,7 +104,7 @@ const EditTestSeries = () => {
 
       if (response.data.success) {
         toast.success("Test series updated successfully!");
-        navigate("all-test-series");
+        navigate("/all-test-series");
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Update failed");
@@ -129,7 +129,7 @@ const EditTestSeries = () => {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Edit Test Series</h1>
           <button
-            onClick={() => navigate("all-test-series")}
+            onClick={() => navigate("/all-test-series")}
             className="text-blue-600 hover:text-blue-800 font-medium"
           >
             ← Back to List
@@ -387,7 +387,7 @@ const EditTestSeries = () => {
             </button>
             <button
               type="button"
-              onClick={() => navigate("all-test-series")}
+              onClick={() => navigate("/all-test-series")}
               className="px-10 py-4 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition"
             >
               Cancel

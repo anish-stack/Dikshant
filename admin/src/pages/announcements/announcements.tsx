@@ -31,6 +31,7 @@ interface Announcement {
   description: string;
   textSize: string;
   image?: string; // ✅ NEW
+  webviewHeight?:string;
   arrowColor?: string; // ✅ NEW
   arrowBackgroundColor?: string; // ✅ NEW
   arrowSize?: string; // ✅ NEW
@@ -71,6 +72,7 @@ export default function Announcements() {
     publishDate: "",
     WantPromote: [] as number[],
     description: "",
+    webviewHeight:"1000",
     textColor: "#000000",
     image: null as File | null,
     removeImage: false,
@@ -198,6 +200,7 @@ export default function Announcements() {
       message: "",
       WantPromote: [],
       removeImage: false,
+      webviewHeight:"1000",
       publishDate: "",
       textSize: "16px",
       image: null as File | null,
@@ -206,7 +209,7 @@ export default function Announcements() {
       arrowBackgroundColor: "#000000",
       arrowSize: "18px",
 
-      description: "",
+      description: "",  
       textColor: "#000000",
       backgroundColor: "#ffffff",
       width: "100%",
@@ -250,6 +253,7 @@ export default function Announcements() {
       imagePreview: ann.image || "", // ✅
       message: ann.message || "",
       description: ann.description || "",
+      webviewHeight:ann.webviewHeight || "1000",
 
       WantPromote: parsedWantPromote, // ✅ FIXED
       //       textSize: ann.textSize || "16px",
@@ -299,6 +303,7 @@ export default function Announcements() {
     formData.append("textColor", form.textColor);
     formData.append("backgroundColor", form.backgroundColor);
     formData.append("width", form.width);
+    formData.append("webviewHeight", form.webviewHeight);
     formData.append("height", form.height);
     formData.append("removeImage", String(form.removeImage)); // ✅ NEW
     formData.append("arrowColor", form.arrowColor);
@@ -710,6 +715,20 @@ export default function Announcements() {
                     value={form.textSize}
                     onChange={(e) =>
                       setForm({ ...form, textSize: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                    placeholder=""
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                   Web View Height
+                  </label>
+                  <input
+                    type="text"
+                    value={form.webviewHeight}
+                    onChange={(e) =>
+                      setForm({ ...form, webviewHeight: e.target.value })
                     }
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
                     placeholder=""

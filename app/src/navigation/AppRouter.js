@@ -59,6 +59,8 @@ import { HelpSupport } from "../../screens/Others/HelpSupport";
 import { About } from "../../screens/Others/About";
 import Notifications from "../../screens/Others/Notifications";
 import PermissionsScreen from "../../screens/Others/PermissionsScreen";
+import TestSeriesBundleView from "../../pages/TestSeries/Bundle/TestSeriesBundleView";
+import QuizBundleDetails from "../../pages/Quiz/Bundle/QuizBundleDetails";
 
 const Stack = createNativeStackNavigator();
 
@@ -132,6 +134,12 @@ export default function AppRouter({ navigationRef }) {
         <Stack.Screen name="TestSeries" component={TestSeries} />
         <Stack.Screen name="IntroTestSeries" component={IntroTestSeries} />
         <Stack.Screen name="testseries-view" component={TestSeriesView} />
+        <Stack.Screen name="bundle-view" component={TestSeriesBundleView} />
+        <Stack.Screen name="QuizBundleDetails" component={QuizBundleDetails} />
+
+
+
+        
         <Stack.Screen name="ResultScreen" component={ResultScreen} />
 
         {/* Others */}

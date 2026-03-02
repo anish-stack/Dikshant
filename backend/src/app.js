@@ -6,6 +6,17 @@ const routes = require('./routes');
 const cors = require('cors');
 const redis = require('./config/redis');
 const app = express();
+const morgan = require('morgan');
+const logger = require('./config/logger');
+
+// app.use(
+//   morgan("combined", {
+//     stream: {
+//       write: (message) => logger.info(message.trim()),
+//     },
+//   })
+// );
+
 
 
 app.use(
@@ -27,9 +38,9 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.get('/', (req, res) => {
+  logger.info("Root endpoint hit");
   res.json({ message: 'API is running' });
 });
-
 async function clearAllRedisCache() {
   try {
     const keys = await redis.keys("*");

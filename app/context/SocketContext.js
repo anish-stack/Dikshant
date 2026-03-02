@@ -25,8 +25,9 @@ export const SocketProvider = ({ children, userId }) => {
     // Create socket connection
     const newSocket = io('http://192.168.1.7:5001', {
       query: { userId },
-      transports: ["polling", "websocket"], // ✅ allow both
+      transports: ['websocket'],
       forceNew: true,
+      upgrade: false,
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 2000,

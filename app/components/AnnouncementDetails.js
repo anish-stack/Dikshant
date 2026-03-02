@@ -126,7 +126,7 @@ export default function AnnouncementDetails({ route, navigation }) {
             <Text style={styles.badgeText}>📢 Latest Update</Text>
           </View>
           
-          <Text style={styles.title}>{announcement.title}</Text>
+          <Text style={[styles.title,{color:announcement.textColor}]}>{announcement.title}</Text>
           
           <View style={styles.metaRow}>
             <Text style={styles.publishDate}>📅 {publishDate}</Text>
@@ -146,8 +146,9 @@ export default function AnnouncementDetails({ route, navigation }) {
           <View style={styles.descriptionWrapper}>
             <WebView
               originWhitelist={['*']}
+              
               source={{ html: htmlContent }}
-              style={styles.webview}
+              style={[styles.webview,{minHeight:Number(announcement.webviewHeight ? announcement.webviewHeight :2000)}]}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
               showsHorizontalScrollIndicator={false}
@@ -336,7 +337,6 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   webview: {
-    height: 800,
     backgroundColor: 'transparent',
   },
 

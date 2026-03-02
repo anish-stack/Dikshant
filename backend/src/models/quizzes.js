@@ -124,6 +124,12 @@ module.exports = (sequelize, DataTypes) => {
       onDelete: "CASCADE",
     });
 
+    Quizzes.belongsToMany(models.QuizesBundle, {
+      through: "Quizes_bundle_items",
+      as: "bundles",
+      foreignKey: "quiz_id",
+      otherKey: "bundle_id",
+    });
     Quizzes.hasMany(models.QuizPayments, {
       foreignKey: "quizId",
       as: "payments",

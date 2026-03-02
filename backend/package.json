@@ -22,6 +22,7 @@
     "fs": "^0.0.1-security",
     "ioredis": "5.3.2",
     "jsonwebtoken": "9.0.0",
+    "morgan": "^1.10.1",
     "multer": "1.4.5-lts.1",
     "mysql2": "^3.3.1",
     "nodemailer": "^7.0.13",
@@ -29,8 +30,10 @@
     "razorpay": "^2.9.6",
     "sequelize": "^6.32.1",
     "sequelize-cli": "^6.6.3",
+    "slugify": "^1.6.6",
     "socket.io": "^4.8.3",
     "uuid": "9.0.0",
+    "winston": "^3.19.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

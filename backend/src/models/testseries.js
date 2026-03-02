@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
       displayOrder: DataTypes.INTEGER,
 
       status: {
-        type: DataTypes.ENUM('new', 'popular', 'featured'),
+        type: DataTypes.ENUM('new','normal', 'popular', 'featured'),
       },
 
       isActive: DataTypes.BOOLEAN,
@@ -46,6 +46,13 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-
+TestSeries.associate = function (models) {
+  TestSeries.belongsToMany(models.TestSeriesBundle, {
+    through: "testseries_bundle_items",
+    as: "bundles",
+    foreignKey: "testSeriesId",
+    otherKey: "bundleId",
+  });
+};
   return TestSeries;
 };

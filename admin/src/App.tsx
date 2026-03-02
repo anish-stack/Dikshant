@@ -57,6 +57,12 @@ import AppAssets from "./pages/AppAssets/AppAssets";
 import AllCategories from "./pages/app_categories/AllCategories";
 import TutorShowBothChatAndJoinedStudents from "./pages/Courses/Coures/TutorShowBothChatAndJoinedStudents";
 import ShareLiveClassMonitor from "./pages/Courses/Coures/ShareUrl";
+import AllTestSeriesBundle from "./pages/TestSeries/Bundle/AllTestSeriesBundle";
+import CreateTestSeriesBundle from "./pages/TestSeries/Bundle/CreateTestSeriesBundle";
+import EditTestSeriesBundle from "./pages/TestSeries/Bundle/EditTestSeriesBundle";
+import AllQuizBundle from "./pages/Quiz/Bundle/AllQuizBundle";
+import CreateQuizBundle from "./pages/Quiz/Bundle/CreateQuizBundle";
+import EditQuizBundle from "./pages/Quiz/Bundle/EditQuizBundle";
 
 export default function App() {
   return (
@@ -104,6 +110,35 @@ export default function App() {
                 element={<CourseVideos />}
               />
 
+              {/* Test series Bundle */}
+
+              <Route
+                path="/all-test-series-bundle"
+                element={<AllTestSeriesBundle />}
+              />
+              <Route
+                path="/create-test-series-bundle"
+                element={<CreateTestSeriesBundle />}
+              />
+              <Route
+                path="/edit-test-series-bundle/:id"
+                element={<EditTestSeriesBundle />}
+              />
+
+
+                      <Route
+                path="/all-quiz-bundles"
+                element={<AllQuizBundle />}
+              />
+              <Route
+                path="/create-quiz-bundle"
+                element={<CreateQuizBundle />}
+              />
+              <Route
+                path="/edit-quiz-bundle/:id"
+                element={<EditQuizBundle />}
+              />
+
               {/* scholarship-apply */}
               <Route path="/scholarship-apply" element={<ScholarshipApply />} />
               <Route path="/scholarship" element={<Scholarship />} />
@@ -139,19 +174,27 @@ export default function App() {
                 element={<CreateTestSeries />}
               />
 
-              <Route path="admin/testseries/submissions/:id" element={<ViewSubmission/>} />
-              <Route path="admin/testseries/purchases/:id" element={<ViewPurchase/>} />
-              <Route path="admin/testseries/result/:id" element={<Result/>} />
+              <Route
+                path="admin/testseries/submissions/:id"
+                element={<ViewSubmission />}
+              />
+              <Route
+                path="admin/testseries/purchases/:id"
+                element={<ViewPurchase />}
+              />
+              <Route path="admin/testseries/result/:id" element={<Result />} />
 
-              <Route path="/all-attemps" element={<AllAtempts/>} />
-              <Route path="/admin/quiz-attempts/:id/result" element={<ResultQuiz/>} />
+              <Route path="/all-attemps" element={<AllAtempts />} />
+              <Route
+                path="/admin/quiz-attempts/:id/result"
+                element={<ResultQuiz />}
+              />
 
+              <Route path="/app-assets" element={<AppAssets />} />
 
-    <Route path="/app-assets" element={<AppAssets/>} />
+              <Route path="/app-Categories" element={<AllCategories />} />
 
-    <Route path="/app-Categories" element={<AllCategories/>} />
-
-    {/* admin/testseries/purchases */}
+              {/* admin/testseries/purchases */}
               {/* Quizes */}
               <Route path="/all-quizzes" element={<AllQuizzesPage />} />
               <Route path="/create-quizzes" element={<CreateQuiz />} />
@@ -178,10 +221,14 @@ export default function App() {
           {/* 🔓 PUBLIC ROUTES */}
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/live-class-monitor/:id"  element={<ShareLiveClassMonitor/>} />
-          <Route path="/stats-of-class/:id" element={<TutorShowBothChatAndJoinedStudents />} />
-
-
+          <Route
+            path="/live-class-monitor/:id"
+            element={<ShareLiveClassMonitor />}
+          />
+          <Route
+            path="/stats-of-class/:id"
+            element={<TutorShowBothChatAndJoinedStudents />}
+          />
 
           {/* ❌ NOT FOUND */}
           <Route path="*" element={<NotFound />} />

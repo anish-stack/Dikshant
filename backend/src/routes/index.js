@@ -40,4 +40,9 @@ router.use('/assets',require('./appassets'))
 router.use('/quiz', require('./quiz'));
 router.use('/quiz/:quizId/questions', require('./quiz.questions'));
 
+
+router.use("/testseries-bundles", require("./testSeriesBundle.routes"));
+router.use("/quiz-bundles", require("./quizesBundle.routes"));
+
+
 module.exports = router;

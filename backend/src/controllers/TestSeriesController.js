@@ -9,8 +9,8 @@ const { Op } = Sequelize;
 class TestSeriesController {
 
   /* -------------------- CREATE -------------------- */
-  static async create(req, res) {
-    try {
+static async create(req, res) {
+ try {
       const {
         title,
         displayOrder = 0,
@@ -29,81 +29,152 @@ class TestSeriesController {
         expirSeries,
       } = req.body;
 
-      /* ---------- Validation ---------- */
-      if (!title) {
-        return res.status(400).json({ message: "Title is required" });
-      }
+      // ── Status validation (match ENUM in model) ──
+      const allowedStatuses = ['new', 'normal', 'popular', 'featured'];
+      const normalizedStatus = (status || 'new').trim().toLowerCase();
 
-      if (Number(discountPrice) > Number(price)) {
-        return res.status(400).json({ message: "Discount price cannot be greater than price" });
-      }
-
-      if (gst < 0) {
-        return res.status(400).json({ message: "GST cannot be negative" });
-      }
-
-      if (timeDurationForTest && timeDurationForTest <= 0) {
-        return res.status(400).json({ message: "Test duration must be greater than 0 minutes" });
-      }
-
-      if (
-        AnswerSubmitDateAndTime &&
-        AnswerLastSubmitDateAndTime &&
-        new Date(AnswerLastSubmitDateAndTime) < new Date(AnswerSubmitDateAndTime)
-      ) {
+      if (!allowedStatuses.includes(normalizedStatus)) {
         return res.status(400).json({
-          message: "Last answer submit time must be after submit start time",
+          success: false,
+          message: `Invalid status value. Allowed: ${allowedStatuses.join(', ')}`,
         });
       }
 
-      if (expirSeries && testStartDate && new Date(expirSeries) < new Date(testStartDate)) {
+      // ── Basic input validations ──
+      if (!title?.trim()) {
         return res.status(400).json({
+          success: false,
+          message: "Title is required",
+        });
+      }
+
+      if (Number(discountPrice) > Number(price)) {
+        return res.status(400).json({
+          success: false,
+          message: "Discount price cannot be greater than original price",
+        });
+      }
+
+      if (Number(gst) < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "GST cannot be negative",
+        });
+      }
+
+      if (timeDurationForTest && Number(timeDurationForTest) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Test duration must be greater than 0 minutes",
+        });
+      }
+
+      // ── Safe date parser (handles empty, invalid, 'Invalid date', etc.) ──
+      const safeDate = (value) => {
+        if (!value || value === 'Invalid date' || String(value).trim() === '') {
+          return null;
+        }
+        const date = new Date(value);
+        // Also accept common formats from frontend (date + time-local)
+        return isNaN(date.getTime()) ? null : date;
+      };
+
+      // Parse ALL date/time fields consistently
+      const parsedTestStartDate       = safeDate(testStartDate);
+      const parsedTestStartTime       = safeDate(testStartTime);
+      const parsedAnswerSubmitStart   = safeDate(AnswerSubmitDateAndTime);
+      const parsedAnswerSubmitLast    = safeDate(AnswerLastSubmitDateAndTime);
+      const parsedExpiry              = safeDate(expirSeries);
+
+      // ── Logical date validations ──
+      if (parsedAnswerSubmitStart && parsedAnswerSubmitLast &&
+          parsedAnswerSubmitLast < parsedAnswerSubmitStart) {
+        return res.status(400).json({
+          success: false,
+          message: "Last answer submission time must be after start submission time",
+        });
+      }
+
+      if (parsedExpiry && parsedTestStartDate && parsedExpiry < parsedTestStartDate) {
+        return res.status(400).json({
+          success: false,
           message: "Expiry date cannot be before test start date",
         });
       }
 
-      /* ---------- Image Upload ---------- */
+      // ── Handle image upload ──
       let imageUrl = null;
       if (req.file) {
         imageUrl = await uploadToS3(req.file, "testseries");
       }
 
-
-      /* ---------- Create ---------- */
+      // ── Create the record ──
       const item = await TestSeries.create({
         imageUrl,
-        title,
+        title: title.trim(),
         slug: generateSlug(title),
-        displayOrder,
-        status,
-        isActive,
-        description,
-        price,
-        discountPrice,
-        gst,
-        testStartDate,
-        testStartTime,
-        AnswerSubmitDateAndTime,
-        AnswerLastSubmitDateAndTime,
-        timeDurationForTest,
-        passing_marks,
-        expirSeries,
+        displayOrder: Number(displayOrder) || 0,
+        status: normalizedStatus,
+        isActive: Boolean(isActive),
+        description: description?.trim() || null,
+        price: Number(price) || 0,
+        discountPrice: Number(discountPrice) || 0,
+        gst: Number(gst) || 0,
+
+        // All date fields are now safely parsed (null if invalid/empty)
+        testStartDate:      parsedTestStartDate,
+        testStartTime:      parsedTestStartTime,
+        AnswerSubmitDateAndTime: parsedAnswerSubmitStart,
+        AnswerLastSubmitDateAndTime: parsedAnswerSubmitLast,
+        expirSeries:        parsedExpiry,
+
+        timeDurationForTest: timeDurationForTest ? Number(timeDurationForTest) : null,
+        passing_marks:      passing_marks ? Number(passing_marks) : null,
       });
 
+      // ── Clear cache ──
       await redis.del("testseries");
 
-
-      return res.status(200).json({
+      return res.status(201).json({
         success: true,
         message: "Test series created successfully",
         data: item,
       });
 
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Error creating test series", error });
+      console.error("TestSeries create error:", error);
+
+      let message = "Failed to create test series. Please try again later.";
+      let statusCode = 500;
+
+      if (error.name === 'SequelizeDatabaseError') {
+        const sqlMsg = error.parent?.sqlMessage || '';
+
+        if (sqlMsg.includes('Data truncated for column \'status\'')) {
+          message = "Invalid status value. Please use one of: new, normal, popular, featured";
+          statusCode = 400;
+        }
+        else if (sqlMsg.includes('Incorrect datetime value') || sqlMsg.includes('Invalid date')) {
+          message = "One or more date/time fields contain invalid values. Please use correct format (YYYY-MM-DD or YYYY-MM-DDTHH:mm).";
+          statusCode = 400;
+        }
+        else if (sqlMsg.includes('Data too long')) {
+          message = "Some field is too long (title, description, etc.). Please shorten it.";
+          statusCode = 400;
+        }
+      }
+      else if (error.name === 'SequelizeValidationError') {
+        message = error.errors?.map(e => e.message).join(", ") || "Validation failed";
+        statusCode = 400;
+      }
+
+      return res.status(statusCode).json({
+        success: false,
+        message,
+        // error: error.message,   // keep only during development
+      });
     }
-  }
+}
 
   /* -------------------- ADMIN: UPLOAD QUESTION SHEET -------------------- */
   static async uploadQuestionSheet(req, res) {
@@ -620,92 +691,185 @@ class TestSeriesController {
   }
 
   /* -------------------- UPDATE -------------------- */
-  static async update(req, res) {
-    try {
-      const item = await TestSeries.findByPk(req.params.id);
-      if (!item) {
-        return res.status(404).json({ message: "Test series not found" });
-      }
+static async update(req, res) {
+  try {
+    const { id } = req.params;
+    const item = await TestSeries.findByPk(id);
 
-      const {
-        title,
-        displayOrder,
-        status,
-        isActive,
-        description,
-        price,
-        discountPrice,
-        gst,
-        testStartDate,
-        testStartTime,
-        AnswerSubmitDateAndTime,
-        AnswerLastSubmitDateAndTime,
-        timeDurationForTest,
-        passing_marks,
-        expirSeries,
-      } = req.body;
-
-      /* ---------- Validation ---------- */
-      if (discountPrice !== undefined && price !== undefined) {
-        if (Number(discountPrice) > Number(price)) {
-          return res.status(400).json({ message: "Discount price cannot be greater than price" });
-        }
-      }
-
-      if (gst !== undefined && gst < 0) {
-        return res.status(400).json({ message: "GST cannot be negative" });
-      }
-
-      if (timeDurationForTest !== undefined && timeDurationForTest <= 0) {
-        return res.status(400).json({ message: "Test duration must be greater than 0 minutes" });
-      }
-
-      /* ---------- Image Update ---------- */
-      let imageUrl = item.imageUrl;
-      if (req.file) {
-        // if (item.imageUrl) await deleteFromS3(item.imageUrl);
-        imageUrl = await uploadToS3(req.file, "testseries");
-      }
-
-      /* ---------- Update ---------- */
-      await item.update({
-        imageUrl,
-        title: title ?? item.title,
-        slug: title ? generateSlug(title) : item.slug,
-        displayOrder: displayOrder ?? item.displayOrder,
-        status: status ?? item.status,
-        isActive: isActive ?? item.isActive,
-        description: description ?? item.description,
-        price: price ?? item.price,
-        discountPrice: discountPrice ?? item.discountPrice,
-        gst: gst ?? item.gst,
-        testStartDate: testStartDate ?? item.testStartDate,
-        testStartTime: testStartTime ?? item.testStartTime,
-        AnswerSubmitDateAndTime:
-          AnswerSubmitDateAndTime ?? item.AnswerSubmitDateAndTime,
-        AnswerLastSubmitDateAndTime:
-          AnswerLastSubmitDateAndTime ?? item.AnswerLastSubmitDateAndTime,
-        timeDurationForTest:
-          timeDurationForTest ?? item.timeDurationForTest,
-        passing_marks: passing_marks ?? item.passing_marks,
-        expirSeries: expirSeries ?? item.expirSeries,
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Test series not found",
       });
-
-      await redis.del("testseries");
-      await redis.del(`testseries:${req.params.id}`);
-
-      return res.status(200).json({
-        success: true,
-        message: "Test series updated successfully",
-        data: item,
-      });
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Error updating test series", error });
     }
-  }
 
+    const {
+      title,
+      displayOrder,
+      status,
+      isActive,
+      description,
+      price,
+      discountPrice,
+      gst,
+      testStartDate,
+      testStartTime,
+      AnswerSubmitDateAndTime,
+      AnswerLastSubmitDateAndTime,
+      timeDurationForTest,
+      passing_marks,
+      expirSeries,
+    } = req.body;
+
+    // ── Status validation (match ENUM) ──
+    const allowedStatuses = ['new', 'normal', 'popular', 'featured'];
+    let normalizedStatus = item.status;
+
+    if (status !== undefined) {
+      normalizedStatus = (status || 'new').trim().toLowerCase();
+      if (!allowedStatuses.includes(normalizedStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
+        });
+      }
+    }
+
+    // ── Number & basic validations ──
+    if (discountPrice !== undefined && price !== undefined) {
+      if (Number(discountPrice) > Number(price)) {
+        return res.status(400).json({
+          success: false,
+          message: "Discount price cannot be greater than original price",
+        });
+      }
+    }
+
+    if (gst !== undefined && Number(gst) < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "GST cannot be negative",
+      });
+    }
+
+    if (timeDurationForTest !== undefined && Number(timeDurationForTest) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Test duration must be greater than 0 minutes",
+      });
+    }
+
+    // ── Date sanitization helper ──
+    const safeDate = (value, currentValue) => {
+      // If not provided → keep existing
+      if (value === undefined || value === null) {
+        return currentValue;
+      }
+      // Handle empty / invalid cases
+      if (value === '' || value === 'Invalid date' || String(value).trim() === '') {
+        return null;
+      }
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    };
+
+    // Parse all date fields safely (keep old value if not sent)
+    const parsedTestStartDate       = safeDate(testStartDate, item.testStartDate);
+    const parsedTestStartTime       = safeDate(testStartTime, item.testStartTime);
+    const parsedAnswerSubmitStart   = safeDate(AnswerSubmitDateAndTime, item.AnswerSubmitDateAndTime);
+    const parsedAnswerSubmitLast    = safeDate(AnswerLastSubmitDateAndTime, item.AnswerLastSubmitDateAndTime);
+    const parsedExpiry              = safeDate(expirSeries, item.expirSeries);
+
+    // Optional: Add logical validation (only if both dates are present)
+    if (parsedAnswerSubmitStart && parsedAnswerSubmitLast &&
+        parsedAnswerSubmitLast < parsedAnswerSubmitStart) {
+      return res.status(400).json({
+        success: false,
+        message: "Last answer submission time must be after start submission time",
+      });
+    }
+
+    if (parsedExpiry && parsedTestStartDate && parsedExpiry < parsedTestStartDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Expiry date cannot be before test start date",
+      });
+    }
+
+    // ── Image handling ──
+    let imageUrl = item.imageUrl;
+    if (req.file) {
+      // Delete old image if exists (optional – uncomment if you want cleanup)
+      // if (item.imageUrl) {
+      //   await deleteFromS3(item.imageUrl).catch(err => console.warn("Old image delete failed:", err));
+      // }
+      imageUrl = await uploadToS3(req.file, "testseries");
+    }
+
+    // ── Perform update ──
+    await item.update({
+      imageUrl,
+      title: title?.trim() ?? item.title,
+      slug: title ? generateSlug(title) : item.slug,
+      displayOrder: displayOrder !== undefined ? Number(displayOrder) : item.displayOrder,
+      status: normalizedStatus,
+      isActive: isActive !== undefined ? Boolean(isActive) : item.isActive,
+      description: description !== undefined ? (description?.trim() || null) : item.description,
+      price: price !== undefined ? Number(price) : item.price,
+      discountPrice: discountPrice !== undefined ? Number(discountPrice) : item.discountPrice,
+      gst: gst !== undefined ? Number(gst) : item.gst,
+
+      testStartDate: parsedTestStartDate,
+      testStartTime: parsedTestStartTime,
+      AnswerSubmitDateAndTime: parsedAnswerSubmitStart,
+      AnswerLastSubmitDateAndTime: parsedAnswerSubmitLast,
+      expirSeries: parsedExpiry,
+
+      timeDurationForTest: timeDurationForTest !== undefined ? Number(timeDurationForTest) : item.timeDurationForTest,
+      passing_marks: passing_marks !== undefined ? Number(passing_marks) : item.passing_marks,
+    });
+
+    // ── Invalidate cache ──
+    await redis.del("testseries");
+    await redis.del(`testseries:${id}`);
+
+    return res.status(200).json({
+      success: true,
+      message: "Test series updated successfully",
+      data: item,
+    });
+
+  } catch (error) {
+    console.error("TestSeries update error:", error);
+
+    let message = "Failed to update test series. Please try again later.";
+    let statusCode = 500;
+
+    if (error.name === 'SequelizeDatabaseError') {
+      const sqlMsg = error.parent?.sqlMessage || '';
+
+      if (sqlMsg.includes('Data truncated for column \'status\'')) {
+        message = "Invalid status value provided.";
+        statusCode = 400;
+      } else if (sqlMsg.includes('Incorrect datetime value') || sqlMsg.includes('Invalid date')) {
+        message = "One or more date/time fields are invalid. Please use correct format (YYYY-MM-DD or YYYY-MM-DDTHH:mm).";
+        statusCode = 400;
+      } else if (sqlMsg.includes('Data too long')) {
+        message = "Some field value is too long (title, description, etc.).";
+        statusCode = 400;
+      }
+    } else if (error.name === 'SequelizeValidationError') {
+      message = error.errors?.map(e => e.message).join(", ") || "Validation failed";
+      statusCode = 400;
+    }
+
+    return res.status(statusCode).json({
+      success: false,
+      message,
+      // error: error.message,   // keep only for development
+    });
+  }
+}
   /* -------------------- DELETE -------------------- */
   static async delete(req, res) {
     try {

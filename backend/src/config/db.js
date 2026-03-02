@@ -19,9 +19,8 @@ const sequelize = new Sequelize(
       timestamps: true,
     },
 
-    // ✅ VERY IMPORTANT (Connection pooling)
     pool: {
-      max: 5,        // shared hosting safe
+      max: 5,      
       min: 0,
       acquire: 30000,
       idle: 10000,

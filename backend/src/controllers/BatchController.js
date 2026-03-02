@@ -35,12 +35,11 @@ class BatchController {
 static async create(req, res) {
   try {
     let imageUrl = null;
-
     if (req.file) {
       imageUrl = await uploadToS3(req.file, "batchs");
     }
 
-    // ✅ Normalize quizIds & testSeriesIds
+    // Normalize quizIds & testSeriesIds (already good)
     const quizIds =
       typeof req.body.quizIds === "string"
         ? JSON.parse(req.body.quizIds)
@@ -51,8 +50,31 @@ static async create(req, res) {
         ? JSON.parse(req.body.testSeriesIds)
         : req.body.testSeriesIds || [];
 
+    const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
-         const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
+    // ── NEW: Safe date parsing function ──
+    const parseDate = (value) => {
+      if (!value || value === '' || value === 'Invalid date') {
+        return null; // or throw new Error('registrationStartDate is required') if mandatory
+      }
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date; // returns valid Date or null
+    };
+
+    const registrationStart = parseDate(req.body.registrationStartDate);
+    const registrationEnd   = parseDate(req.body.registrationEndDate);
+
+    // Optional: Add similar for startDate/endDate if they can also be bad
+    const start  = parseDate(req.body.startDate);
+    const end    = parseDate(req.body.endDate);
+
+    // Optional: Business validation
+    if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
+      return res.status(400).json({
+        message: "Registration end date cannot be before start date"
+      });
+    }
+
     const payload = {
       name: req.body.name,
       slug: generateSlug(req.body.name),
@@ -61,10 +83,10 @@ static async create(req, res) {
       programId: req.body.programId,
       subjectId: req.body.subjectId,
 
-      startDate: req.body.startDate,
-      endDate: req.body.endDate,
-      registrationStartDate: req.body.registrationStartDate,
-      registrationEndDate: req.body.registrationEndDate,
+      startDate: start,                    // now safe
+      endDate: end,
+      registrationStartDate: registrationStart,
+      registrationEndDate: registrationEnd,
 
       status: req.body.status,
       shortDescription: req.body.shortDescription,
@@ -75,7 +97,6 @@ static async create(req, res) {
       gst: req.body.gst,
       offerValidityDays: req.body.offerValidityDays,
 
-      // ✅ NEW FIELDS
       quizIds: Array.isArray(quizIds) ? quizIds : [],
       testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
 
@@ -93,13 +114,28 @@ static async create(req, res) {
     return res.status(201).json(item);
   } catch (err) {
     console.error("Batch Create Error:", err);
-    return res.status(500).json({
-      message: "Error creating batch",
-      error: err.message,
+
+    // ── User-friendly error response ──
+    let userMessage = "Failed to create batch. Please try again.";
+    let status = 500;
+
+    if (err.name === 'SequelizeDatabaseError') {
+      if (err.parent?.sqlMessage?.includes('Incorrect datetime value')) {
+        userMessage = "Invalid date format for start/end or registration dates. Please use valid dates (e.g., YYYY-MM-DD or ISO format).";
+        status = 400;
+      }
+    } else if (err.name === 'SequelizeValidationError') {
+      userMessage = "Validation failed: " + err.errors.map(e => e.message).join(", ");
+      status = 400;
+    }
+
+    return res.status(status).json({
+      message: userMessage,
+      error: err.message,          // keep for debugging (optional: remove in prod)
+      // details: err.errors       // if you want to send validation details
     });
   }
 }
-
   // =========================
   // FIND ALL
   // =========================

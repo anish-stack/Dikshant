@@ -98,6 +98,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: '22',
       },
+      webviewHeight:{
+  type: DataTypes.STRING,
+   defaultValue: '1000',
+      },
       WantPromote: {
         type: DataTypes.JSON,
         allowNull: true,
