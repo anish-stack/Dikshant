@@ -199,18 +199,9 @@ export default function CoursePage() {
               <Feather name="check-circle" size={10} color="#ffffff" />
               <Text style={styles.subscribedText}>SUBSCRIBED</Text>
             </View>
-          ) : discount > 0 ? (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{discount}% OFF</Text>
-            </View>
-          ) : null}
+          ) :null}
 
-          <View style={styles.categoryBadge}>
-            <Feather name={getFilterIcon(item.category)} size={10} color="#ffffff" />
-            <Text style={styles.categoryText}>
-              {item.category === "recorded" ? "Recorded" : item.category.charAt(0).toUpperCase() + item.category.slice(1)}
-            </Text>
-          </View>
+         
         </View>
 
         <View style={styles.cardContent}>

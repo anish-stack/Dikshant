@@ -173,14 +173,7 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
             <Feather name="check-circle" size={12} color="#ffffff" />
             <Text style={styles.subscribedText}>SUBSCRIBED</Text>
           </View>
-        ) : (
-          /* Discount Badge - Only show if not subscribed */
-          discountPercent > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{discountPercent}% OFF</Text>
-            </View>
-          )
-        )}
+        ) : null}
       </View>
 
       {/* Content Section */}
@@ -229,24 +222,6 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
               ) : (
                 <Text style={styles.price}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
               )}
-            </View>
-          )}
-
-          {batch.category && (
-            <View style={[
-              styles.categoryTag,
-              batch.category === "online" && styles.categoryTagOnline,
-              batch.category === "offline" && styles.categoryTagOffline,
-              batch.category === "recorded" && styles.categoryTagRecorded,
-            ]}>
-              <Text style={[
-                styles.categoryTagText,
-                batch.category === "online" && styles.categoryTagTextOnline,
-                batch.category === "offline" && styles.categoryTagTextOffline,
-                batch.category === "recorded" && styles.categoryTagTextRecorded,
-              ]}>
-                {batch.category.toUpperCase()}
-              </Text>
             </View>
           )}
         </View>

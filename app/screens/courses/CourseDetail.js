@@ -485,11 +485,11 @@ export default function CourseDetail() {
               resizeMode="contain"
             />
 
-            {discountPercent > 0 && (
+            {/* {discountPercent > 0 && (
               <View style={styles.discountTag}>
                 <Text style={styles.discountTagText}>{discountPercent}% OFF</Text>
               </View>
-            )}
+            )} */}
 
           </View>
         )}
