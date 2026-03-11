@@ -1,6 +1,6 @@
 "use strict";
 
-const { Batch, Program, Subject, Sequelize ,Quizzes,TestSeries} = require("../models");
+const { Batch, Program, Subject, Sequelize, Quizzes, TestSeries } = require("../models");
 const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
@@ -32,110 +32,110 @@ class BatchController {
   // =========================
   // CREATE
   // =========================
-static async create(req, res) {
-  try {
-    let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadToS3(req.file, "batchs");
-    }
-
-    // Normalize quizIds & testSeriesIds (already good)
-    const quizIds =
-      typeof req.body.quizIds === "string"
-        ? JSON.parse(req.body.quizIds)
-        : req.body.quizIds || [];
-
-    const testSeriesIds =
-      typeof req.body.testSeriesIds === "string"
-        ? JSON.parse(req.body.testSeriesIds)
-        : req.body.testSeriesIds || [];
-
-    const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
-
-    // ── NEW: Safe date parsing function ──
-    const parseDate = (value) => {
-      if (!value || value === '' || value === 'Invalid date') {
-        return null; // or throw new Error('registrationStartDate is required') if mandatory
+  static async create(req, res) {
+    try {
+      let imageUrl = null;
+      if (req.file) {
+        imageUrl = await uploadToS3(req.file, "batchs");
       }
-      const date = new Date(value);
-      return isNaN(date.getTime()) ? null : date; // returns valid Date or null
-    };
 
-    const registrationStart = parseDate(req.body.registrationStartDate);
-    const registrationEnd   = parseDate(req.body.registrationEndDate);
+      // Normalize quizIds & testSeriesIds (already good)
+      const quizIds =
+        typeof req.body.quizIds === "string"
+          ? JSON.parse(req.body.quizIds)
+          : req.body.quizIds || [];
 
-    // Optional: Add similar for startDate/endDate if they can also be bad
-    const start  = parseDate(req.body.startDate);
-    const end    = parseDate(req.body.endDate);
+      const testSeriesIds =
+        typeof req.body.testSeriesIds === "string"
+          ? JSON.parse(req.body.testSeriesIds)
+          : req.body.testSeriesIds || [];
 
-    // Optional: Business validation
-    if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
-      return res.status(400).json({
-        message: "Registration end date cannot be before start date"
-      });
-    }
+      const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
-    const payload = {
-      name: req.body.name,
-      slug: generateSlug(req.body.name),
-      imageUrl,
-      displayOrder: req.body.displayOrder,
-      programId: req.body.programId,
-      subjectId: req.body.subjectId,
+      // ── NEW: Safe date parsing function ──
+      const parseDate = (value) => {
+        if (!value || value === '' || value === 'Invalid date') {
+          return null; // or throw new Error('registrationStartDate is required') if mandatory
+        }
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date; // returns valid Date or null
+      };
 
-      startDate: start,                    // now safe
-      endDate: end,
-      registrationStartDate: registrationStart,
-      registrationEndDate: registrationEnd,
+      const registrationStart = parseDate(req.body.registrationStartDate);
+      const registrationEnd = parseDate(req.body.registrationEndDate);
 
-      status: req.body.status,
-      shortDescription: req.body.shortDescription,
-      longDescription: req.body.longDescription,
+      // Optional: Add similar for startDate/endDate if they can also be bad
+      const start = parseDate(req.body.startDate);
+      const end = parseDate(req.body.endDate);
 
-      batchPrice: req.body.batchPrice,
-      batchDiscountPrice: req.body.batchDiscountPrice,
-      gst: req.body.gst,
-      offerValidityDays: req.body.offerValidityDays,
+      // Optional: Business validation
+      if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
+        return res.status(400).json({
+          message: "Registration end date cannot be before start date"
+        });
+      }
 
-      quizIds: Array.isArray(quizIds) ? quizIds : [],
-      testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
+      const payload = {
+        name: req.body.name,
+        slug: generateSlug(req.body.name),
+        imageUrl,
+        displayOrder: req.body.displayOrder,
+        programId: req.body.programId,
+        subjectId: req.body.subjectId,
 
-      isEmi: Boolean(req.body.isEmi),
-      emiTotal: req.body.emiTotal || null,
-      emiSchedule: emiSchedule,
+        startDate: start,                    // now safe
+        endDate: end,
+        registrationStartDate: registrationStart,
+        registrationEndDate: registrationEnd,
 
-      category: req.body.category,
-    };
+        status: req.body.status,
+        shortDescription: req.body.shortDescription,
+        longDescription: req.body.longDescription,
 
-    const item = await Batch.create(payload);
+        batchPrice: req.body.batchPrice,
+        batchDiscountPrice: req.body.batchDiscountPrice,
+        gst: req.body.gst,
+        offerValidityDays: req.body.offerValidityDays,
 
-    await BatchController.clearBatchCache();
+        quizIds: Array.isArray(quizIds) ? quizIds : [],
+        testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
 
-    return res.status(201).json(item);
-  } catch (err) {
-    console.error("Batch Create Error:", err);
+        isEmi: Boolean(req.body.isEmi),
+        emiTotal: req.body.emiTotal || null,
+        emiSchedule: emiSchedule,
 
-    // ── User-friendly error response ──
-    let userMessage = "Failed to create batch. Please try again.";
-    let status = 500;
+        category: req.body.category,
+      };
 
-    if (err.name === 'SequelizeDatabaseError') {
-      if (err.parent?.sqlMessage?.includes('Incorrect datetime value')) {
-        userMessage = "Invalid date format for start/end or registration dates. Please use valid dates (e.g., YYYY-MM-DD or ISO format).";
+      const item = await Batch.create(payload);
+
+      await BatchController.clearBatchCache();
+
+      return res.status(201).json(item);
+    } catch (err) {
+      console.error("Batch Create Error:", err);
+
+      // ── User-friendly error response ──
+      let userMessage = "Failed to create batch. Please try again.";
+      let status = 500;
+
+      if (err.name === 'SequelizeDatabaseError') {
+        if (err.parent?.sqlMessage?.includes('Incorrect datetime value')) {
+          userMessage = "Invalid date format for start/end or registration dates. Please use valid dates (e.g., YYYY-MM-DD or ISO format).";
+          status = 400;
+        }
+      } else if (err.name === 'SequelizeValidationError') {
+        userMessage = "Validation failed: " + err.errors.map(e => e.message).join(", ");
         status = 400;
       }
-    } else if (err.name === 'SequelizeValidationError') {
-      userMessage = "Validation failed: " + err.errors.map(e => e.message).join(", ");
-      status = 400;
-    }
 
-    return res.status(status).json({
-      message: userMessage,
-      error: err.message,          // keep for debugging (optional: remove in prod)
-      // details: err.errors       // if you want to send validation details
-    });
+      return res.status(status).json({
+        message: userMessage,
+        error: err.message,          // keep for debugging (optional: remove in prod)
+        // details: err.errors       // if you want to send validation details
+      });
+    }
   }
-}
   // =========================
   // FIND ALL
   // =========================
@@ -147,7 +147,7 @@ static async create(req, res) {
       limit = parseInt(limit);
       const offset = (page - 1) * limit;
 
-      
+
       const where = {};
 
       if (search.trim()) {
@@ -271,7 +271,7 @@ static async create(req, res) {
         ? await Subject.findAll({
           where: {
             id: { [Op.in]: subjectIds }
-          },attributes: ["id", "name"],
+          }, attributes: ["id", "name"],
         })
         : [];
 
@@ -296,227 +296,300 @@ static async create(req, res) {
     }
   }
 
+  static async findOneBySlug(req, res) {
+    try {
+      const slug = req.params.slug;
+      // console.log("slug",slug)
 
-static async findOneForStudent(req, res) {
-  try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ message: "Batch ID is required" });
+      const item = await Batch.findOne({
+        where: { slug },
+        include: [
+          {
+            model: Program,
+            as: "program",
+            attributes: ["id", "name", "slug"],
+          },
+        ],
+      });
 
-    const { Op } = Sequelize;
+      if (!item) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
 
-    const batch = await Batch.findByPk(id, {
-      include: [
-        {
-          model: Program,
-          as: "program",
+      const { Op } = require("sequelize");
+
+      let subjectIds = [];
+
+      try {
+        let raw = item.subjectId;
+
+        // first parse
+        if (typeof raw === "string") {
+          raw = JSON.parse(raw);
+        }
+
+        // second parse
+        if (typeof raw === "string") {
+          raw = JSON.parse(raw);
+        }
+
+        if (Array.isArray(raw)) {
+          subjectIds = raw.map(Number);
+        }
+      } catch (err) {
+        subjectIds = [];
+      }
+
+      const subjectsList = subjectIds.length
+        ? await Subject.findAll({
+          where: {
+            id: { [Op.in]: subjectIds },
+          },
           attributes: ["id", "name"],
-        },
-      ],
-      raw: false,
-    });
+        })
+        : [];
 
-    if (!batch) return res.status(404).json({ message: "Batch not found" });
+      const subjectNames = subjectsList.map((sub) => ({
+        id: sub.id,
+        name: sub.name,
+      }));
 
-    // ---------------------------
-    // Helper: safely parse ID array
-    // ---------------------------
-    const parseIdArray = (raw) => {
-      if (!raw) return [];
+      const response = {
+        ...item.toJSON(),
+        subjects: subjectNames,
+      };
 
-      let parsed = raw;
+      return res.json(response);
+    } catch (err) {
+      console.error("Batch Fetch Error:", err);
+      return res.status(500).json({
+        message: "Error fetching batch",
+        error: err.message,
+      });
+    }
+  }
 
-      // string -> parse
-      if (typeof parsed === "string") {
-        try {
-          parsed = JSON.parse(parsed);
-        } catch {
-          return [];
+
+  static async findOneForStudent(req, res) {
+    try {
+      const { id } = req.params;
+      if (!id) return res.status(400).json({ message: "Batch ID is required" });
+
+      const { Op } = Sequelize;
+
+      const batch = await Batch.findByPk(id, {
+        include: [
+          {
+            model: Program,
+            as: "program",
+            attributes: ["id", "name"],
+          },
+        ],
+        raw: false,
+      });
+
+      if (!batch) return res.status(404).json({ message: "Batch not found" });
+
+      // ---------------------------
+      // Helper: safely parse ID array
+      // ---------------------------
+      const parseIdArray = (raw) => {
+        if (!raw) return [];
+
+        let parsed = raw;
+
+        // string -> parse
+        if (typeof parsed === "string") {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            return [];
+          }
         }
-      }
 
-      // double-stringified
-      if (typeof parsed === "string") {
-        try {
-          parsed = JSON.parse(parsed);
-        } catch {
-          return [];
+        // double-stringified
+        if (typeof parsed === "string") {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            return [];
+          }
         }
-      }
 
-      if (!Array.isArray(parsed)) return [];
+        if (!Array.isArray(parsed)) return [];
 
-      return parsed
-        .map((x) => Number(x))
-        .filter((n) => Number.isInteger(n));
-    };
+        return parsed
+          .map((x) => Number(x))
+          .filter((n) => Number.isInteger(n));
+      };
 
-    // ✅ IDs parse (IMPORTANT: your batch has QuizzesIds not quizIds)
-    const subjectIds = parseIdArray(batch.subjectId);
+      // ✅ IDs parse (IMPORTANT: your batch has QuizzesIds not quizIds)
+      const subjectIds = parseIdArray(batch.subjectId);
 
-    // If your field is quizIds (recommended):
-    const quizIds = parseIdArray(batch.quizIds);
+      // If your field is quizIds (recommended):
+      const quizIds = parseIdArray(batch.quizIds);
 
-    // If your field is QuizzesIds (current in your model), use this instead:
-    // const quizIds = parseIdArray(batch.QuizzesIds);
+      // If your field is QuizzesIds (current in your model), use this instead:
+      // const quizIds = parseIdArray(batch.QuizzesIds);
 
-    const testSeriesIds = parseIdArray(batch.testSeriesIds);
+      const testSeriesIds = parseIdArray(batch.testSeriesIds);
 
-    const [subjects, quizzes, testSeries] = await Promise.all([
-      subjectIds.length
-        ? Subject.findAll({
+      const [subjects, quizzes, testSeries] = await Promise.all([
+        subjectIds.length
+          ? Subject.findAll({
             where: { id: { [Op.in]: subjectIds } },
             attributes: ["id", "name"],
             raw: true,
           })
-        : Promise.resolve([]),
+          : Promise.resolve([]),
 
-      quizIds.length
-        ? Quizzes.findAll({
+        quizIds.length
+          ? Quizzes.findAll({
             where: { id: { [Op.in]: quizIds } },
             attributes: ["id", "title", "image", "price", "description"],
             raw: true,
           })
-        : Promise.resolve([]),
+          : Promise.resolve([]),
 
-      testSeriesIds.length
-        ? TestSeries.findAll({
+        testSeriesIds.length
+          ? TestSeries.findAll({
             where: { id: { [Op.in]: testSeriesIds } },
             attributes: ["id", "title", "imageUrl", "price", "description"],
             raw: true,
           })
-        : Promise.resolve([]),
-    ]);
+          : Promise.resolve([]),
+      ]);
 
-    const response = {
-      ...batch.toJSON(),
+      const response = {
+        ...batch.toJSON(),
 
-      program: batch.program
-        ? { id: batch.program.id, name: batch.program.name }
-        : null,
+        program: batch.program
+          ? { id: batch.program.id, name: batch.program.name }
+          : null,
 
-      subjects: subjects.map((s) => ({
-        id: s.id,
-        name: s.name,
-      })),
+        subjects: subjects.map((s) => ({
+          id: s.id,
+          name: s.name,
+        })),
 
-      quizzes: quizzes.map((q) => ({
-        id: q.id,
-        title: q.title,
-        image: q.image || null,
-        price: q.price ?? null,
-        description: q.description || null,
-      })),
+        quizzes: quizzes.map((q) => ({
+          id: q.id,
+          title: q.title,
+          image: q.image || null,
+          price: q.price ?? null,
+          description: q.description || null,
+        })),
 
-      testSeries: testSeries.map((ts) => ({
-        id: ts.id,
-        title: ts.title,
-        imageUrl: ts.imageUrl || null,
-        price: ts.price ?? null,
-        description: ts.description || null,
-      })),
+        testSeries: testSeries.map((ts) => ({
+          id: ts.id,
+          title: ts.title,
+          imageUrl: ts.imageUrl || null,
+          price: ts.price ?? null,
+          description: ts.description || null,
+        })),
 
-      // hide raw id arrays (optional)
-      subjectId: undefined,
-      quizIds: undefined,        // remove if you used QuizzesIds
-      QuizzesIds: undefined,     // remove if you used quizIds
-      testSeriesIds: undefined,
-    };
+        // hide raw id arrays (optional)
+        subjectId: undefined,
+        quizIds: undefined,        // remove if you used QuizzesIds
+        QuizzesIds: undefined,     // remove if you used quizIds
+        testSeriesIds: undefined,
+      };
 
-    return res.status(200).json(response);
-  } catch (err) {
-    console.error("Batch Fetch Error:", err);
-    return res.status(500).json({
-      message: "Error fetching batch details",
-      error: err.message,
-    });
+      return res.status(200).json(response);
+    } catch (err) {
+      console.error("Batch Fetch Error:", err);
+      return res.status(500).json({
+        message: "Error fetching batch details",
+        error: err.message,
+      });
+    }
   }
-}
 
   // =========================
   // UPDATE
   // =========================
-static async update(req, res) {
+  static async update(req, res) {
 
 
-  try {
-    const batchId = req.params.id;
+    try {
+      const batchId = req.params.id;
 
-    const item = await Batch.findByPk(batchId);
-    if (!item) {
-      return res.status(404).json({ message: "Batch not found" });
-    }
-
-    /* ================= IMAGE ================= */
-    let imageUrl = item.imageUrl;
-    if (req.file) {
-      if (item.imageUrl) {
-        await deleteFromS3(item.imageUrl);
+      const item = await Batch.findByPk(batchId);
+      if (!item) {
+        return res.status(404).json({ message: "Batch not found" });
       }
-      imageUrl = await uploadToS3(req.file, "batchs");
+
+      /* ================= IMAGE ================= */
+      let imageUrl = item.imageUrl;
+      if (req.file) {
+        if (item.imageUrl) {
+          await deleteFromS3(item.imageUrl);
+        }
+        imageUrl = await uploadToS3(req.file, "batchs");
+      }
+
+      /* ================= NORMALIZE JSON FIELDS ================= */
+      const quizIds =
+        typeof req.body.quizIds === "string"
+          ? JSON.parse(req.body.quizIds)
+          : req.body.quizIds;
+
+      const testSeriesIds =
+        typeof req.body.testSeriesIds === "string"
+          ? JSON.parse(req.body.testSeriesIds)
+          : req.body.testSeriesIds;
+
+      const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
+      /* ================= UPDATE PAYLOAD ================= */
+      const payload = {
+        name: req.body.name,
+        displayOrder: req.body.displayOrder,
+        programId: req.body.programId,
+        subjectId: req.body.subjectId,
+
+        startDate: req.body.startDate,
+        endDate: req.body.endDate,
+        registrationStartDate: req.body.registrationStartDate,
+        registrationEndDate: req.body.registrationEndDate,
+
+        status: req.body.status,
+        shortDescription: req.body.shortDescription,
+        longDescription: req.body.longDescription,
+
+        batchPrice: req.body.batchPrice,
+        batchDiscountPrice: req.body.batchDiscountPrice,
+        gst: req.body.gst,
+        offerValidityDays: req.body.offerValidityDays,
+
+        // ✅ NEW FIELDS
+        quizIds: Array.isArray(quizIds) ? quizIds : [],
+        testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
+
+        isEmi: Boolean(req.body.isEmi),
+        emiTotal: req.body.emiTotal || null,
+        emiSchedule: emiSchedule || null,
+
+        category: req.body.category,
+        imageUrl,
+
+        slug: req.body.name
+          ? generateSlug(req.body.name)
+          : item.slug,
+      };
+
+      await item.update(payload);
+
+      await BatchController.clearBatchCache(batchId);
+
+      return res.json(item);
+    } catch (err) {
+      console.error("Batch Update Error:", err);
+      return res.status(500).json({
+        message: "Error updating batch",
+        error: err.message,
+      });
     }
-
-    /* ================= NORMALIZE JSON FIELDS ================= */
-    const quizIds =
-      typeof req.body.quizIds === "string"
-        ? JSON.parse(req.body.quizIds)
-        : req.body.quizIds;
-
-    const testSeriesIds =
-      typeof req.body.testSeriesIds === "string"
-        ? JSON.parse(req.body.testSeriesIds)
-        : req.body.testSeriesIds;
-
-         const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
-    /* ================= UPDATE PAYLOAD ================= */
-    const payload = {
-      name: req.body.name,
-      displayOrder: req.body.displayOrder,
-      programId: req.body.programId,
-      subjectId: req.body.subjectId,
-
-      startDate: req.body.startDate,
-      endDate: req.body.endDate,
-      registrationStartDate: req.body.registrationStartDate,
-      registrationEndDate: req.body.registrationEndDate,
-
-      status: req.body.status,
-      shortDescription: req.body.shortDescription,
-      longDescription: req.body.longDescription,
-
-      batchPrice: req.body.batchPrice,
-      batchDiscountPrice: req.body.batchDiscountPrice,
-      gst: req.body.gst,
-      offerValidityDays: req.body.offerValidityDays,
-
-      // ✅ NEW FIELDS
-      quizIds: Array.isArray(quizIds) ? quizIds : [],
-      testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
-
-      isEmi: Boolean(req.body.isEmi),
-      emiTotal: req.body.emiTotal || null,
-      emiSchedule: emiSchedule|| null,
-
-      category: req.body.category,
-      imageUrl,
-
-      slug: req.body.name
-        ? generateSlug(req.body.name)
-        : item.slug,
-    };
-
-    await item.update(payload);
-
-    await BatchController.clearBatchCache(batchId);
-
-    return res.json(item);
-  } catch (err) {
-    console.error("Batch Update Error:", err);
-    return res.status(500).json({
-      message: "Error updating batch",
-      error: err.message,
-    });
   }
-}
 
   // =========================
   // DELETE

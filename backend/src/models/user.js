@@ -18,7 +18,7 @@ module.exports = (sequelize, DataTypes) => {
       fcm_token: DataTypes.STRING,
 
       forgetPasswordOtp: DataTypes.STRING,
-timeOfExipreOtp: DataTypes.DATE,
+      timeOfExipreOtp: DataTypes.DATE,
 
       tempPassword: DataTypes.STRING,
 
@@ -31,6 +31,10 @@ timeOfExipreOtp: DataTypes.DATE,
       refresh_token: DataTypes.STRING,
       city: DataTypes.STRING,
       address: DataTypes.STRING,
+      register_from: {
+        type: DataTypes.ENUM("web", "app"),
+        defaultValue: "app",
+      },
     },
     { tableName: "users" }
   );
