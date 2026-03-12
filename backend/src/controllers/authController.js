@@ -1,4 +1,4 @@
-const { User, Order, Batch, Program, Subject, Sequelize, sequelize, Notification } = require("../models");
+const { User, Order, Batch, Program, Subject, Sequelize, sequelize, Notification ,DeviceHistory } = require("../models");
 const bcrypt = require("bcrypt");
 const { sign, verify } = require("../utils/generateToken");
 const redis = require("../config/redis");
