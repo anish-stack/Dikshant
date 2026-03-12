@@ -448,162 +448,132 @@ exports.verifyOtp = async (req, res) => {
 };
 
 // ==================== LOGIN ====================
-
 exports.login = async (req, res) => {
   try {
     const {
       mobile,
       password,
-      otp,
       device_id,
       fcm_token,
       platform,
       appVersion,
     } = req.body;
 
+    const ip = req.ip;
 
-    // -------------------------------------------------
-    // 1️⃣ MOBILE REQUIRED
-    // -------------------------------------------------
     if (!mobile) {
-      return res.status(400).json({ error: "Please enter your mobile number" });
+      return res.status(400).json({
+        error: "Mobile number required",
+      });
     }
 
-    if (!/^\d{10}$/.test(mobile)) {
-      return res
-        .status(400)
-        .json({ error: "Please enter a valid 10-digit mobile number" });
-    }
-
-    // Fetch user
     const user = await User.findOne({ where: { mobile } });
 
     if (!user) {
       return res.status(404).json({
-        error:
-          "No account found with this mobile number. Please sign up first.",
+        error: "Account not found",
       });
     }
 
     if (!user.is_active) {
       return res.status(403).json({
-        error: "Your account has been deactivated. Please contact support.",
+        error: "Account disabled",
       });
     }
 
-    // -------------------------------------------------
-    // Update device & app info for all requests
-    // -------------------------------------------------
-    let shouldSave = false;
-    if (device_id && device_id !== user.device_id) {
+    // BLOCK CHECK
+    if (user.blocked_until && user.blocked_until > new Date()) {
+      return res.status(403).json({
+        error: "Account blocked for 24 hours due to multiple device changes.",
+      });
+    }
+
+    // PASSWORD VERIFY
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({
+        error: "Invalid credentials",
+      });
+    }
+
+    // ===============================
+    // DEVICE CHECK
+    // ===============================
+
+    if (!user.device_id) {
       user.device_id = device_id;
-      shouldSave = true;
+    } 
+    else if (user.device_id !== device_id) {
+
+      // Save device history
+      await DeviceHistory.create({
+        user_id: user.id,
+        old_device: user.device_id,
+        new_device: device_id,
+        platform,
+        appVersion,
+        ip_address: ip,
+        changed_at: new Date(),
+      });
+
+      // ❗ LOGOUT OLD DEVICE
+      user.active_token = null;
+      user.refresh_token = null;
+
+      user.device_id = device_id;
+      user.device_change_count += 1;
+      user.last_device_change_at = new Date();
+
+      // Block after 5 changes
+      if (user.device_change_count >= 5) {
+        user.blocked_until = new Date(
+          Date.now() + 24 * 60 * 60 * 1000
+        );
+
+        await user.save();
+
+        return res.status(403).json({
+          error: "Too many device changes. Account blocked for 24 hours.",
+        });
+      }
     }
 
-    if (appVersion && appVersion !== user.appVersion) {
-      user.appVersion = appVersion;
-      shouldSave = true;
-    }
+    // ===============================
+    // GENERATE NEW TOKENS
+    // ===============================
 
-    if (fcm_token && fcm_token !== user.fcm_token) {
+    const { accessToken, refreshToken } = generateTokens(user);
+
+    user.active_token = accessToken;
+    user.refresh_token = refreshToken;
+
+    user.last_login_at = new Date();
+    user.last_login_device = device_id;
+
+    if (fcm_token) {
       user.fcm_token = fcm_token;
       user.fcm_update_at = new Date();
-      shouldSave = true;
     }
 
-    if (platform && platform !== user.platform) {
-      user.platform = platform;
-      shouldSave = true;
-    }
+    if (platform) user.platform = platform;
+    if (appVersion) user.appVersion = appVersion;
 
-    if (shouldSave) await user.save();
-
-    // -------------------------------------------------
-    // 2️⃣ PASSWORD LOGIN
-    // -------------------------------------------------
-    if (password && password.trim() !== "") {
-      if (!user.password) {
-        return res.status(400).json({
-          error: "No password set for this account. Please login with OTP.",
-        });
-      }
-
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({
-          error: "Incorrect mobile number or password. Please try again.",
-        });
-      }
-
-      const { accessToken, refreshToken } = generateTokens(user);
-      user.refresh_token = refreshToken;
-      await user.save();
-
-      return res.json({
-        status: "success",
-        message: "Logged in successfully!",
-        token: accessToken,
-        refresh_token: refreshToken,
-        user: getUserResponse(user),
-      });
-    }
-
-    // -------------------------------------------------
-    // 3️⃣ OTP VERIFICATION
-    // -------------------------------------------------
-    if (otp && otp.trim() !== "") {
-      const storedOtp = await redis.get(`otp:${user.id}`);
-      const isValid =
-        (storedOtp && storedOtp === otp) ||
-        (user.otp === otp && user.otp_expiry > new Date());
-
-      if (!isValid) {
-        return res.status(400).json({
-          error: "Invalid or expired OTP. Please request a new one.",
-        });
-      }
-
-      // Clear OTP
-      await redis.del(`otp:${user.id}`);
-      user.otp = null;
-      user.otp_expiry = null;
-      user.is_verified = true;
-
-      const { accessToken, refreshToken } = generateTokens(user);
-      user.refresh_token = refreshToken;
-      await user.save();
-
-      return res.json({
-        status: "success",
-        message: "OTP verified successfully!",
-        token: accessToken,
-        refresh_token: refreshToken,
-        user: getUserResponse(user),
-      });
-    }
-
-    // -------------------------------------------------
-    // 4️⃣ SEND OTP
-    // -------------------------------------------------
-    const generatedOtp = genOtp();
-    await redis.set(`otp:${user.id}`, generatedOtp, "EX", 300); // 5 mins
-
-    user.otp = generatedOtp;
     await user.save();
 
-    // TODO: Send OTP via SMS
-    console.log(`📧 OTP for user ${user.id}: ${generatedOtp}`);
-
     return res.json({
-      success: true,
-      message: "OTP sent successfully! Please check your messages.",
-      user_id: user.id,
-      expires_in: "5 minutes",
+      status: "success",
+      message: "Login successful",
+      token: accessToken,
+      refresh_token: refreshToken,
+      user,
     });
+
   } catch (err) {
     console.error("Login Error:", err);
+
     return res.status(500).json({
-      error: "Unable to process login. Please try again later.",
+      error: "Server error",
     });
   }
 };
@@ -872,9 +842,9 @@ exports.getAllProfile = async (req, res) => {
 
     /** 2️⃣ Fetch Orders of All Users */
     const orders = await Order.findAll({
-      where: { 
+      where: {
         userId: userIds,
-        status:"success"
+        status: "success"
       },
       order: [["createdAt", "DESC"]],
     });

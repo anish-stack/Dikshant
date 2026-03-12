@@ -301,12 +301,6 @@ class OrderController {
 
       const totalAmount = amount - discount + gst;
 
-      console.log("🧮 Final Amount:", {
-        amount,
-        discount,
-        gst,
-        totalAmount
-      });
 
       /* 🔐 Razorpay Keys Debug */
       console.log("🔐 Razorpay Key Loaded:", {

@@ -1,14 +1,53 @@
-const { verify } = require('../utils/generateToken');
+const { verify } = require("../utils/generateToken");
+const { User } = require("../models");
 
-module.exports = (req, res, next) => {
-  const header = req.headers.authorization;
-  if (!header) return res.status(401).json({ error: 'Missing token' });
-  const token = header.replace('Bearer ', '');
+module.exports = async (req, res, next) => {
   try {
+    const header = req.headers.authorization;
+
+    if (!header) {
+      return res.status(401).json({
+        error: "Missing token",
+      });
+    }
+
+    const token = header.replace("Bearer ", "");
+
+
     const payload = verify(token);
-    req.user = payload;
+
+
+    const user = await User.findByPk(payload.id);
+
+    if (!user) {
+      return res.status(401).json({
+        error: "User not found",
+      });
+    }
+
+    if (!user.active_token || user.active_token !== token) {
+
+      user.active_token = null;
+      user.refresh_token = null;
+      await user.save();
+
+      return res.status(401).json({
+        error: "Session expired. Please login again.",
+      });
+    }
+
+
+    req.user = user;
+
     next();
+
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+
+    console.error("Auth Middleware Error:", err);
+
+    return res.status(401).json({
+      error: "Invalid token",
+    });
+
   }
 };
