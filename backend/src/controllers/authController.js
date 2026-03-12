@@ -330,6 +330,112 @@ exports.signup = async (req, res) => {
   }
 };
 
+// ==================== SIGNUP FROM WEB ====================
+
+exports.webSignup = async (req, res) => {
+  // console.log("i am hit")
+  try {
+    const {
+      name,
+      email,
+      mobile,
+      // password,
+    } = req.body;
+
+    // Validation
+    if (!email && !mobile) {
+      return res.status(400).json({
+        error:
+          "Please provide either an email address or mobile number to create your account",
+      });
+    }
+
+    if (!name || name.trim().length === 0) {
+      return res.status(400).json({ error: "Please enter your name" });
+    }
+
+    // if (password && password.length < 6) {
+    //   return res.status(400).json({
+    //     error: "Password must be at least 6 characters long",
+    //   });
+    // }
+
+    // Email validation
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid email address" });
+    }
+
+    // Mobile validation
+    if (mobile && !/^\d{10}$/.test(mobile)) {
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid 10-digit mobile number" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [email ? { email } : null, mobile ? { mobile } : null].filter(
+          Boolean
+        ),
+      },
+    });
+
+    if (existingUser) {
+      if (existingUser.email === email && existingUser.mobile === mobile) {
+        return res.status(200).json({
+          success: true,
+          user: getUserResponse(existingUser)
+          // error:
+          //   "This email and mobile number are already registered. Please login.",
+        });
+      } else if (existingUser.email === email) {
+        return res.status(200).json({
+          success: true,
+          user: getUserResponse(existingUser)
+          // error:
+          //   "This email is already registered. Please login or use a different email.",
+        });
+      } else if (existingUser.mobile === mobile) {
+        return res.status(200).json({
+          success: true,
+          user: getUserResponse(existingUser)
+          // error:
+          //   "This mobile number is already registered. Please login or use a different number.",
+        });
+      }
+    }
+
+    // Hash password
+    const hashed = mobile ? await bcrypt.hash(mobile, 10) : null;
+
+    // Create user
+    const user = await User.create({
+      name: name.trim(),
+      email,
+      mobile,
+      password: hashed,
+      register_from: "web",
+    });
+
+    return res.status(201).json({
+      status: "success",
+      message:
+        "Account created successfully! Please verify your OTP to continue.",
+      user: getUserResponse(user),
+      // otp_sent: true,
+    });
+
+  } catch (err) {
+    console.error("Signup Error:", err);
+    return res.status(500).json({
+      error: "Unable to create account. Please try again later.",
+    });
+  }
+};
+
 // ==================== REQUEST OTP ====================
 
 exports.requestOtp = async (req, res) => {

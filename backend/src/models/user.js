@@ -71,6 +71,16 @@ module.exports = (sequelize, DataTypes) => {
       timeOfExipreOtp: DataTypes.DATE,
 
       tempPassword: DataTypes.STRING,
+
+
+      fcm_update_at: DataTypes.DATE,
+
+      device_id: DataTypes.STRING,
+      platform: DataTypes.STRING,
+      appVersion: { type: DataTypes.STRING, field: 'app_version' },
+      refresh_token: DataTypes.STRING,
+      city: DataTypes.STRING,
+      address: DataTypes.STRING,
     },
     {
       tableName: "users",

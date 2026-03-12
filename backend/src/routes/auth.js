@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const role = require("../middleware/role");
 
 router.post("/signup", ctrl.signup);
+router.post("/web-signup", ctrl.webSignup);
 router.post("/request-otp", ctrl.requestOtp);
 router.post("/verify-otp", ctrl.verifyOtp);
 router.post("/login", ctrl.login);
@@ -16,10 +17,10 @@ router.post("/update-fcm-token", auth, ctrl.updateFcmToken);
 router.post("/update-password", ctrl.sendForgotPasswordOtp);
 router.post("/verify-otp-and-change-password", ctrl.verifyForgotPasswordOtpAndUpdatePassword);
 
-router.patch("/users/:userId/toggle-active",auth,role(["admin"]),ctrl.toggleUserActive);
+router.patch("/users/:userId/toggle-active", auth, role(["admin"]), ctrl.toggleUserActive);
 
 // Delete user and all related data
-router.delete("/users/:userId",auth,role(["admin"]),ctrl.deleteUser);
+router.delete("/users/:userId", auth, role(["admin"]), ctrl.deleteUser);
 
 router.get("/all-profile", ctrl.getAllProfile);
 
