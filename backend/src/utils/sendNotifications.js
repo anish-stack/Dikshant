@@ -151,7 +151,7 @@ const sendNotification = async (token, title, body, channel) => {
   }
 };
 
-const sendMultipleNotifications = async (tokens, title, body, channel = "default") => {
+const sendMultipleNotifications = async (users,tokens, title, body, channel = "default") => {
   initializeFirebase();
 
   if (!Array.isArray(tokens) || tokens.length === 0) {

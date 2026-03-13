@@ -52,7 +52,8 @@ class NotificationController {
       if (!tokens.length) {
         return res.status(400).json({ message: 'No users with FCM tokens found' });
       }
-      await notificationQueue.add({ tokens, title, message, channel });
+
+      await notificationQueue.add({users, tokens, title, message, channel });
 
       return res.status(200).json({ message: 'Notification job queued successfully' });
     } catch (error) {
