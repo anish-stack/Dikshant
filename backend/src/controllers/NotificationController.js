@@ -1,4 +1,5 @@
 // controllers/NotificationController.js
+const { Op } = require("sequelize");
 const { Notification, User } = require("../models");
 const { notificationQueue } = require("../queues/notificationQueue");
 const sendNotification = require("../utils/sendNotifications");
@@ -46,9 +47,21 @@ class NotificationController {
 
     try {
  
-      const users = await User.findAll({ attributes: ['fcm_token'] });
-      const tokens = users.map(u => u.fcm_token).filter(Boolean);
+  const users = await User.findAll({
+      attributes: ["id", "fcm_token"],
+      where: {
+        fcm_token: { [Op.ne]: null }
+      }
+    });
 
+    if (!users.length) {
+      return res.status(400).json({
+        message: "No users with FCM tokens found"
+      });
+    }
+
+ const tokens = users.map((u) => u.fcm_token);
+ 
       if (!tokens.length) {
         return res.status(400).json({ message: 'No users with FCM tokens found' });
       }
