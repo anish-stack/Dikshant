@@ -590,7 +590,7 @@ exports.login = async (req, res) => {
     // BLOCK CHECK
     if (user.blocked_until && user.blocked_until > new Date()) {
       return res.status(403).json({
-        error: "Account blocked for 24 hours due to multiple device changes.",
+        error: "Account blocked for 1 hours due to multiple device changes.",
       });
     }
 
@@ -631,16 +631,16 @@ exports.login = async (req, res) => {
       user.device_change_count += 1;
       user.last_device_change_at = new Date();
 
-      // Block after 5 changes
-      if (user.device_change_count >= 5) {
+      // Block after 10 changes
+      if (user.device_change_count >= 10) {
         user.blocked_until = new Date(
-          Date.now() + 24 * 60 * 60 * 1000
+          Date.now() + 60 * 60 * 1000
         );
 
         await user.save();
 
         return res.status(403).json({
-          error: "Too many device changes. Account blocked for 24 hours.",
+          error: "Too many device changes. Account blocked for 1 hours.",
         });
       }
     }
