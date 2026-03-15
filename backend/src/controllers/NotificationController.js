@@ -42,31 +42,31 @@ class NotificationController {
     }
   }
 
- static async adminCreateNotificationForAll(req, res) {
+  static async adminCreateNotificationForAll(req, res) {
     const { title, message, channel, personalized } = req.body;
 
     try {
- 
-  const users = await User.findAll({
-      attributes: ["id", "fcm_token"],
-      where: {
-        fcm_token: { [Op.ne]: null }
-      }
-    });
 
-    if (!users.length) {
-      return res.status(400).json({
-        message: "No users with FCM tokens found"
+      const users = await User.findAll({
+        attributes: ["id", "fcm_token"],
+        where: {
+          fcm_token: { [Op.ne]: null }
+        }
       });
-    }
 
- const tokens = users.map((u) => u.fcm_token);
- 
+      if (!users.length) {
+        return res.status(400).json({
+          message: "No users with FCM tokens found"
+        });
+      }
+
+      const tokens = users.map((u) => u.fcm_token);
+
       if (!tokens.length) {
         return res.status(400).json({ message: 'No users with FCM tokens found' });
       }
 
-      await notificationQueue.add({users, tokens, title, message, channel });
+      await notificationQueue.add({ users, tokens, title, message, channel });
 
       return res.status(200).json({ message: 'Notification job queued successfully' });
     } catch (error) {
