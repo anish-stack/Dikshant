@@ -38,7 +38,7 @@ function LMSContent() {
   const { canJoin, isLive, hasEnded, timeToLive, viewerCount, handleJoinLive } =
     useLiveSession(currentVideo, userId);
 
-
+  // console.log("isLive", isLive)
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState(isLive ? "live" : "comments");
@@ -68,7 +68,7 @@ function LMSContent() {
       setActiveTab("live")
     }
   }, [isLive])
-  
+
   // Network monitoring
   useEffect(() => {
     const goOnline = () => {
@@ -127,7 +127,7 @@ function LMSContent() {
         setVideoSource(null);
 
         const res = await axios.post(
-          `http://192.168.1.11:5001/api/videocourses/decrypt/batch/${userId}`,
+          `http://localhost:5001/api/videocourses/decrypt/batch/${userId}`,
           { token: currentVideo.secureToken },
           {
             headers: {
@@ -185,11 +185,11 @@ function LMSContent() {
         const timeout = setTimeout(() => controller.abort(), 10000);
 
         const [batchRes, videosRes] = await Promise.all([
-          fetch(`http://192.168.1.11:5001/api/batchs/${courseId}`, {
+          fetch(`http://localhost:5001/api/batchs/${courseId}`, {
             signal: controller.signal,
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`http://192.168.1.11:5001/api/videocourses/batch/${courseId}`, {
+          fetch(`http://localhost:5001/api/videocourses/batch/${courseId}`, {
             signal: controller.signal,
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -323,28 +323,33 @@ function LMSContent() {
         </div>
       )}
 
-      {/* {scrolled && (
+      {scrolled && (
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="lg:hidden fixed top-4 left-4 z-50 p-3 bg-white rounded-xl shadow-2xl border"
         >
           <Menu className="w-6 h-6" />
         </button>
-      )} */}
+      )}
 
-      {/* {sidebarOpen && (
+      {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setSidebarOpen(false)} />
-      )} */}
-
-      {/* <aside className={`${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto transition-transform duration-300`}>
+      )}
+      <aside className="hidden lg:block fixed lg:static inset-y-0 left-0 z-[9999] w-80 bg-white border-r overflow-y-auto">
         <Sidebar
           videos={videos}
           currentVideo={currentVideo}
           batch={batch}
           onVideoClick={handleVideoClick}
           onClose={() => setSidebarOpen(false)}
+          user={user}
+          videoId={currentVideo?.id}
+          userId={userId}
+          visible={true}
+          onLiveCountChange={setLiveCount}
+          inline={true}
         />
-      </aside> */}
+      </aside>
 
       {/* Main content area - NO SCROLL */}
       <main className="flex-1 flex flex-col h-screen bg-slate-50 overflow-hidden">
@@ -392,11 +397,10 @@ function LMSContent() {
             {!isLive && (
               <button
                 onClick={() => setActiveTab("comments")}
-                className={`px-6 py-3 text-sm font-semibold border-b-2 ${
-                  activeTab === "comments"
-                    ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-slate-500"
-                }`}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 ${activeTab === "comments"
+                  ? "border-blue-600 text-blue-600"
+                  : "border-transparent text-slate-500"
+                  }`}
               >
                 Comments
               </button>
@@ -405,11 +409,10 @@ function LMSContent() {
             {isLive && (currentVideo?.isLive && !hasEnded) && (
               <button
                 onClick={() => setActiveTab("live")}
-                className={`px-6 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 ${
-                  activeTab === "live"
-                    ? "border-red-600 text-red-600"
-                    : "border-transparent text-slate-500"
-                }`}
+                className={`px-6 py-3 text-sm font-semibold border-b-2 flex items-center gap-2 ${activeTab === "live"
+                  ? "border-red-600 text-red-600"
+                  : "border-transparent text-slate-500"
+                  }`}
               >
                 Live Chat
                 <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />

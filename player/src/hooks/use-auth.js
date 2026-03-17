@@ -18,7 +18,7 @@ const useAuth = (token) => {
 
     try {
       setLoading(true)
-      const response = await axios.get("http://192.168.1.11:5001/api/auth/profile-details", {
+      const response = await axios.get("http://localhost:5001/api/auth/profile-details", {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -59,7 +59,7 @@ export default function VideoPlayer({
   const [currentQuality, setCurrentQuality] = useState("auto")
 
   const speedOptions = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-  const API_BASE = "http://192.168.1.11:5001/api"
+  const API_BASE = "http://localhost:5001/api"
 
 const getVideoId = () => {
   if (!playableUrl) return null;

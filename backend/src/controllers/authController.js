@@ -297,6 +297,7 @@ exports.signup = async (req, res) => {
       otp_expiry: new Date(Date.now() + 10 * 60 * 1000),
     });
 
+    console.log(otp)
     // TODO: Send OTP via SMS/Email
     console.log(`📧 OTP for user ${user.id}: ${otp}`);
     try {
@@ -559,6 +560,7 @@ exports.login = async (req, res) => {
     const {
       mobile,
       password,
+      login_from = "App",
       device_id,
       fcm_token,
       platform,
@@ -587,13 +589,6 @@ exports.login = async (req, res) => {
       });
     }
 
-    // BLOCK CHECK
-    if (user.blocked_until && user.blocked_until > new Date()) {
-      return res.status(403).json({
-        error: "Account blocked for 1 hours due to multiple device changes.",
-      });
-    }
-
     // PASSWORD VERIFY
     const validPassword = await bcrypt.compare(password, user.password);
 
@@ -603,16 +598,66 @@ exports.login = async (req, res) => {
       });
     }
 
-    // ===============================
+    // =========================================
+    // WEB LOGIN OTP VERIFICATION
+    // =========================================
+
+    if (login_from === "Web" && !user.is_verified) {
+
+      const otp = genOtp();
+
+      await redis.set(`otp:${user.id}`, otp, "EX", 600);
+
+      await user.update({
+        otp,
+        otp_expiry: new Date(Date.now() + 10 * 60 * 1000),
+      });
+
+      console.log(`OTP for user ${user.id}: ${otp}`);
+
+      try {
+        const html = otpEmailTemplate(
+          "Your OTP Verification Code",
+          otp,
+          user
+        );
+
+        await sendEmail(html, {
+          receiver_email: user.email,
+          subject: "Your Dikshant IAS OTP Verification Code",
+        });
+
+      } catch (error) {
+        console.log("Email Error", error);
+      }
+
+      return res.status(200).json({
+        status: "otp_sent",
+        message: "Account not verified. OTP sent to your email.",
+        isLoginOtpSent: true,
+        user_id: user.id
+      });
+    }
+
+    // =========================================
+    // BLOCK CHECK
+    // =========================================
+
+    if (user.blocked_until && user.blocked_until > new Date()) {
+      return res.status(403).json({
+        error: "Account blocked for 1 hours due to multiple device changes.",
+      });
+    }
+
+    // =========================================
     // DEVICE CHECK
-    // ===============================
+    // =========================================
 
     if (!user.device_id) {
       user.device_id = device_id;
     } 
     else if (user.device_id !== device_id) {
 
-      // Save device history
       await DeviceHistory.create({
         user_id: user.id,
         old_device: user.device_id,
@@ -623,7 +668,6 @@ exports.login = async (req, res) => {
         changed_at: new Date(),
       });
 
-      // ❗ LOGOUT OLD DEVICE
       user.active_token = null;
       user.refresh_token = null;
 
@@ -631,11 +675,8 @@ exports.login = async (req, res) => {
       user.device_change_count += 1;
       user.last_device_change_at = new Date();
 
-      // Block after 10 changes
       if (user.device_change_count >= 10) {
-        user.blocked_until = new Date(
-          Date.now() + 60 * 60 * 1000
-        );
+        user.blocked_until = new Date(Date.now() + 60 * 60 * 1000);
 
         await user.save();
 
@@ -645,9 +686,9 @@ exports.login = async (req, res) => {
       }
     }
 
-    // ===============================
-    // GENERATE NEW TOKENS
-    // ===============================
+    // =========================================
+    // GENERATE TOKENS
+    // =========================================
 
     const { accessToken, refreshToken } = generateTokens(user);
 

@@ -17,7 +17,7 @@ export default function CommentsSection({ video, token, userId }) {
   const intervalRef = useRef(null)
   const previousCommentsRef = useRef([])
 
-  const API_BASE = "http://192.168.1.11:5001/api"
+  const API_BASE = "http://localhost:5001/api"
 
   // Toast notification
   const showToast = (message, type = "success") => {
