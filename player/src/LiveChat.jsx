@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
-const API_BASE = "http://localhost:5001/api/chat";
+const API_BASE = "https://www.app.api.dikshantias.com/api/chat";
 const JOIN_API = `${API_BASE}/Student-join-api`;
 const LEAVE_API = `${API_BASE}/Student-Leave-api`;
 const SAVE_MESSAGE_API = `${API_BASE}/chat/save-message`;

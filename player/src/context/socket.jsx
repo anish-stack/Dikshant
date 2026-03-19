@@ -22,7 +22,7 @@ export const SocketProvider = ({ children, userId }) => {
     if (!userId) return;
 
     // ✅ Correct way: use the imported 'io'
-    const newSocket = io("http://localhost:5001", {
+    const newSocket = io("https://www.app.api.dikshantias.com", {
       query: { userId },
       transports: ["polling", "websocket"],
       forceNew: true,
