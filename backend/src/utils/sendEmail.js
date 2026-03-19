@@ -1,5 +1,7 @@
 const nodemailer = require("nodemailer");
 
+console.log("Initializing mail transporter...");
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -9,7 +11,14 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendEmail = async (html, options) => {
+  console.log("sendEmail called with:", {
+    to: options.receiver_email,
+    subject: options.subject,
+  });
+
   try {
+    console.log("Sending email...");
+
     const info = await transporter.sendMail({
       from: `"Dikshant Ias" <${process.env.SMTP_EMAIL}>`,
       to: options.receiver_email,
@@ -17,13 +26,19 @@ const sendEmail = async (html, options) => {
       html,
     });
 
+    console.log("Raw response from nodemailer:", info);
+
     if (info.accepted && info.accepted.length > 0) {
+      console.log("Email accepted:", info.accepted);
+
       return {
         status: true,
         message: "Email sent successfully",
         messageId: info.messageId,
       };
     }
+
+    console.warn("Email rejected:", info.rejected);
 
     return {
       status: false,
@@ -32,6 +47,8 @@ const sendEmail = async (html, options) => {
 
   } catch (error) {
     console.error("Email Error:", error);
+    console.error("Error message:", error.message);
+    console.error("Stack:", error.stack);
 
     return {
       status: false,
@@ -42,6 +59,3 @@ const sendEmail = async (html, options) => {
 };
 
 module.exports = sendEmail;
-
-
-
