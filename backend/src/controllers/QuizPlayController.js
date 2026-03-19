@@ -616,225 +616,231 @@ class QuizPlayController {
     }
 
     /* Internal submit logic */
-    static async submitQuizInternal(attemptId, userId, res) {
-        console.log("🟢 SUBMIT QUIZ START", { attemptId, userId });
+  static async submitQuizInternal(attemptId, userId, res) {
+    console.log("🟢 SUBMIT QUIZ START", { attemptId, userId });
 
-        if (!attemptId || !userId) {
-            console.warn("⚠️ Missing attemptId or userId");
+    if (!attemptId || !userId) {
+        return res.status(400).json({
+            success: false,
+            message: "attemptId and userId are required",
+        });
+    }
+
+    const transaction = await Quizzes.sequelize.transaction();
+
+    try {
+        /* ---------------- Fetch Attempt ---------------- */
+        const attempt = await QuizAttempts.findOne({
+            where: {
+                id: attemptId,
+                userId,
+                status: "in_progress",
+            },
+            transaction,
+        });
+
+        if (!attempt) {
+            await transaction.rollback();
             return res.status(400).json({
                 success: false,
-                message: "attemptId and userId are required",
+                message: "Attempt not found or already submitted",
             });
         }
 
-        const transaction = await Quizzes.sequelize.transaction();
+        console.log("✅ Attempt found", {
+            quizId: attempt.quizId,
+            attemptNumber: attempt.attemptNumber,
+        });
 
-        try {
-            /* ---------------- Fetch Attempt ---------------- */
-            const attempt = await QuizAttempts.findOne({
-                where: {
-                    id: attemptId,
-                    userId,
-                    status: "in_progress",
-                },
-                transaction,
-            });
+        /* ---------------- Fetch Quiz ---------------- */
+        const quiz = await Quizzes.findByPk(attempt.quizId, { transaction });
 
-            if (!attempt) {
-                console.warn("⚠️ Attempt not found or already completed", {
-                    attemptId,
-                    userId,
-                });
-
-                await transaction.rollback();
-                return res.status(400).json({
-                    success: false,
-                    message: "Attempt not found or already submitted",
-                });
-            }
-
-            console.log("✅ Attempt found", {
-                quizId: attempt.quizId,
-                questionOrder: attempt.question_order,
-                attemptNumber: attempt.attemptNumber,
-            });
-
-            /* ---------------- Fetch Quiz ---------------- */
-            const quiz = await Quizzes.findByPk(attempt.quizId, { transaction });
-
-            if (!quiz) {
-                console.error("❌ Quiz not found for attempt", attempt.quizId);
-                await transaction.rollback();
-                return res.status(404).json({
-                    success: false,
-                    message: "Quiz not found",
-                });
-            }
-
-            /* ---------------- Parse Question Order ---------------- */
-            let questionOrder = attempt.questionOrder || [];
-
-            if (typeof questionOrder === "string") {
-                try {
-                    questionOrder = JSON.parse(questionOrder);
-                } catch (err) {
-                    console.error("❌ Invalid questionOrder JSON", err);
-                    questionOrder = [];
-                }
-            }
-
-            if (!Array.isArray(questionOrder) || questionOrder.length === 0) {
-                console.warn("⚠️ Empty question order", { attemptId });
-            }
-
-            console.log("📌 Question Order:", questionOrder);
-
-            /* ---------------- Fetch User Answers ---------------- */
-            const userAnswers = await StudentAnswers.findAll({
-                where: { attempt_id: attemptId },
-                raw: true,
-                transaction,
-            });
-
-            console.log("📝 User Answers Count:", userAnswers.length);
-
-            /* ---------------- Fetch Questions ---------------- */
-            const questions = await QuizQuestions.findAll({
-                where: { quiz_id: quiz.id },
-                transaction,
-            });
-
-            if (!questions.length) {
-                console.error("❌ No questions found for quiz", quiz.id);
-            }
-
-            /* ---------------- Fetch Options ---------------- */
-            const allOptions = await QuizQuestionOptions.findAll({
-                where: { question_id: questions.map(q => q.id) },
-                raw: true,
-                transaction,
-            });
-
-            console.log("📦 Questions:", questions.length, "Options:", allOptions.length);
-
-            let obtainedMarks = 0;
-            const resultQuestions = [];
-
-            /* ---------------- Calculate Marks ---------------- */
-            for (const questionId of questionOrder) {
-                const question = questions.find(q => q.id === questionId);
-
-                if (!question) {
-                    console.warn("⚠️ Question missing", questionId);
-                    continue;
-                }
-
-                const userAnswer = userAnswers.find(
-                    a => Number(a.questionId) === Number(questionId)
-                );
-                console.log("🧐 Evaluating Question:", userAnswer);
-                const correctOption = allOptions.find(
-                    o => o.question_id === questionId && o.is_correct === true
-                );
-
-                let isCorrect = false;
-                let marksAwarded = 0;
-
-                if (userAnswer) {
-                    isCorrect = Boolean(userAnswer.isCorrect);
-                    marksAwarded = Number(userAnswer.marksObtained || 0);
-                }
-
-
-                obtainedMarks += marksAwarded;
-
-                console.log("🧮 Question Result", {
-                    questionId,
-                    isCorrect,
-                    marksAwarded,
-                });
-
-                resultQuestions.push({
-                    question_id: questionId,
-                    question_text: question.question_text,
-                    user_selected_option_id: userAnswer?.selectedOptionId || null,
-                    correct_option_id: correctOption?.id || null,
-                    is_correct: isCorrect,
-                    marks_awarded: marksAwarded,
-                    marks_total: question.marks,
-                    explanation: quiz.show_explanations ? question.explanation : null,
-                    hint: quiz.show_hints ? question.hint : null,
-
-                    // 🔥 YEH NAYA PART ADD KAR DO 🔥
-                    options: allOptions
-                        .filter(o => o.question_id === questionId)
-                        .map(o => ({
-                            option_id: o.id,
-                            option_text: o.option_text,
-                            is_correct: o.is_correct,
-                        }))
-                        .sort((a, b) => a.option_id - b.option_id), // optional: order by ID
-                });
-
-            }
-
-            obtainedMarks = Math.max(0, obtainedMarks);
-            /* ---------------- Update Attempt ---------------- */
-            const totalMarks =
-                quiz.total_marks ?? quiz.totalMarks ?? 0;
-
-            const percentage =
-                totalMarks > 0
-                    ? Number(((obtainedMarks / totalMarks) * 100).toFixed(2))
-                    : 0;
-
-            console.log("🏁 FINAL SCORE", {
-                obtainedMarks,
-                totalMarks: totalMarks,
-            });
-
-
-            await attempt.update(
-                {
-                    status: "completed",
-                    completedAt: new Date(),
-                    totalMarks: totalMarks,
-                    totalMarksObtained: obtainedMarks,
-                    percentage: percentage,
-                },
-                { transaction }
-            );
-
-            await transaction.commit();
-
-            /* ---------------- Cache Cleanup ---------------- */
-            await redis.del(`attempt:${attemptId}`);
-
-            console.log("✅ QUIZ SUBMITTED SUCCESSFULLY");
-
-            return res.json({
-                success: true,
-                message: "Quiz submitted successfully",
-                data: {
-                    attemptId: attempt.id,
-                    attemptNumber: attempt.attemptNumber,
-                    score: obtainedMarks,
-                    totalMarks: totalMarks,
-                    percentage: percentage,
-                    passingMarks: quiz.passingMarks,
-                    passed: obtainedMarks >= quiz.passingMarks,
-                    totalQuestions: questionOrder.length,
-                    questions: resultQuestions,
-                    submittedAt: new Date().toISOString(),
-                },
-            });
-
-        } catch (error) {
+        if (!quiz) {
             await transaction.rollback();
-            console.error("❌ SUBMIT QUIZ INTERNAL ERROR:", error);
-            throw error;
+            return res.status(404).json({
+                success: false,
+                message: "Quiz not found",
+            });
         }
+
+        /* ---------------- Parse Question Order ---------------- */
+        let questionOrder = attempt.questionOrder || attempt.question_order || [];
+
+        if (typeof questionOrder === "string") {
+            try {
+                questionOrder = JSON.parse(questionOrder);
+            } catch (err) {
+                console.error("❌ Invalid questionOrder JSON");
+                questionOrder = [];
+            }
+        }
+
+        if (!Array.isArray(questionOrder)) questionOrder = [];
+
+        console.log("📌 Question Order:", questionOrder);
+
+        /* ---------------- Fetch Data ---------------- */
+        const [userAnswers, questions, allOptions] = await Promise.all([
+            StudentAnswers.findAll({
+                where: { attemptId },
+                raw: true,
+                transaction,
+            }),
+            QuizQuestions.findAll({
+                where: { quiz_id: quiz.id },
+                raw: true,
+                transaction,
+            }),
+            QuizQuestionOptions.findAll({
+                raw: true,
+                transaction,
+            }),
+        ]);
+
+        console.log("📦 Data Loaded", {
+            answers: userAnswers.length,
+            questions: questions.length,
+            options: allOptions.length,
+        });
+
+        /* ---------------- Create Maps (FAST LOOKUP) ---------------- */
+        const questionMap = new Map();
+        const answerMap = new Map();
+        const optionMap = new Map();
+        const correctOptionMap = new Map();
+
+        questions.forEach(q => {
+            questionMap.set(Number(q.id), q);
+        });
+
+        userAnswers.forEach(a => {
+            answerMap.set(Number(a.questionId), a);
+        });
+
+        allOptions.forEach(o => {
+            const qId = Number(o.question_id);
+
+            if (!optionMap.has(qId)) optionMap.set(qId, []);
+            optionMap.get(qId).push(o);
+
+            if (Boolean(o.is_correct)) {
+                correctOptionMap.set(qId, o);
+            }
+        });
+
+        /* ---------------- Calculate Marks ---------------- */
+        let obtainedMarks = 0;
+        const resultQuestions = [];
+
+        for (const qIdRaw of questionOrder) {
+            const questionId = Number(qIdRaw);
+
+            const question = questionMap.get(questionId);
+            if (!question) {
+                console.warn("⚠️ Missing Question:", questionId);
+                continue;
+            }
+
+            const userAnswer = answerMap.get(questionId);
+            const correctOption = correctOptionMap.get(questionId);
+            const options = optionMap.get(questionId) || [];
+
+            const isCorrect = Boolean(userAnswer?.isCorrect);
+            const marksAwarded = Number(userAnswer?.marksObtained || 0);
+
+            obtainedMarks += marksAwarded;
+
+            console.log("🧮 Q:", questionId, {
+                isCorrect,
+                marksAwarded,
+                correctOptionId: correctOption?.id,
+            });
+
+            resultQuestions.push({
+                question_id: questionId,
+                question_text: question.question_text,
+
+                user_selected_option_id:
+                    userAnswer?.selectedOptionId ?? null,
+
+                // 🔥 SAFE FALLBACK
+                correct_option_id:
+                    correctOption?.id ??
+                    options.find(o => Boolean(o.is_correct))?.id ??
+                    null,
+
+                is_correct: isCorrect,
+                marks_awarded: marksAwarded,
+                marks_total: question.marks,
+
+                explanation:question.explanation ,
+
+                hint:question.hint, 
+
+                options: options
+                    .map(o => ({
+                        option_id: o.id,
+                        option_text: o.option_text,
+                        is_correct: Boolean(o.is_correct),
+                    }))
+                    .sort((a, b) => a.option_id - b.option_id),
+            });
+        }
+
+        obtainedMarks = Math.max(0, obtainedMarks);
+
+        /* ---------------- Score ---------------- */
+        const totalMarks = Number(
+            quiz.total_marks ?? quiz.totalMarks ?? 0
+        );
+
+        const percentage =
+            totalMarks > 0
+                ? Number(((obtainedMarks / totalMarks) * 100).toFixed(2))
+                : 0;
+
+        /* ---------------- Update Attempt ---------------- */
+        await attempt.update(
+            {
+                status: "completed",
+                completedAt: new Date(),
+                totalMarks,
+                totalMarksObtained: obtainedMarks,
+                percentage,
+            },
+            { transaction }
+        );
+
+        await transaction.commit();
+
+        /* ---------------- Cache Cleanup ---------------- */
+        await redis.del(`attempt:${attemptId}`);
+
+        console.log("✅ QUIZ SUBMITTED SUCCESSFULLY");
+
+        return res.json({
+            success: true,
+            message: "Quiz submitted successfully",
+            data: {
+                attemptId: attempt.id,
+                attemptNumber: attempt.attemptNumber,
+                score: obtainedMarks,
+                totalMarks,
+                percentage,
+                passingMarks: quiz.passingMarks,
+                passed: obtainedMarks >= quiz.passingMarks,
+                totalQuestions: questionOrder.length,
+                questions: resultQuestions,
+                submittedAt: new Date().toISOString(),
+            },
+        });
+
+    } catch (error) {
+        await transaction.rollback();
+        console.error("❌ SUBMIT QUIZ ERROR:", error);
+        throw error;
     }
+}
 
 
     /* GET ATTEMPT RESULT */

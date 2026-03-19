@@ -8,6 +8,7 @@ const redis = require('./config/redis');
 const app = express();
 const morgan = require('morgan');
 const logger = require('./config/logger');
+const { sendNotification } = require('./utils/sendNotifications');
 
 // app.use(
 //   morgan("combined", {
@@ -30,7 +31,7 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3001",
       "https://www.dikshantias.com",
-      "https://dikshantias.com"
+      "https://dikshantias.com",
     ],
     credentials: true
   })
@@ -43,6 +44,8 @@ app.get('/', (req, res) => {
   logger.info("Root endpoint hit");
   res.json({ message: 'API is running' });
 });
+
+
 async function clearAllRedisCache() {
   try {
     const keys = await redis.keys("*");

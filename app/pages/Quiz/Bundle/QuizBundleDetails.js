@@ -180,7 +180,7 @@ export default function QuizBundleDetails({ route, navigation }) {
   const [paying, setPaying] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState(null); // null | 'success' | 'failed'
 
-    const {token,user} = useAuthStore()
+  const { token, user } = useAuthStore()
 
   // ── animations ─────────────────────────────────────────────────────────────
   const heroScale = useRef(new Animated.Value(1.08)).current;

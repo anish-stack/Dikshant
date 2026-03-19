@@ -24,4 +24,6 @@ router.delete("/users/:userId", auth, role(["admin"]), ctrl.deleteUser);
 
 router.get("/all-profile", ctrl.getAllProfile);
 
+
+router.get("/performance/:userId",ctrl.getPerformanceOfUser)
 module.exports = router;

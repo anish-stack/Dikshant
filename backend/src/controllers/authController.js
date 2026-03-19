@@ -1,4 +1,4 @@
-const { User, Order, Batch, Program, Subject, Sequelize, sequelize, Notification ,DeviceHistory } = require("../models");
+const { User, Order, Batch, Program, Quizzes, QuizAttempts, StudentAnswers, TestSeries, StudentAnswerSubmission, Subject, Sequelize, sequelize, Notification, DeviceHistory } = require("../models");
 const bcrypt = require("bcrypt");
 const { sign, verify } = require("../utils/generateToken");
 const redis = require("../config/redis");
@@ -655,7 +655,7 @@ exports.login = async (req, res) => {
 
     if (!user.device_id) {
       user.device_id = device_id;
-    } 
+    }
     else if (user.device_id !== device_id) {
 
       await DeviceHistory.create({
@@ -1438,6 +1438,265 @@ exports.deleteUser = async (req, res) => {
     console.error("Delete User Error:", err);
     res.status(500).json({
       error: "Unable to delete user",
+    });
+  }
+};
+
+
+
+exports.getPerformanceOfUser = async (req, res) => {
+  try {
+    const userId = req.params.userId || req.user?.id;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID required" });
+    }
+
+    // ─── 1. User ───────────────────────────────
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // ─── 2. Orders ─────────────────────────────
+    const orders = await Order.findAll({
+      where: { userId, status: "success" },
+      order: [["createdAt", "DESC"]],
+    });
+
+    const getAmount = (arr) =>
+      arr.reduce((sum, o) => sum + (o.totalAmount || o.amount || 0), 0);
+
+    const batchOrders  = orders.filter(o => o.type === "batch");
+    const testOrders   = orders.filter(o => o.type === "test");
+    const quizOrders   = orders.filter(o => o.type === "quiz");
+    const bundleOrders = orders.filter(o => ["quiz_bundle", "test_series_bundle"].includes(o.type));
+
+    const totalSpent = getAmount(orders);
+
+    const purchaseStats = {
+      quizzes: {
+        count: quizOrders.length,
+        spent: getAmount(quizOrders),
+      },
+      testSeries: {
+        count: testOrders.length,
+        spent: getAmount(testOrders),
+      },
+      bundles: {
+        count: bundleOrders.length,
+        spent: getAmount(bundleOrders),
+      },
+      batches: {
+        count: batchOrders.length,
+        spent: getAmount(batchOrders),
+      },
+    };
+
+    // ─── 3. Quiz Attempts ──────────────────────
+    const quizAttempts = await QuizAttempts.findAll({
+      where: { user_id: userId },
+      include: [{ model: Quizzes, as: "quiz" }],
+    });
+
+    const completedAttempts = quizAttempts.filter(a => a.status === "completed");
+
+    const quizScores = completedAttempts.map(a =>
+      a.total_marks ? (a.score / a.total_marks) * 100 : 0
+    );
+
+    const avgQuizScore = quizScores.length
+      ? quizScores.reduce((a, b) => a + b, 0) / quizScores.length
+      : 0;
+
+    const bestQuizScore = quizScores.length
+      ? Math.max(...quizScores)
+      : 0;
+
+    const passedQuizzes = completedAttempts.filter(a => {
+      const pass = a.quiz?.passingMarks || 0;
+      return a.score >= pass;
+    }).length;
+
+    // ─── 4. Answer Stats ──────────────────────
+    const attemptIds = completedAttempts.map(a => a.id);
+
+    let totalAnswered = 0;
+    let totalCorrect = 0;
+    let totalWrong = 0;
+    let totalSkipped = 0;
+
+    if (attemptIds.length) {
+      const [stats] = await sequelize.query(`
+        SELECT
+          COUNT(*) AS totalAnswered,
+          SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS totalCorrect,
+          SUM(CASE WHEN is_correct = 0 AND selected_option_id IS NOT NULL THEN 1 ELSE 0 END) AS totalWrong,
+          SUM(CASE WHEN selected_option_id IS NULL THEN 1 ELSE 0 END) AS totalSkipped
+        FROM student_answers
+        WHERE attempt_id IN (:attemptIds)
+      `, {
+        replacements: { attemptIds },
+        type: Sequelize.QueryTypes.SELECT
+      });
+
+      totalAnswered = Number(stats?.totalAnswered || 0);
+      totalCorrect  = Number(stats?.totalCorrect || 0);
+      totalWrong    = Number(stats?.totalWrong || 0);
+      totalSkipped  = Number(stats?.totalSkipped || 0);
+    }
+
+    const accuracy = totalAnswered
+      ? (totalCorrect / totalAnswered) * 100
+      : 0;
+
+    // ─── 5. Test Series ───────────────────────
+    const testSubmissions = await StudentAnswerSubmission.findAll({
+      where: { userId },
+      include: [{ model: TestSeries }],
+      order: [["submittedAt", "DESC"]],
+    });
+
+    const evaluated = testSubmissions.filter(s => s.resultGenerated);
+
+    const testScores = evaluated
+      .filter(s => s.totalMarks)
+      .map(s => (s.marksObtained / s.totalMarks) * 100);
+
+    const avgTestScore = testScores.length
+      ? testScores.reduce((a, b) => a + b, 0) / testScores.length
+      : 0;
+
+    const bestTestScore = testScores.length
+      ? Math.max(...testScores)
+      : 0;
+
+    const passedTests = evaluated.filter(s => {
+      const pass = s.TestSeries?.passing_marks || 0;
+      return s.marksObtained >= pass;
+    }).length;
+
+    // ─── 6. Activity (30 days) ─────────────────
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentAttempts = await QuizAttempts.findAll({
+      where: {
+        user_id: userId,
+        started_at: { [Op.gte]: thirtyDaysAgo }
+      },
+      attributes: ["started_at"]
+    });
+
+    const recentSubmissions = await StudentAnswerSubmission.findAll({
+      where: {
+        userId,
+        submittedAt: { [Op.gte]: thirtyDaysAgo }
+      },
+      attributes: ["submittedAt"]
+    });
+
+    const activeDaysSet = new Set([
+      ...recentAttempts.map(a => new Date(a.started_at).toDateString()),
+      ...recentSubmissions.map(s => new Date(s.submittedAt).toDateString())
+    ]);
+
+    const activeDaysLast30 = activeDaysSet.size;
+
+    // ─── 7. Rank ──────────────────────────────
+    const [rankResult] = await sequelize.query(`
+      SELECT
+        (
+          SELECT COUNT(DISTINCT user_id)
+          FROM quiz_attempts qa
+          WHERE qa.status = 'completed'
+            AND qa.user_id != :userId
+            AND (
+              SELECT AVG(score / total_marks * 100)
+              FROM quiz_attempts qa2
+              WHERE qa2.user_id = qa.user_id
+                AND qa2.status = 'completed'
+                AND qa2.total_marks > 0
+            ) > :avgScore
+        ) + 1 AS userRank,
+
+        (
+          SELECT COUNT(DISTINCT user_id)
+          FROM quiz_attempts
+          WHERE status = 'completed'
+        ) AS totalRanked
+    `, {
+      replacements: { userId, avgScore: avgQuizScore },
+      type: Sequelize.QueryTypes.SELECT
+    });
+
+    const rank = rankResult?.userRank || null;
+    const totalRanked = rankResult?.totalRanked || null;
+
+    const percentile = rank && totalRanked
+      ? ((totalRanked - rank) / totalRanked) * 100
+      : null;
+
+    // ─── FINAL RESPONSE ───────────────────────
+    return res.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          mobile: user.mobile,
+
+          memberSince: user.createdAt,
+        },
+
+        overview: {
+          totalSpent,
+          totalOrders: orders.length,
+          activeDaysLast30,
+        },
+
+        purchases: {
+          total: orders.length,
+          breakdown: purchaseStats,
+          totalSpent,
+          recentOrders: orders.slice(0, 5),
+        },
+
+        quizPerformance: {
+          totalAttempts: quizAttempts.length,
+          completedAttempts: completedAttempts.length,
+          passedQuizzes,
+          avgScore: avgQuizScore,
+          bestScore: bestQuizScore,
+          accuracy,
+          totalAnswered,
+          totalCorrect,
+          totalWrong,
+          totalSkipped,
+        },
+
+        testPerformance: {
+          total: testSubmissions.length,
+          evaluated: evaluated.length,
+          passedTests,
+          avgScore: avgTestScore,
+          bestScore: bestTestScore,
+        },
+
+        rank: {
+          position: rank,
+          total: totalRanked,
+          percentile,
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
     });
   }
 };

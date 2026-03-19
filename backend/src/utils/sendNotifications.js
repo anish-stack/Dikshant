@@ -58,7 +58,7 @@ const initializeFirebase = () => {
     );
   }
 
-  const privateKey ="-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDMkMf0gA07XVkl\ngYAIyX37VLkJT0sikKq7smDHo1Z2G1+FksnWrPxwA99CeuI7Q0+Bgr3HPQ+Fn2TU\nyvd3v8IqqjyzcfGPdXe8CJcvL2yqxS/Gn7D+wHIQjFNRHudd2RgE1hFbYqtm1f4p\n65vydeUH/Klzf/kimigcOK++qYGj0D8gpnRWaQGjIPxd1CDgpPfjqpSn7SWx5Q85\n8HOIIhHJ6RAOYX9SoKWcxflFwc4SoN68ru31a8PDUaymUtg1zWb3imURRCjh4mnQ\ns+8GQRFu39o08AaVM+n+RcCFEN7fBWviuiNOSTEz0l96IBXAg3Fu0d2QX274UOUe\n3nc9iMn9AgMBAAECggEAEQlVvcUUVQdXL0pzsUemmFHb/yx9Y2mM7ojSio3N25Q4\nBlXNPXW2qFWKOG0nfiwC6RRMXdV1/3jg2t/0cCKmNwtqdr9ckMgFqsFEZgebEzXM\n3svZ372DQmGNZsoeFrDH0U9KrsOu5qeXvUIEANNUua+PJTFZPEp+YKtP558STuQY\n2ysgXr7yFh5hOymM5j8X6oKS+aO/+IHLCSMYwtsONpI2IjH100lO8YhRXBqr/ML3\nNvlqo9X9MPzyMiPrVCHUK1AfEPFvqQ3cbuOqAwyHyFiTLnM5ZZJ/qLTwU4FRjHao\nVkDODh5X0KzNx0PWkzA8ON61vikfPREwKfhqAwXwgQKBgQDsBZRrYOoCk6UBWxjd\ng7c21wuPXKqvrXuFy8yXZmFZiHf4P0BI8qgEfJfI3nQnT8sYdCTBiWeJ7tRUNAPK\nwwMDLRHYr5x70Zek4iyOcOxIneDN8rjGB79mv1mIdiu+jgT14F+dkWJvmmPqMDqs\nFBZkit09H1EEcfodcTP6Yj7gjQKBgQDd4ZFCX//ZNMw3Wad3h4R+pwFC0k7coVzk\n8UbCzl3j/MFD4SLmZIO8Gk4isBilYWsd5vNZfAct9ukTEm6ww7EkOtaeh7eYTypW\nBDGYXX2NNSpotFw4KpZRwLlTteN7adneX7tpLVuMpPDUN+cz37NW8kOtcKP5GljJ\nOAEqnTDLMQKBgHkoHBpK85VDCU763nbHqINEPLDpFs17to7mIS4O5iY5wavzfCJ2\nPf2fn6MDXojXkyAIbt3SlQ3fRau7z76EAMXemuyqqR9+ZePEHq84FHLqaH4P/P3a\n+EvcKi+8yZPV/4HgHfUarncvv951x4iR/zS5e/xmWQZ5I7V9aPs89535AoGBAIEE\nlM6fu8m1ZboZq8NZTbXHrngIikrImZeWpKrKDNZxNoAd/YkykVdjhGOvOeWQjBTL\nIl26PQKBPG4Wnb6zS+HhRMLR7/PktJ1nut76HfNqIsrXdXhDaz0Gb705Wpl8p28j\nA3rZIQ7bKh58kzgar9Gy9Z94jCBhLZdztVnuJV1BAoGAF7jKaT/zfo+aQFyjAWWM\nEXiSgW8q1upxyOigN1HUt4smdBe5HHx21TjxpNJZxzxdu8EdykyStdVc/bpIxnf/\nXe+u/Ek5SeXf6kXzsYETKNo12A1youo0vEDCI/conPSa2eKojWLxPEqaSQzvwCvw\ntVTk3Yx/pUGNb0J5xKjxQkA=\n-----END PRIVATE KEY-----\n"
+  const privateKey = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDMkMf0gA07XVkl\ngYAIyX37VLkJT0sikKq7smDHo1Z2G1+FksnWrPxwA99CeuI7Q0+Bgr3HPQ+Fn2TU\nyvd3v8IqqjyzcfGPdXe8CJcvL2yqxS/Gn7D+wHIQjFNRHudd2RgE1hFbYqtm1f4p\n65vydeUH/Klzf/kimigcOK++qYGj0D8gpnRWaQGjIPxd1CDgpPfjqpSn7SWx5Q85\n8HOIIhHJ6RAOYX9SoKWcxflFwc4SoN68ru31a8PDUaymUtg1zWb3imURRCjh4mnQ\ns+8GQRFu39o08AaVM+n+RcCFEN7fBWviuiNOSTEz0l96IBXAg3Fu0d2QX274UOUe\n3nc9iMn9AgMBAAECggEAEQlVvcUUVQdXL0pzsUemmFHb/yx9Y2mM7ojSio3N25Q4\nBlXNPXW2qFWKOG0nfiwC6RRMXdV1/3jg2t/0cCKmNwtqdr9ckMgFqsFEZgebEzXM\n3svZ372DQmGNZsoeFrDH0U9KrsOu5qeXvUIEANNUua+PJTFZPEp+YKtP558STuQY\n2ysgXr7yFh5hOymM5j8X6oKS+aO/+IHLCSMYwtsONpI2IjH100lO8YhRXBqr/ML3\nNvlqo9X9MPzyMiPrVCHUK1AfEPFvqQ3cbuOqAwyHyFiTLnM5ZZJ/qLTwU4FRjHao\nVkDODh5X0KzNx0PWkzA8ON61vikfPREwKfhqAwXwgQKBgQDsBZRrYOoCk6UBWxjd\ng7c21wuPXKqvrXuFy8yXZmFZiHf4P0BI8qgEfJfI3nQnT8sYdCTBiWeJ7tRUNAPK\nwwMDLRHYr5x70Zek4iyOcOxIneDN8rjGB79mv1mIdiu+jgT14F+dkWJvmmPqMDqs\nFBZkit09H1EEcfodcTP6Yj7gjQKBgQDd4ZFCX//ZNMw3Wad3h4R+pwFC0k7coVzk\n8UbCzl3j/MFD4SLmZIO8Gk4isBilYWsd5vNZfAct9ukTEm6ww7EkOtaeh7eYTypW\nBDGYXX2NNSpotFw4KpZRwLlTteN7adneX7tpLVuMpPDUN+cz37NW8kOtcKP5GljJ\nOAEqnTDLMQKBgHkoHBpK85VDCU763nbHqINEPLDpFs17to7mIS4O5iY5wavzfCJ2\nPf2fn6MDXojXkyAIbt3SlQ3fRau7z76EAMXemuyqqR9+ZePEHq84FHLqaH4P/P3a\n+EvcKi+8yZPV/4HgHfUarncvv951x4iR/zS5e/xmWQZ5I7V9aPs89535AoGBAIEE\nlM6fu8m1ZboZq8NZTbXHrngIikrImZeWpKrKDNZxNoAd/YkykVdjhGOvOeWQjBTL\nIl26PQKBPG4Wnb6zS+HhRMLR7/PktJ1nut76HfNqIsrXdXhDaz0Gb705Wpl8p28j\nA3rZIQ7bKh58kzgar9Gy9Z94jCBhLZdztVnuJV1BAoGAF7jKaT/zfo+aQFyjAWWM\nEXiSgW8q1upxyOigN1HUt4smdBe5HHx21TjxpNJZxzxdu8EdykyStdVc/bpIxnf/\nXe+u/Ek5SeXf6kXzsYETKNo12A1youo0vEDCI/conPSa2eKojWLxPEqaSQzvwCvw\ntVTk3Yx/pUGNb0J5xKjxQkA=\n-----END PRIVATE KEY-----\n"
   try {
 
     if (privateKey && privateKey.includes("\\n")) {
@@ -119,15 +119,22 @@ const sendNotification = async (token, title, body, channel) => {
     const message = {
       token,
       notification: {
-        title: title ,
-        body: body ,
+        title: title,
+        body: body,
       },
       android: {
         priority: "high",
         notification: {
-          channelId: channel ,
+          channelId: channel,
           clickAction: "",
-          imageUrl:"https://i.ibb.co/TxJRvf12/favicon.png"
+          imageUrl: "https://i.ibb.co/TxJRvf12/favicon.png"
+        },
+      },
+      webpush: {
+        notification: {
+          title,
+          body,
+          icon: "https://i.ibb.co/TxJRvf12/favicon.png",
         },
       },
     };
@@ -143,7 +150,7 @@ const sendNotification = async (token, title, body, channel) => {
     if (error.errorInfo && error.errorInfo.code === "messaging/registration-token-not-registered") {
       logger.warn(`⚠️ Token invalid or app uninstalled — cleaning up: ${token}`);
 
-    
+
     }
 
     if (error instanceof NotificationError) return null;
@@ -151,7 +158,7 @@ const sendNotification = async (token, title, body, channel) => {
   }
 };
 
-const sendMultipleNotifications = async (users,tokens, title, body, channel = "default") => {
+const sendMultipleNotifications = async (users, tokens, title, body, channel = "default") => {
   initializeFirebase();
 
   if (!Array.isArray(tokens) || tokens.length === 0) {
