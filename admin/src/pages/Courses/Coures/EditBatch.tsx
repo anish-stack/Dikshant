@@ -42,6 +42,12 @@ interface EditBatchFormData {
   registrationStartDate: string;
   registrationEndDate: string;
   status: BatchStatus;
+  medium: string;
+  offerText: string;
+  fee_one_time: number;
+  fee_inst: number;
+  note: string;
+
   shortDescription: string;
   longDescription: string;
   quizIds: number[];
@@ -66,6 +72,12 @@ interface Batch {
   registrationStartDate: string;
   registrationEndDate: string;
   status: BatchStatus;
+  medium: string;
+  offerText: string;
+  fee_one_time: number;
+  fee_inst: number;
+  note: string;
+
   shortDescription: string;
   longDescription: string;
   batchPrice: number;
@@ -144,6 +156,11 @@ const EditBatch = () => {
     shortDescription: "",
     longDescription: "",
     quizIds: [],
+    medium: "",
+    offerText: "",
+    fee_one_time: 0,
+    fee_inst: 0,
+    note: "",
     testSeriesIds: [],
     batchPrice: 0,
     batchDiscountPrice: 0,
@@ -305,7 +322,11 @@ const EditBatch = () => {
           registrationEndDate: data.registrationEndDate
             ? data.registrationEndDate.split("T")[0]
             : "",
-
+          medium: data?.medium || "",
+          offerText: data?.offerText || "",
+          fee_one_time: data?.fee_one_time || 0,
+          fee_inst: data?.fee_inst || 0,
+          note: data?.note || "",
           status: data.status || "inactive",
 
           quizIds: Array.isArray(data.quizIds) ? data.quizIds : [],
@@ -324,10 +345,10 @@ const EditBatch = () => {
           category:
             typeof data.category === "string"
               ? (data.category.toLowerCase() as
-                  | ""
-                  | "online"
-                  | "offline"
-                  | "recorded")
+                | ""
+                | "online"
+                | "offline"
+                | "recorded")
               : "",
         });
 
@@ -511,6 +532,13 @@ const EditBatch = () => {
         data.append("offerValidityDays", formData.offerValidityDays.toString());
       }
 
+      data.append("medium", formData.medium.trim());
+      data.append("offerText", formData.offerText.trim());
+      data.append("fee_one_time", formData.fee_one_time);
+      data.append("fee_inst", formData.fee_inst);
+      data.append("note", formData.note);
+
+
       data.append("isEmi", isEmi.toString());
       if (isEmi) {
         data.append("emiTotal", totalEmi.toString());
@@ -690,22 +718,21 @@ const EditBatch = () => {
                 >
                   <span className="truncate">
                     {Array.isArray(selectedSubjectIds) &&
-                    selectedSubjectIds.length === 0
+                      selectedSubjectIds.length === 0
                       ? "Select subjects..."
                       : Array.isArray(selectedSubjectIds)
                         ? selectedSubjectIds
-                            .map(
-                              (id) =>
-                                allSubjects.find((s) => s.id === id)?.name,
-                            )
-                            .filter(Boolean)
-                            .join(", ")
+                          .map(
+                            (id) =>
+                              allSubjects.find((s) => s.id === id)?.name,
+                          )
+                          .filter(Boolean)
+                          .join(", ")
                         : "Select subjects..."}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 transition-transform ${
-                      subjectsDropdownOpen ? "rotate-180" : ""
-                    }`}
+                    className={`w-4 h-4 transition-transform ${subjectsDropdownOpen ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -772,11 +799,11 @@ const EditBatch = () => {
                       : selectedQuizIds.length === 0
                         ? "Select quizzes (optional)"
                         : selectedQuizIds
-                            .map(
-                              (id) => quizzes.find((q) => q.id === id)?.title,
-                            )
-                            .filter(Boolean)
-                            .join(", ")}
+                          .map(
+                            (id) => quizzes.find((q) => q.id === id)?.title,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${quizzesDropdownOpen ? "rotate-180" : ""}`}
@@ -864,13 +891,13 @@ const EditBatch = () => {
                       : selectedTestSeriesIds.length === 0
                         ? "Select test series (optional)"
                         : selectedTestSeriesIds
-                            .map(
-                              (id) =>
-                                testSeriesList.find((ts) => ts.id === id)
-                                  ?.title,
-                            )
-                            .filter(Boolean)
-                            .join(", ")}
+                          .map(
+                            (id) =>
+                              testSeriesList.find((ts) => ts.id === id)
+                                ?.title,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${testSeriesDropdownOpen ? "rotate-180" : ""}`}
@@ -996,7 +1023,89 @@ const EditBatch = () => {
                 </div>
               </div>
             </div>
+            <div className="space-y-4 mb-6">
+              <div className="grid md:grid-cols-2 gap-4">
 
+                {/* Medium */}
+                <div>
+                  <Label className="text-sm">Medium</Label>
+                  <Input
+                    value={formData.medium}
+                    onChange={(e) =>
+                      setFormData({ ...formData, medium: e.target.value })
+                    }
+                    className="text-sm"
+                    placeholder="e.g. Hindi / English"
+                  />
+                </div>
+
+                {/* Offer Text */}
+                <div>
+                  <Label className="text-sm">Offer Text</Label>
+                  <Input
+                    value={formData.offerText}
+                    onChange={(e) =>
+                      setFormData({ ...formData, offerText: e.target.value })
+                    }
+                    className="text-sm"
+                    placeholder="e.g. Limited time offer"
+                  />
+                </div>
+
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+
+                {/* One Time Fee */}
+                <div>
+                  <Label className="text-sm">One Time Fee (₹)</Label>
+                  <Input
+                    type="number"
+                    value={formData.fee_one_time}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        fee_one_time: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="text-sm"
+                    min="0"
+                  />
+                </div>
+
+                {/* Installment Fee */}
+                <div>
+                  <Label className="text-sm">Installment Fee (₹)</Label>
+                  <Input
+                    type="number"
+                    value={formData.fee_inst}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        fee_inst: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="text-sm"
+                    min="0"
+                  />
+                </div>
+
+              </div>
+
+              {/* Note */}
+              <div>
+                <Label className="text-sm">Note</Label>
+                <TextArea
+                  value={formData.note}
+                  onChange={(value) =>
+                    setFormData({ ...formData, note: value })
+                  }
+                  rows={3}
+                  className="text-sm"
+                  placeholder="Any additional info..."
+                />
+              </div>
+            </div>
             {/* Status */}
             <div className="mb-6">
               <Label className="text-sm">Status</Label>
@@ -1151,8 +1260,8 @@ const EditBatch = () => {
                         ₹
                         {emiSchedule.length > 0
                           ? Math.round(finalPrice / emiMonths).toLocaleString(
-                              "en-IN",
-                            )
+                            "en-IN",
+                          )
                           : 0}
                       </div>
                     </div>

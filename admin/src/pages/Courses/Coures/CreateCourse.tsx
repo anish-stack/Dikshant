@@ -47,6 +47,11 @@ interface CreateBatchFormData {
   startDate: string;
   endDate: string;
   quizIds: number[];
+ medium: string;
+offerText: string;
+fee_one_time: number;
+fee_inst: number;
+note: string;
   testSeriesIds: number[];
   registrationStartDate: string;
   registrationEndDate: string;
@@ -130,6 +135,11 @@ const CreateBatch = () => {
     batchPrice: 0,
     batchDiscountPrice: 0,
     gst: 18,
+    medium:"",
+    offerText:"",
+    fee_one_time:0,
+    fee_inst:0,
+    note:"",
     offerValidityDays: 0,
     category: "",
   });
@@ -333,6 +343,13 @@ const CreateBatch = () => {
       data.append("status", formData.status);
       data.append("shortDescription", formData.shortDescription.trim());
       data.append("longDescription", formData.longDescription.trim());
+      data.append("medium", formData.medium.trim());
+      data.append("offerText", formData.offerText.trim());
+      data.append("fee_one_time", formData.fee_one_time);
+      data.append("fee_inst", formData.fee_inst);
+      data.append("note", formData.note);
+
+     
       data.append("batchPrice", formData.batchPrice.toString());
 
       if (formData.batchDiscountPrice > 0) {
@@ -864,6 +881,90 @@ const CreateBatch = () => {
                 </div>
               </div>
             </div>
+            {/* Extra Fields */}
+<div className="space-y-4 mb-6">
+  <div className="grid md:grid-cols-2 gap-4">
+    
+    {/* Medium */}
+    <div>
+      <Label className="text-sm">Medium</Label>
+      <Input
+        value={formData.medium}
+        onChange={(e) =>
+          setFormData({ ...formData, medium: e.target.value })
+        }
+        className="text-sm"
+        placeholder="e.g. Hindi / English"
+      />
+    </div>
+
+    {/* Offer Text */}
+    <div>
+      <Label className="text-sm">Offer Text</Label>
+      <Input
+        value={formData.offerText}
+        onChange={(e) =>
+          setFormData({ ...formData, offerText: e.target.value })
+        }
+        className="text-sm"
+        placeholder="e.g. Limited time offer"
+      />
+    </div>
+
+  </div>
+
+  <div className="grid md:grid-cols-2 gap-4">
+    
+    {/* One Time Fee */}
+    <div>
+      <Label className="text-sm">One Time Fee (₹)</Label>
+      <Input
+        type="number"
+        value={formData.fee_one_time}
+        onChange={(e) =>
+          setFormData({
+            ...formData,
+            fee_one_time: parseFloat(e.target.value) || 0,
+          })
+        }
+        className="text-sm"
+        min="0"
+      />
+    </div>
+
+    {/* Installment Fee */}
+    <div>
+      <Label className="text-sm">Installment Fee (₹)</Label>
+      <Input
+        type="number"
+        value={formData.fee_inst}
+        onChange={(e) =>
+          setFormData({
+            ...formData,
+            fee_inst: parseFloat(e.target.value) || 0,
+          })
+        }
+        className="text-sm"
+        min="0"
+      />
+    </div>
+
+  </div>
+
+  {/* Note */}
+  <div>
+    <Label className="text-sm">Note</Label>
+    <TextArea
+      value={formData.note}
+      onChange={(value) =>
+        setFormData({ ...formData, note: value })
+      }
+      rows={3}
+      className="text-sm"
+      placeholder="Any additional info..."
+    />
+  </div>
+</div>
 
             {/* Status */}
             <select

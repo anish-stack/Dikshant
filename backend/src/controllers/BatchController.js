@@ -82,7 +82,11 @@ class BatchController {
         displayOrder: req.body.displayOrder,
         programId: req.body.programId,
         subjectId: req.body.subjectId,
-
+        medium: req.body.medium || "",
+        offerText: req.body.offerText,
+        fee_one_time: req.body.fee_one_time,
+        fee_inst: req.body.fee_inst,
+        note: req.body.note,
         startDate: start,                    // now safe
         endDate: end,
         registrationStartDate: registrationStart,
@@ -555,7 +559,11 @@ class BatchController {
         status: req.body.status,
         shortDescription: req.body.shortDescription,
         longDescription: req.body.longDescription,
-
+        medium: req.body.medium || "",
+        offerText: req.body.offerText,
+        fee_one_time: req.body.fee_one_time,
+        fee_inst: req.body.fee_inst,
+        note: req.body.note,
         batchPrice: req.body.batchPrice,
         batchDiscountPrice: req.body.batchDiscountPrice,
         gst: req.body.gst,

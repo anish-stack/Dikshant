@@ -14,6 +14,35 @@ module.exports = (sequelize, DataTypes) => {
     programId: DataTypes.INTEGER,
     subjectId: DataTypes.JSON,
 
+    medium: {
+      type: DataTypes.STRING(2000),
+      allowNull: false,
+      defaultValue: "Hindi / English",
+    },
+
+    offerText: {
+      type: DataTypes.STRING(1000),
+      allowNull: true,
+      defaultValue: null,
+    },
+
+    fee_one_time: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
+
+    fee_inst: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: null,
+    },
+    note: {
+      type: DataTypes.STRING(2000),
+      allowNull: true,
+      defaultValue: null,
+    },
+
     startDate: DataTypes.DATE,
     endDate: DataTypes.DATE,
 
@@ -29,16 +58,16 @@ module.exports = (sequelize, DataTypes) => {
     batchDiscountPrice: DataTypes.FLOAT,
     gst: DataTypes.FLOAT,
     offerValidityDays: DataTypes.INTEGER,
-quizIds: {
-  type: DataTypes.JSON,
-  allowNull: true,
-  defaultValue: []
-},
-testSeriesIds: {
-  type: DataTypes.JSON,
-  allowNull: true,
-  defaultValue: []
-},
+    quizIds: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: []
+    },
+    testSeriesIds: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: []
+    },
 
     isEmi: {
       type: DataTypes.BOOLEAN,
@@ -80,12 +109,12 @@ testSeriesIds: {
     Batch.hasMany(models.CourseProgress, { foreignKey: 'batchId', as: 'progress' });
     Batch.belongsToMany(models.Subject, { through: "batch_subjects" });
 
- Batch.belongsToMany(models.Announcement, {
-    through: "AnnouncementBatches",
-    as: "announcements",
-    foreignKey: "batchId",
-    otherKey: "announcementId",
-  });
+    Batch.belongsToMany(models.Announcement, {
+      through: "AnnouncementBatches",
+      as: "announcements",
+      foreignKey: "batchId",
+      otherKey: "announcementId",
+    });
     // Add this line:
     Batch.hasMany(models.Order, {
       foreignKey: 'itemId',
