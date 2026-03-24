@@ -47,11 +47,11 @@ interface CreateBatchFormData {
   startDate: string;
   endDate: string;
   quizIds: number[];
- medium: string;
-offerText: string;
-fee_one_time: number;
-fee_inst: number;
-note: string;
+  medium: string;
+  offerText: string;
+  fee_one_time: string;
+  fee_inst: string;
+  note: string;
   testSeriesIds: number[];
   registrationStartDate: string;
   registrationEndDate: string;
@@ -135,11 +135,11 @@ const CreateBatch = () => {
     batchPrice: 0,
     batchDiscountPrice: 0,
     gst: 18,
-    medium:"",
-    offerText:"",
-    fee_one_time:0,
-    fee_inst:0,
-    note:"",
+    medium: "",
+    offerText: "",
+    fee_one_time: "",
+    fee_inst: "",
+    note: "",
     offerValidityDays: 0,
     category: "",
   });
@@ -349,7 +349,7 @@ const CreateBatch = () => {
       data.append("fee_inst", formData.fee_inst);
       data.append("note", formData.note);
 
-     
+
       data.append("batchPrice", formData.batchPrice.toString());
 
       if (formData.batchDiscountPrice > 0) {
@@ -524,17 +524,16 @@ const CreateBatch = () => {
                         : selectedSubjectIds.length === 0
                           ? "Select subjects..."
                           : selectedSubjectIds
-                              .map(
-                                (id) =>
-                                  allSubjects.find((s) => s.id === id)?.name,
-                              )
-                              .filter(Boolean)
-                              .join(", ")}
+                            .map(
+                              (id) =>
+                                allSubjects.find((s) => s.id === id)?.name,
+                            )
+                            .filter(Boolean)
+                            .join(", ")}
                     </span>
                     <ChevronDown
-                      className={`w-4 h-4 transition-transform ${
-                        subjectsDropdownOpen ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 transition-transform ${subjectsDropdownOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -568,11 +567,10 @@ const CreateBatch = () => {
                                 className="flex items-start gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                               >
                                 <div
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition ${
-                                    isSelected
-                                      ? "bg-indigo-600 border-indigo-600"
-                                      : "border-gray-300 dark:border-gray-600"
-                                  }`}
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition ${isSelected
+                                    ? "bg-indigo-600 border-indigo-600"
+                                    : "border-gray-300 dark:border-gray-600"
+                                    }`}
                                 >
                                   {isSelected && (
                                     <Check className="w-3 h-3 text-white" />
@@ -641,11 +639,11 @@ const CreateBatch = () => {
                       : selectedQuizIds.length === 0
                         ? "Select quizzes (optional)"
                         : selectedQuizIds
-                            .map(
-                              (id) => quizzes.find((q) => q.id === id)?.title,
-                            )
-                            .filter(Boolean)
-                            .join(", ")}
+                          .map(
+                            (id) => quizzes.find((q) => q.id === id)?.title,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${quizzesDropdownOpen ? "rotate-180" : ""}`}
@@ -733,11 +731,11 @@ const CreateBatch = () => {
                       : selectedTestSeriesIds.length === 0
                         ? "Select quizzes (optional)"
                         : selectedTestSeriesIds
-                            .map(
-                              (id) => quizzes.find((q) => q.id === id)?.title,
-                            )
-                            .filter(Boolean)
-                            .join(", ")}
+                          .map(
+                            (id) => quizzes.find((q) => q.id === id)?.title,
+                          )
+                          .filter(Boolean)
+                          .join(", ")}
                   </span>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform ${testSeriesDropdownOpen ? "rotate-180" : ""}`}
@@ -778,18 +776,16 @@ const CreateBatch = () => {
                             return (
                               <label
                                 key={quiz.id}
-                                className={`flex items-start gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 ${
-                                  loadingTestSeries
-                                    ? "pointer-events-none opacity-60"
-                                    : ""
-                                }`}
+                                className={`flex items-start gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 ${loadingTestSeries
+                                  ? "pointer-events-none opacity-60"
+                                  : ""
+                                  }`}
                               >
                                 <div
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                                    isSelected
-                                      ? "bg-indigo-600 border-indigo-600"
-                                      : "border-gray-300"
-                                  }`}
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
+                                    ? "bg-indigo-600 border-indigo-600"
+                                    : "border-gray-300"
+                                    }`}
                                 >
                                   {isSelected && (
                                     <Check className="w-3 h-3 text-white" />
@@ -882,89 +878,89 @@ const CreateBatch = () => {
               </div>
             </div>
             {/* Extra Fields */}
-<div className="space-y-4 mb-6">
-  <div className="grid md:grid-cols-2 gap-4">
-    
-    {/* Medium */}
-    <div>
-      <Label className="text-sm">Medium</Label>
-      <Input
-        value={formData.medium}
-        onChange={(e) =>
-          setFormData({ ...formData, medium: e.target.value })
-        }
-        className="text-sm"
-        placeholder="e.g. Hindi / English"
-      />
-    </div>
+            <div className="space-y-4 mb-6">
+              <div className="grid md:grid-cols-2 gap-4">
 
-    {/* Offer Text */}
-    <div>
-      <Label className="text-sm">Offer Text</Label>
-      <Input
-        value={formData.offerText}
-        onChange={(e) =>
-          setFormData({ ...formData, offerText: e.target.value })
-        }
-        className="text-sm"
-        placeholder="e.g. Limited time offer"
-      />
-    </div>
+                {/* Medium */}
+                <div>
+                  <Label className="text-sm">Medium</Label>
+                  <Input
+                    value={formData.medium}
+                    onChange={(e) =>
+                      setFormData({ ...formData, medium: e.target.value })
+                    }
+                    className="text-sm"
+                    placeholder="e.g. Hindi / English"
+                  />
+                </div>
 
-  </div>
+                {/* Offer Text */}
+                <div>
+                  <Label className="text-sm">Offer Text</Label>
+                  <Input
+                    value={formData.offerText}
+                    onChange={(e) =>
+                      setFormData({ ...formData, offerText: e.target.value })
+                    }
+                    className="text-sm"
+                    placeholder="e.g. Limited time offer"
+                  />
+                </div>
 
-  <div className="grid md:grid-cols-2 gap-4">
-    
-    {/* One Time Fee */}
-    <div>
-      <Label className="text-sm">One Time Fee (₹)</Label>
-      <Input
-        type="number"
-        value={formData.fee_one_time}
-        onChange={(e) =>
-          setFormData({
-            ...formData,
-            fee_one_time: parseFloat(e.target.value) || 0,
-          })
-        }
-        className="text-sm"
-        min="0"
-      />
-    </div>
+              </div>
 
-    {/* Installment Fee */}
-    <div>
-      <Label className="text-sm">Installment Fee (₹)</Label>
-      <Input
-        type="number"
-        value={formData.fee_inst}
-        onChange={(e) =>
-          setFormData({
-            ...formData,
-            fee_inst: parseFloat(e.target.value) || 0,
-          })
-        }
-        className="text-sm"
-        min="0"
-      />
-    </div>
+              <div className="grid md:grid-cols-2 gap-4">
 
-  </div>
+                {/* One Time Fee */}
+                <div>
+                  <Label className="text-sm">One Time Fee (₹)</Label>
+                  <Input
+                    type="text"
+                    value={formData.fee_one_time}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        fee_one_time: e.target.value,
+                      })
+                    }
+                    className="text-sm"
+                    min="0"
+                  />
+                </div>
 
-  {/* Note */}
-  <div>
-    <Label className="text-sm">Note</Label>
-    <TextArea
-      value={formData.note}
-      onChange={(value) =>
-        setFormData({ ...formData, note: value })
-      }
-      rows={3}
-      className="text-sm"
-      placeholder="Any additional info..."
-    />
-  </div>
-</div>
+                {/* Installment Fee */}
+                <div>
+                  <Label className="text-sm">Installment Fee (₹)</Label>
+                  <Input
+                    type="text"
+                    value={formData.fee_inst}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        fee_inst: e.target.value,
+                      })
+                    }
+                    className="text-sm"
+                    min="0"
+                  />
+                </div>
+
+              </div>
+
+              {/* Note */}
+              <div>
+                <Label className="text-sm">Note</Label>
+                <TextArea
+                  value={formData.note}
+                  onChange={(value) =>
+                    setFormData({ ...formData, note: value })
+                  }
+                  rows={3}
+                  className="text-sm"
+                  placeholder="Any additional info..."
+                />
+              </div>
+            </div>
 
             {/* Status */}
             <select
@@ -1122,8 +1118,8 @@ const CreateBatch = () => {
                         ₹
                         {emiSchedule.length > 0
                           ? Math.round(finalPrice / emiMonths).toLocaleString(
-                              "en-IN",
-                            )
+                            "en-IN",
+                          )
                           : 0}
                       </div>
                     </div>

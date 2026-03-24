@@ -27,13 +27,13 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     fee_one_time: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(1500),
       allowNull: true,
       defaultValue: null,
     },
 
     fee_inst: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(1500),
       allowNull: true,
       defaultValue: null,
     },

@@ -44,8 +44,8 @@ interface EditBatchFormData {
   status: BatchStatus;
   medium: string;
   offerText: string;
-  fee_one_time: number;
-  fee_inst: number;
+  fee_one_time: string;
+  fee_inst: string;
   note: string;
 
   shortDescription: string;
@@ -74,8 +74,8 @@ interface Batch {
   status: BatchStatus;
   medium: string;
   offerText: string;
-  fee_one_time: number;
-  fee_inst: number;
+  fee_one_time: string;
+  fee_inst: string;
   note: string;
 
   shortDescription: string;
@@ -158,8 +158,8 @@ const EditBatch = () => {
     quizIds: [],
     medium: "",
     offerText: "",
-    fee_one_time: 0,
-    fee_inst: 0,
+    fee_one_time: "",
+    fee_inst: "",
     note: "",
     testSeriesIds: [],
     batchPrice: 0,
@@ -324,8 +324,8 @@ const EditBatch = () => {
             : "",
           medium: data?.medium || "",
           offerText: data?.offerText || "",
-          fee_one_time: data?.fee_one_time || 0,
-          fee_inst: data?.fee_inst || 0,
+          fee_one_time: data?.fee_one_time || "",
+          fee_inst: data?.fee_inst || "",
           note: data?.note || "",
           status: data.status || "inactive",
 
@@ -1060,12 +1060,12 @@ const EditBatch = () => {
                 <div>
                   <Label className="text-sm">One Time Fee (₹)</Label>
                   <Input
-                    type="number"
+                    type="text"
                     value={formData.fee_one_time}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        fee_one_time: parseFloat(e.target.value) || 0,
+                        fee_one_time: e.target.value,
                       })
                     }
                     className="text-sm"
@@ -1082,7 +1082,7 @@ const EditBatch = () => {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        fee_inst: parseFloat(e.target.value) || 0,
+                        fee_inst:e.target.value,
                       })
                     }
                     className="text-sm"
