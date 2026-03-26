@@ -16,7 +16,7 @@ import {
   CalendarRange,
 } from "lucide-react";
 
-const API_BASE = "https://www.app.api.dikshantias.com/api/admin/";
+const API_BASE = "https://www.app.api.dikshantias.com//api/admin/";
 const token = localStorage.getItem("accessToken");
 
 interface Order {

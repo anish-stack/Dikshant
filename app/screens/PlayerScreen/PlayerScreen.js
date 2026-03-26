@@ -9,11 +9,13 @@ import {
   AppState,
   BackHandler,
   Alert,
+  StatusBar,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import axios from "axios";
 import { useSettings } from "../../hooks/useSettings";
+import * as ScreenOrientation from "expo-screen-orientation";
 
 const API_BASE = "http://192.168.1.7:5001/api/chat";
 const JOIN_API = `${API_BASE}/Student-join-api`;
@@ -42,12 +44,25 @@ const injectedConsoleJS = `
 true;
 `;
 
+// ── Helper: restore screen to normal portrait mode ──────────────────────────
+const resetToPortrait = async () => {
+  try {
+    await ScreenOrientation.lockAsync(
+      ScreenOrientation.OrientationLock.PORTRAIT_UP
+    );
+    StatusBar.setHidden(false, "fade");
+    StatusBar.setBarStyle("light-content", true);
+  } catch (err) {
+    console.warn("[PlayerScreen] resetToPortrait error:", err);
+  }
+};
+
 const PlayerScreen = ({ route, navigation }) => {
   const { settings } = useSettings();
-  const { video, batchId, userId, token, courseId, isDemo, videoId } = route.params || {};
+  const { video, batchId, userId, token, courseId, isDemo, videoId } =
+    route.params || {};
   const playerUrl = `https://www.player.dikshantias.com/?video=${video}&batchId=${batchId}&userId=${userId}&token=${token}&courseId=${courseId}`;
-  console.log("🎬 PlayerScreen params:", { video, batchId, userId, token, courseId, isDemo, videoId });
-  console.log("🎬 Player URL:", playerUrl);
+
   const [pageLoaded, setPageLoaded] = useState(false);
   const [minTimePassed, setMinTimePassed] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -61,7 +76,6 @@ const PlayerScreen = ({ route, navigation }) => {
   // ─── Join / Leave Functions ─────────────────────────────────────────
   const joinChat = useCallback(async () => {
     if (!videoId || !userId || hasJoined) return;
-
     try {
       const payload = { videoId, userId: String(userId) };
       const { data } = await axios.post(JOIN_API, payload, { timeout: 7000 });
@@ -74,7 +88,6 @@ const PlayerScreen = ({ route, navigation }) => {
 
   const leaveChat = useCallback(async () => {
     if (!hasJoined) return;
-
     try {
       const payload = { videoId, userId: String(userId) };
       await axios.post(LEAVE_API, payload, { timeout: 7000 });
@@ -93,7 +106,11 @@ const PlayerScreen = ({ route, navigation }) => {
         "Do you want to leave the class?",
         [
           { text: "No, Stay", style: "cancel", onPress: () => resolve(false) },
-          { text: "Yes, Leave", style: "destructive", onPress: () => resolve(true) },
+          {
+            text: "Yes, Leave",
+            style: "destructive",
+            onPress: () => resolve(true),
+          },
         ],
         { cancelable: false }
       );
@@ -102,8 +119,7 @@ const PlayerScreen = ({ route, navigation }) => {
 
   // ─── Centralized canLeave function ──────────────────────────────────
   const attemptLeave = useCallback(async () => {
-    if (!hasJoined) return true; // can leave immediately
-
+    if (!hasJoined) return true;
     const userConfirmed = await showLeaveConfirmation();
     if (userConfirmed) {
       await leaveChat();
@@ -114,30 +130,29 @@ const PlayerScreen = ({ route, navigation }) => {
 
   // ─── Prevent back navigation without confirmation ───────────────────
   useEffect(() => {
-    // React Navigation back (header / swipe / goBack)
     const unsubscribe = navigation.addListener("beforeRemove", async (e) => {
       const canProceed = await attemptLeave();
-
       if (!canProceed) {
         e.preventDefault();
         return;
       }
-
-      // If we reach here → user confirmed leave or no join → allow navigation
-      // no need to dispatch manually in most cases
+      // ✅ User is leaving screen — reset orientation & status bar
+      await resetToPortrait();
     });
 
-    // Android hardware back button
-    const backHandler = BackHandler.addEventListener("hardwareBackPress", async () => {
-      const canProceed = await attemptLeave();
-
-      if (canProceed) {
-        navigation.goBack();
-        return true; // we handled it
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      async () => {
+        const canProceed = await attemptLeave();
+        if (canProceed) {
+          // ✅ Reset orientation before going back
+          await resetToPortrait();
+          navigation.goBack();
+          return true;
+        }
+        return true;
       }
-
-      return true; // we handled (prevented) it
-    });
+    );
 
     return () => {
       unsubscribe();
@@ -145,17 +160,19 @@ const PlayerScreen = ({ route, navigation }) => {
     };
   }, [navigation, attemptLeave]);
 
+  // ─── Reset orientation when component unmounts ──────────────────────
+  useEffect(() => {
+    return () => {
+      // ✅ Always reset when this screen is destroyed
+      resetToPortrait();
+    };
+  }, []);
+
   // ─── Auto join on mount / params change ─────────────────────────────
   useEffect(() => {
-    if (video && videoId && userId) {
-      joinChat();
-    }
-
-    // Cleanup on unmount
-    return () => {
-      leaveChat();
-    };
-  }, [video, videoId, userId, joinChat, leaveChat]);
+    if (video && videoId && userId) joinChat();
+    return () => { leaveChat(); };
+  }, [video, videoId, userId]);
 
   // ─── App state handling (background/foreground) ─────────────────────
   useEffect(() => {
@@ -164,21 +181,12 @@ const PlayerScreen = ({ route, navigation }) => {
         appStateRef.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // Foreground → try re-join
-        if (video && videoId && userId && !hasJoined) {
-          joinChat();
-        }
-      } else if (
-        nextAppState.match(/inactive|background/) &&
-        hasJoined
-      ) {
-        // Background → leave
+        if (video && videoId && userId && !hasJoined) joinChat();
+      } else if (nextAppState.match(/inactive|background/) && hasJoined) {
         leaveChat();
       }
-
       appStateRef.current = nextAppState;
     });
-
     return () => subscription.remove();
   }, [video, videoId, userId, hasJoined, joinChat, leaveChat]);
 
@@ -234,6 +242,64 @@ const PlayerScreen = ({ route, navigation }) => {
     webViewRef.current?.reload();
   };
 
+  // ─── WebView message handler ─────────────────────────────────────────
+  const handleMessage = useCallback(async (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+
+      if (data.type === "fullscreenRequest") {
+        // ✅ Go landscape + hide status bar
+        console.log("📲 Fullscreen request received");
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE
+        );
+        StatusBar.setHidden(true, "fade");
+      }
+
+
+      else if (data.type === "exitfromFullScreen") {
+        // ✅ WebView can also request to go back to portrait
+        await resetToPortrait();
+      }
+
+      else if (data.type === "log") {
+        console.log("[WebView LOG]:", data.message);
+      }
+      else if (data.type === "warn") {
+        console.warn("[WebView WARN]:", data.message);
+      }
+      else if (data.type === "error") {
+        console.error("[WebView ERROR]:", data.message);
+      }
+    } catch (err) {
+      console.log("[WebView RAW]:", event.nativeEvent.data);
+    }
+  }, []);
+
+  // ─── Listen for device rotation to auto-exit fullscreen ─────────────
+  useEffect(() => {
+    const sub = ScreenOrientation.addOrientationChangeListener((evt) => {
+      const orientation = evt.orientationInfo.orientation;
+      // ScreenOrientation values: 1=PORTRAIT_UP, 2=PORTRAIT_DOWN, 3=LANDSCAPE_LEFT, 4=LANDSCAPE_RIGHT
+      const isPortrait =
+        orientation === ScreenOrientation.Orientation.PORTRAIT_UP ||
+        orientation === ScreenOrientation.Orientation.PORTRAIT_DOWN;
+
+      if (isPortrait) {
+        // ✅ User physically rotated back to portrait — restore UI
+        StatusBar.setHidden(false, "fade");
+        StatusBar.setBarStyle("light-content", true);
+        // Notify WebView so it can update its UI state too
+        webViewRef.current?.injectJavaScript(`
+          window.dispatchEvent(new Event('resize'));
+          true;
+        `);
+      }
+    });
+
+    return () => ScreenOrientation.removeOrientationChangeListener(sub);
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.container}>
@@ -253,17 +319,16 @@ const PlayerScreen = ({ route, navigation }) => {
             injectedJavaScriptBeforeContentLoaded={injectedConsoleJS}
             onLoadEnd={() => setPageLoaded(true)}
             onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.warn("WebView error:", nativeEvent);
+              console.warn("WebView error:", syntheticEvent.nativeEvent);
               setHasError(true);
             }}
             onHttpError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              console.warn("HTTP error:", nativeEvent.statusCode);
+              console.warn(
+                "HTTP error:",
+                syntheticEvent.nativeEvent.statusCode
+              );
             }}
-            onMessage={() => {
-              // console messages already handled via injected js
-            }}
+            onMessage={handleMessage}
           />
         )}
 
@@ -326,7 +391,6 @@ const PlayerScreen = ({ route, navigation }) => {
 
 export default PlayerScreen;
 
-// styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

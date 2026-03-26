@@ -3,10 +3,10 @@
 module.exports = (sequelize, DataTypes) => {
   const Banner = sequelize.define("Banner", {
 
-    id: { 
+    id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
-      autoIncrement: true 
+      autoIncrement: true
     },
 
     title: {
@@ -14,6 +14,9 @@ module.exports = (sequelize, DataTypes) => {
     },
 
     imageUrl: {
+      type: DataTypes.STRING,
+    },
+    mobileImageUrl: {
       type: DataTypes.STRING,
     },
 

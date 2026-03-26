@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  Pressable,
   Platform,
   ScrollView,
   AppState,
@@ -127,13 +126,13 @@ export default function Header() {
 
   useEffect(() => {
     if (!isMaintenanceActive) {
-      assetsRefetch(); 
+      assetsRefetch();
       return;
     }
 
     const interval = setInterval(() => {
       assetsRefetch();
-    }, 12000); 
+    }, 12000);
 
     return () => clearInterval(interval);
   }, [isMaintenanceActive, assetsRefetch]);
@@ -149,10 +148,9 @@ export default function Header() {
   }, [assetsRefetch]);
 
   const sidebarTranslateX = sidebarAnim;
-  const overlayOpacity = overlayAnim;
-  const logoSource = assets?.appLogo
-    ? { uri: assets.appLogo }
-    : require("../assets/small.png");
+  const logoSource = require("../assets/small.png");
+
+
   return (
     <>
 
@@ -333,7 +331,7 @@ const menuItems = {
     { icon: "home", label: "Home", screen: "Home" },
     { icon: "book-open", label: "My Courses", screen: "Profile" },
     { icon: "play-circle", label: "Recorded Courses", screen: "Courses" },
-    { icon: "file-text", label: "Test Series",screen: "Courses", badge: "New" },
+    { icon: "file-text", label: "Test Series", screen: "Courses", badge: "New" },
     { icon: "user", label: "Profile", screen: "Profile" },
   ],
 
@@ -350,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 6,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#f1f5f9",

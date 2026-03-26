@@ -1323,7 +1323,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.text,
+    color: "#a50309",
     marginBottom: 12,
   },
   sectionHeader: {
@@ -1719,7 +1719,7 @@ const styles = StyleSheet.create({
   },
   enrollPriceLabel: {
     fontSize: 11,
-    color: colors.textSecondary,
+    color: "#a50309",
     marginBottom: 2,
   },
   enrollPriceValue: {
@@ -2001,11 +2001,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  enrollPriceLabel: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
 
   enrollPriceValue: {
     fontSize: 18,

@@ -16,12 +16,13 @@ import {
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
-const API_URL = "https://www.app.api.dikshantias.com/api/banners";
+const API_URL = "https://www.app.api.dikshantias.com//api/banners";
 
 interface Banner {
   id: number;
   title: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   linkUrl: string;
   position: number;
   status: boolean;
@@ -46,11 +47,12 @@ export default function BannerManagement() {
   const [form, setForm] = useState({
     title: "",
     linkUrl: "",
+    mobileImage: null as File | null,
     image: null as File | null,
   });
   const [preview, setPreview] = useState("");
   const [formErrors, setFormErrors] = useState<{ title?: string; image?: string }>({});
-
+  const [mobilePreview, setMobilePreview] = useState("");
   const fetchBanners = useCallback(async () => {
     setLoading(true);
     try {
@@ -69,6 +71,24 @@ export default function BannerManagement() {
   useEffect(() => {
     fetchBanners();
   }, [fetchBanners]);
+
+  const handleMobileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, mobileImage: file }));
+    setMobilePreview(URL.createObjectURL(file));
+  };
 
   // Search filtering
   useEffect(() => {
@@ -113,10 +133,10 @@ export default function BannerManagement() {
     setPreview(URL.createObjectURL(file));
     setFormErrors((prev) => ({ ...prev, image: undefined }));
   };
-
   const resetForm = () => {
-    setForm({ title: "", linkUrl: "", image: null });
+    setForm({ title: "", linkUrl: "", image: null, mobileImage: null });
     setPreview("");
+    setMobilePreview("");
     setFormErrors({});
   };
 
@@ -132,19 +152,15 @@ export default function BannerManagement() {
     data.append("linkUrl", form.linkUrl.trim());
     data.append("position", editBanner ? editBanner.position.toString() : nextPosition.toString());
     data.append("status", "true");
-    if (form.image) data.append("imageUrl", form.image); // backend should handle field name "imageUrl" or change to "image"
-
+    if (form.image) data.append("imageUrl", form.image);
+    // if (form.mobileImage) data.append("MobileImageUrl", form.mobileImage);
     try {
       if (editBanner) {
-        await axios.put(`${API_URL}/${editBanner.id}`, data, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.put(`${API_URL}/${editBanner.id}`, data);
         toast.success("Banner updated successfully", { id: toastId });
         console.log(`Banner updated: #${editBanner.id} - ${form.title}`);
       } else {
-        await axios.post(API_URL, data, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await axios.post(API_URL, data);
         toast.success("Banner created successfully", { id: toastId });
         console.log(`New banner created: ${form.title} (pos: ${nextPosition})`);
       }
@@ -204,8 +220,12 @@ export default function BannerManagement() {
       title: banner.title,
       linkUrl: banner.linkUrl || "",
       image: null,
+      mobileImage: null,
     });
+
     setPreview(banner.imageUrl);
+    setMobilePreview(banner.mobileImageUrl || ""); // 👈 add
+
     setEditBanner(banner);
     setCreateModal(true);
   };
@@ -265,6 +285,8 @@ export default function BannerManagement() {
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Pos</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Image</th>
+                  {/* <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Mobile Image</th> */}
+
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Link</th>
                   <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -300,6 +322,17 @@ export default function BannerManagement() {
                           onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150?text=Error")}
                         />
                       </td>
+                      {/* <td className="px-6 py-5 whitespace-nowrap">
+                        {banner.mobileImageUrl && (
+                          <img
+                            src={banner.mobileImageUrl}
+                            alt={banner.title}
+                            className="w-28 h-20 object-cover rounded-lg shadow-sm border border-gray-200"
+                            onError={(e) => (e.currentTarget.src = "https://via.placeholder.com/150?text=Error")}
+                          />
+                        )}
+
+                      </td> */}
                       <td className="px-6 py-5 font-medium text-gray-900 max-w-xs truncate">
                         {banner.title}
                       </td>
@@ -308,11 +341,10 @@ export default function BannerManagement() {
                       </td>
                       <td className="px-6 py-5 text-center">
                         <span
-                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                            banner.status
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
+                          className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${banner.status
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                            }`}
                         >
                           {banner.status ? "Active" : "Inactive"}
                         </span>
@@ -411,9 +443,8 @@ export default function BannerManagement() {
                       setForm({ ...form, title: e.target.value });
                       setFormErrors((prev) => ({ ...prev, title: undefined }));
                     }}
-                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${
-                      formErrors.title ? "border-red-500" : "border-gray-300"
-                    }`}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition ${formErrors.title ? "border-red-500" : "border-gray-300"
+                      }`}
                     placeholder="e.g. Summer Sale 2025"
                   />
                   {formErrors.title && (
@@ -476,7 +507,44 @@ export default function BannerManagement() {
                     <p className="mt-2 text-sm text-red-600">{formErrors.image}</p>
                   )}
                 </div>
+                {/* <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mobile Banner Image
+                  </label>
 
+                  {mobilePreview ? (
+                    <div className="relative rounded-xl overflow-hidden border shadow-sm inline-block">
+                      <img
+                        src={mobilePreview}
+                        alt="Mobile Preview"
+                        className="max-w-full h-56 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobilePreview("");
+                          setForm({ ...form, mobileImage: null });
+                        }}
+                        className="absolute top-3 right-3 bg-red-600 text-white p-2 rounded-full"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-indigo-500">
+                      <Upload size={40} className="text-gray-400 mb-3" />
+                      <span className="text-sm text-gray-500">
+                        Upload Mobile Banner
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleMobileImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div> */}
                 {editBanner && (
                   <p className="text-sm text-gray-500 italic">
                     Current position: <strong>#{editBanner.position}</strong> (auto preserved)

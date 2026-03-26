@@ -18,24 +18,27 @@ const { sendNotification } = require('./utils/sendNotifications');
 //   })
 // );
 
+app.use(cors("*"))
 
+// app.use(
+//   cors({
+//     origin: [
+//       "https://www.app.admin.dikshantias.com",
+//       "https://app.admin.dikshantias.com",
+//       "https://www.player.dikshantias.com",
+//       "https://player.dikshantias.com",
+//       "http://localhost:3000",
+//       "http://localhost:5173",
+//       "http://localhost:5174",
+//       "http://localhost:5173",
 
-app.use(
-  cors({
-    origin: [
-      "https://www.app.admin.dikshantias.com",
-      "https://app.admin.dikshantias.com",
-      "https://www.player.dikshantias.com",
-      "https://player.dikshantias.com",
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "http://localhost:3001",
-      "https://www.dikshantias.com",
-      "https://dikshantias.com",
-    ],
-    credentials: true
-  })
-);
+//       "http://localhost:3001",
+//       "https://www.dikshantias.com",
+//       "https://dikshantias.com",
+//     ],
+//     credentials: true
+//   })
+// );
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));

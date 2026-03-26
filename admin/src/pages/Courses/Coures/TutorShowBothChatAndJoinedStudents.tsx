@@ -93,8 +93,8 @@ const TutorShowBothChatAndJoinedStudents = () => {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const shouldAutoScroll = useRef(true);
 
-  const COMPLETE_DATA_API = `https://www.app.api.dikshantias.com/api/chat/complete-data/${VIDEO_ID}`;
-  const ADMIN_MESSAGE_API = `https://www.app.api.dikshantias.com/api/chat/admin-message`;
+  const COMPLETE_DATA_API = `https://www.app.api.dikshantias.com//api/chat/complete-data/${VIDEO_ID}`;
+  const ADMIN_MESSAGE_API = `https://www.app.api.dikshantias.com//api/chat/admin-message`;
 
   // ── Fetch Complete Chat Data ─────────────────────────────
   const fetchCompleteChatData = useCallback(async () => {

@@ -14,7 +14,10 @@ import axios from "axios";
 import { API_URL_LOCAL_ENDPOINT } from "../constant/api";
 import { useNavigation } from "@react-navigation/native";
 
-const { width: screenWidth } = Dimensions.get("window");
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+
+const CARD_WIDTH = screenWidth - 32; // 16px padding on each side — text won't clip
+const CARD_MIN_HEIGHT = screenHeight * 0.09; // ~11% of screen height, fits all displays
 
 const Announcement = ({ refreshing }) => {
   const navigation = useNavigation();
@@ -41,19 +44,18 @@ const Announcement = ({ refreshing }) => {
   }, [refreshing]);
 
   useEffect(() => {
-    if (announcements.length === 0) return;
+    if (announcements.length <= 1) return;
 
     const interval = setInterval(() => {
       Animated.parallel([
-        Animated.timing(fadeAnim, { toValue: 0, duration: 450, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: -40, duration: 450, useNativeDriver: true }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: -30, duration: 400, useNativeDriver: true }),
       ]).start(() => {
         setCurrentIndex((prev) => (prev + 1) % announcements.length);
-        slideAnim.setValue(40);
-
+        slideAnim.setValue(30);
         Animated.parallel([
-          Animated.timing(fadeAnim, { toValue: 1, duration: 450, useNativeDriver: true }),
-          Animated.timing(slideAnim, { toValue: 0, duration: 450, useNativeDriver: true }),
+          Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
         ]).start();
       });
     }, 5500);
@@ -64,159 +66,182 @@ const Announcement = ({ refreshing }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6b48ff" />
+        <ActivityIndicator size="small" color="#6b48ff" />
       </View>
     );
   }
 
-  if (announcements.length === 0) {
-    return null;
-  }
+  if (announcements.length === 0) return null;
 
   const current = announcements[currentIndex];
 
-  // ── Style parsing with safe fallbacks ──
-  const bgColor = current.backgroundColor || "#ffffff";
-  const textColor = current.textColor || "#222222";
-  const textSizeBase = parseFloat(current.textSize) || 15;
-  const arrowBg = current.arrowBackgroundColor || "#1976D2";
-  const arrowSize = current.arrowSize || 48;
-
+  const bgColor = current.backgroundColor || "#F0F4FF";
+  const textColor = current.textColor || "#1A1A2E";
+  const textSizeBase = parseFloat(current.textSize) || 13;
+  const arrowBg = current.arrowBackgroundColor || "#6b48ff";
   const arrowColor = current.arrowColor || "#ffffff";
 
-  // Width & Height handling
-  let cardWidth = screenWidth - 16;
-  if (current.width && current.width !== "100%") {
-    const w = parseFloat(current.width);
-    cardWidth = isNaN(w) ? cardWidth : w;
-  }
-
-  let cardHeight = 100;
-  if (current.height) {
-    const h = parseFloat(current.height.replace("px", ""));
-    cardHeight = isNaN(h) ? cardHeight : h;
-  }
-
   return (
-    <TouchableOpacity
-      activeOpacity={0.92}
-      onPress={() => navigation.navigate("annouce-details", { id: current.id })}
-      style={styles.container}
-    >
-      <Animated.View
-        style={[
-          styles.card,
-          {
-            backgroundColor: bgColor,
-            width: cardWidth,
-            minHeight: cardHeight,
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+    <View style={styles.wrapper}>
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => navigation.navigate("annouce-details", { id: current.id })}
       >
-        <View style={styles.innerRow}>
-          {/* Optional banner image on left */}
-          {current.image && (
-            <Image
-              source={{ uri: current.image }}
-              style={styles.bannerImage}
-              resizeMode="cover"
-            />
-          )}
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              backgroundColor: bgColor,
+              width: CARD_WIDTH,
+              minHeight: CARD_MIN_HEIGHT,
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <View style={styles.innerRow}>
+           
 
-          <View style={styles.textBlock}>
-            <Text
-              style={[
-                styles.title,
-                { color: textColor, fontSize: textSizeBase + 3 },
-              ]}
-              numberOfLines={2}
-            >
-              {current.title}
-            </Text>
+            {/* Optional image */}
+            {current.image ? (
+              <Image
+                source={{ uri: current.image }}
+                style={styles.bannerImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={[styles.iconFallback, { backgroundColor: arrowBg + "22" }]}>
+                <FontAwesome name="bullhorn" size={18} color={arrowBg} />
+              </View>
+            )}
 
-            <Text
-              style={[
-                styles.message,
-                { color: textColor, fontSize: textSizeBase },
-              ]}
-              numberOfLines={3}
-            >
-              {current.message}
-            </Text>
+            {/* Text block — flex:1 ensures it never overflows */}
+            <View style={styles.textBlock}>
+              <Text
+                style={[styles.title, { color: textColor, fontSize: textSizeBase + 1 }]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {current.title}
+              </Text>
+              <Text
+                style={[styles.message, { color: textColor, fontSize: textSizeBase }]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {current.message}
+              </Text>
+            </View>
+
+            {/* Arrow CTA */}
+            <View style={[styles.arrowButton, { backgroundColor: arrowBg }]}>
+              <FontAwesome name="chevron-right" size={13} color={arrowColor} />
+            </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.arrowButton, { backgroundColor: arrowBg }]}
-            onPress={() => navigation.navigate("annouce-details", { id: current.id })}
-          >
-            <FontAwesome name="arrow-right" size={Number(arrowSize) || 20} color={arrowColor} />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    </TouchableOpacity>
+          {/* Dot indicators (only if multiple) */}
+          {announcements.length > 1 && (
+            <View style={styles.dotsRow}>
+              {announcements.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: i === currentIndex ? arrowBg : arrowBg + "44",
+                      width: i === currentIndex ? 16 : 6,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 export default Announcement;
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     alignItems: "center",
-    paddingHorizontal: 3,
     marginVertical: 8,
   },
   loadingContainer: {
-    paddingVertical: 40,
+    paddingVertical: 28,
     alignItems: "center",
   },
   card: {
-    borderRadius: 12,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-    elevation: 5,
+    // Soft shadow
+    shadowColor: "#6b48ff",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.112,
+    shadowRadius: 1,
+    elevation: 2,
   },
   innerRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    flex: 1,
+    paddingVertical: 12,
+    paddingRight: 14,
+    paddingLeft: 0,
+  },
+  accentBar: {
+    width: 4,
+    alignSelf: "stretch",
+    borderRadius: 4,
+    marginRight: 12,
   },
   bannerImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    marginRight: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    marginRight: 12,
+  },
+  iconFallback: {
+    marginLeft:3,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   textBlock: {
-    flex: 1,
-    gap: 6,
+    flex: 1,          // ← key: takes remaining space, never overflows
+    gap: 4,
+    marginRight: 10,
   },
   title: {
     fontWeight: "700",
-    lineHeight: 24,
-    letterSpacing: 0.2,
+    lineHeight: 20,
+    letterSpacing: 0.1,
   },
   message: {
-    fontWeight: "500",
-    lineHeight: 20,
-    opacity: 0.92,
+    fontWeight: "400",
+    lineHeight: 18,
+    opacity: 0.78,
   },
   arrowButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 12,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    flexShrink: 0,    // ← never squishes the arrow
+  },
+  dotsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 5,
+    paddingBottom: 10,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
   },
 });

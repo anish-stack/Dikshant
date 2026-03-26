@@ -457,71 +457,71 @@ const HelpSupportScreen = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-const handleSubmitForm = async () => {
-  if (
-    !formData.name ||
-    !formData.email ||
-    !formData.subject ||
-    !formData.message
-  ) {
-    Alert.alert("Error", "Please fill in all required fields");
-    return;
-  }
+  const handleSubmitForm = async () => {
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.subject ||
+      !formData.message
+    ) {
+      Alert.alert("Error", "Please fill in all required fields");
+      return;
+    }
 
-  try {
-    setIsSubmitting(true);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      setIsSubmitting(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const payload = {
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      subject: formData.subject.trim(),
-      category: formData.category || "general",
-      message: formData.message.trim(),
-    };
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        category: formData.category || "general",
+        message: formData.message.trim(),
+      };
 
-    const res = await axios.post(
-      `${API_URL_LOCAL_ENDPOINT}/support`,
-      payload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          // Authorization: `Bearer ${token}`, // 🔐 if needed
-        },
-        timeout: 10000,
-      }
-    );
+      const res = await axios.post(
+        `${API_URL_LOCAL_ENDPOINT}/support`,
+        payload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            // Authorization: `Bearer ${token}`, // 🔐 if needed
+          },
+          timeout: 10000,
+        }
+      );
 
-    await Haptics.notificationAsync(
-      Haptics.NotificationFeedbackType.Success
-    );
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      );
 
-    Alert.alert(
-      "Success",
-      res?.data?.message ||
+      Alert.alert(
+        "Success",
+        res?.data?.message ||
         "Your support ticket has been submitted. We'll get back to you soon!"
-    );
+      );
 
-    // Reset form
-    setFormData({
-      name: "",
-      email: "",
-      subject: "",
-      category: "general",
-      message: "",
-    });
-  } catch (error) {
-    console.error("❌ Support Submit Error:", error);
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        subject: "",
+        category: "general",
+        message: "",
+      });
+    } catch (error) {
+      console.error("❌ Support Submit Error:", error);
 
-    Alert.alert(
-      "Error",
-      error?.response?.data?.message ||
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message ||
         "Failed to submit support ticket"
-    );
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const openLink = async (type, value) => {
     if (!value) {
@@ -640,7 +640,7 @@ const handleSubmitForm = async () => {
                     style={[
                       styles.categoryOption,
                       formData.category === cat.value &&
-                        styles.categoryOptionActive,
+                      styles.categoryOptionActive,
                     ]}
                     onPress={() => handleInputChange("category", cat.value)}
                   >
@@ -648,7 +648,7 @@ const handleSubmitForm = async () => {
                       style={[
                         styles.categoryText,
                         formData.category === cat.value &&
-                          styles.categoryTextActive,
+                        styles.categoryTextActive,
                       ]}
                     >
                       {cat.label}

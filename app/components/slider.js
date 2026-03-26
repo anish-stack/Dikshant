@@ -100,7 +100,7 @@ export default function Slider({refreshing}) {
         <Image
           source={require("../assets/images/placeholder.png")}
           style={styles.image}
-          resizeMode="cover"
+          resizeMode="cover"  
         />
       </View>
     );

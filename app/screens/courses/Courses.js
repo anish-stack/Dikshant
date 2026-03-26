@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#a50309",
     letterSpacing: -0.5,
   },
   seeAllButton: {

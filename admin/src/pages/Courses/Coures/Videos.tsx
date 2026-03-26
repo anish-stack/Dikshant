@@ -23,8 +23,8 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-const API_URL = "https://www.app.api.dikshantias.com/api/videocourses"; // ← updated to your local
-const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com//api/videocourses"; // ← updated to your local
+const BATCHS_API = "https://www.app.api.dikshantias.com//api/batchs";
 
 interface Subject {
   id: number;

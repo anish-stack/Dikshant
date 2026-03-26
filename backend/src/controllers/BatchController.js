@@ -33,6 +33,14 @@ class BatchController {
   // CREATE
   // =========================
   static async create(req, res) {
+    console.log("BODY =>", req.body);
+    console.log("FILES =>", req.files);
+
+    console.log("imageUrl =>", req.files?.imageUrl);
+    console.log("mobileImageUrl =>", req.files?.mobileImageUrl);
+
+    console.log("Single image =>", req.files?.imageUrl?.[0]);
+    console.log("Single mobile image =>", req.files?.mobileImageUrl?.[0]);
     try {
       let imageUrl = null;
       if (req.file) {
@@ -513,7 +521,14 @@ class BatchController {
   // UPDATE
   // =========================
   static async update(req, res) {
+    console.log("BODY =>", req.body);
+    console.log("FILES =>", req.files);
 
+    console.log("imageUrl =>", req.files?.imageUrl);
+    console.log("mobileImageUrl =>", req.files?.mobileImageUrl);
+
+    console.log("Single image =>", req.files?.imageUrl?.[0]);
+    console.log("Single mobile image =>", req.files?.mobileImageUrl?.[0]);
 
     try {
       const batchId = req.params.id;

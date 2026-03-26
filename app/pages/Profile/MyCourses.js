@@ -122,7 +122,7 @@ export default function MyCourses() {
     if (order.expired) return;
 
     const batch = order.batch || {};
-    const url = batch.category === 'online' ? 'my-course' : 'my-course-subjects';
+    const url = ['online', 'offline'].includes(batch.category) ? 'my-course' : 'my-course-subjects';
     navigation.navigate(url, { unlocked: true, courseId: batch.id });
   };
 
@@ -231,12 +231,12 @@ export default function MyCourses() {
                               width: expired
                                 ? '0%'
                                 : batch.c_status === 'Completed'
-                                ? '100%'
-                                : batch.c_status === 'In Progress'
-                                ? '60%'
-                                : batch.c_status === 'Partially Complete'
-                                ? '85%'
-                                : '0%',
+                                  ? '100%'
+                                  : batch.c_status === 'In Progress'
+                                    ? '60%'
+                                    : batch.c_status === 'Partially Complete'
+                                      ? '85%'
+                                      : '0%',
                               backgroundColor: expired ? colors.disabled : statusStyle.bg,
                             },
                           ]}
@@ -253,12 +253,12 @@ export default function MyCourses() {
                       {expired
                         ? 'Expired'
                         : batch.c_status === 'Completed'
-                        ? 'Completed'
-                        : batch.c_status === 'In Progress'
-                        ? 'In Progress'
-                        : batch.c_status === 'Start Soon'
-                        ? 'Not Started'
-                        : 'Ongoing'}
+                          ? 'Completed'
+                          : batch.c_status === 'In Progress'
+                            ? 'In Progress'
+                            : batch.c_status === 'Start Soon'
+                              ? 'Not Started'
+                              : 'Ongoing'}
                     </Text>
                   </View>
                 </TouchableOpacity>

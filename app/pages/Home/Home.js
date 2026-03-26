@@ -51,16 +51,16 @@ export default function Home() {
           style={styles.joinUsButton}
         >
           <LinearGradient
-          colors={['#ef4444', '#dc2626']}
+          colors={['#f1eaea', '#fef9f9']}
 
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
             <View style={styles.buttonContent}>
-              <Feather name="users" size={20} color="#ffffff" />
-              <Text style={styles.buttonText}>Join Our Community</Text>
-              <Feather name="arrow-right" size={18} color="#ffffff" />
+              <Feather name="users" size={15} color="#e22222" />
+              <Text style={styles.buttonText}>Follow us on Social media for Daily updates </Text>
+              
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -99,8 +99,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
+    color: '#a50309',
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,
   },

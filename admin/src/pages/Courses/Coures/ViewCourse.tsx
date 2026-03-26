@@ -19,7 +19,7 @@ import PageMeta from "../../../components/common/PageMeta";
 import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import { Skeleton } from "../../../components/ui/Skeleton/Skeleton";
 
-const API_URL = "https://www.app.api.dikshantias.com/api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com//api/batchs";
 
 interface Subject {
   id: number;

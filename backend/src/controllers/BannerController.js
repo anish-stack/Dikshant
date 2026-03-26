@@ -7,49 +7,60 @@ const deleteFromS3 = require("../utils/s3Delete");
 
 class BannerController {
 
-  static async create(req, res) {
-    try {
-      let imageUrl = null;
+ static async create(req, res) {
+  try {
+    let imageUrl = null;
+    let mobileImageUrl = null;
 
-      if (req.file) {
-        imageUrl = await uploadToS3(req.file, "banners");
+    // ✅ Handle multiple files
+    if (req.files) {
+      if (req.files.imageUrl && req.files.imageUrl[0]) {
+        imageUrl = await uploadToS3(req.files.imageUrl[0], "banners");
       }
 
-      const booleanFields = ["status"];
-      for (const field of booleanFields) {
-        if (req.body[field] !== undefined) {
-          const val = req.body[field];
-          if (val === true || val === false) continue;
-          if (val === "true" || val === "1" || val === 1) req.body[field] = true;
-          else if (val === "false" || val === "0" || val === 0) req.body[field] = false;
-          else {
-            return res.status(400).json({
-              success: false,
-              message: `${field} must be a boolean`
-            });
-          }
+      if (req.files.MobileImageUrl && req.files.MobileImageUrl[0]) {
+        mobileImageUrl = await uploadToS3(req.files.MobileImageUrl[0], "banners");
+      }
+    }
+
+    // ✅ Boolean conversion
+    const booleanFields = ["status"];
+    for (const field of booleanFields) {
+      if (req.body[field] !== undefined) {
+        const val = req.body[field];
+        if (val === true || val === false) continue;
+        if (val === "true" || val === "1" || val === 1) req.body[field] = true;
+        else if (val === "false" || val === "0" || val === 0) req.body[field] = false;
+        else {
+          return res.status(400).json({
+            success: false,
+            message: `${field} must be a boolean`
+          });
         }
       }
-
-      const payload = {
-        title: req.body.title,
-        imageUrl,
-        linkUrl: req.body.linkUrl,
-        position: req.body.position ? Number(req.body.position) : 0,
-        status: req.body.status !== undefined ? req.body.status : true
-      };
-
-      const item = await Banner.create(payload);
-
-      await redis.del("banners");
-
-      return res.status(201).json(item);
-
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Error creating banner" });
     }
+
+    // ✅ Payload
+    const payload = {
+      title: req.body.title,
+      imageUrl,
+      mobileImageUrl, // 👈 added
+      linkUrl: req.body.linkUrl,
+      position: req.body.position ? Number(req.body.position) : 0,
+      status: req.body.status !== undefined ? req.body.status : true
+    };
+
+    const item = await Banner.create(payload);
+
+    await redis.del("banners");
+
+    return res.status(201).json(item);
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error creating banner" });
   }
+}
 
 
 
@@ -96,52 +107,70 @@ class BannerController {
 
 
 
-  static async update(req, res) {
-    try {
-      const item = await Banner.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: "Banner not found" });
+static async update(req, res) {
+  try {
+    const item = await Banner.findByPk(req.params.id);
+    if (!item) return res.status(404).json({ message: "Banner not found" });
 
-      let imageUrl = item.imageUrl;
-   
-      if (req.file) {
+    let imageUrl = item.imageUrl;
+    let mobileImageUrl = item.mobileImageUrl;
+
+    // ✅ Handle multiple files
+    if (req.files) {
+      // Desktop image
+      if (req.files.imageUrl && req.files.imageUrl[0]) {
         if (item.imageUrl) await deleteFromS3(item.imageUrl);
-        imageUrl = await uploadToS3(req.file, "banners");
+        imageUrl = await uploadToS3(req.files.imageUrl[0], "banners");
       }
 
-      const booleanFields = ["status"];
-      for (const field of booleanFields) {
-        if (req.body[field] !== undefined) {
-          const val = req.body[field];
-          if (val === true || val === false) continue;
-          if (val === "true" || val === "1" || val === 1) req.body[field] = true;
-          else if (val === "false" || val === "0" || val === 0) req.body[field] = false;
-          else {
-            return res.status(400).json({
-              success: false,
-              message: `${field} must be a boolean`
-            });
-          }
+      // Mobile image
+      if (req.files.MobileImageUrl && req.files.MobileImageUrl[0]) {
+        if (item.mobileImageUrl) await deleteFromS3(item.mobileImageUrl);
+        mobileImageUrl = await uploadToS3(req.files.MobileImageUrl[0], "banners");
+      }
+    }
+
+    // ✅ Boolean conversion
+    const booleanFields = ["status"];
+    for (const field of booleanFields) {
+      if (req.body[field] !== undefined) {
+        const val = req.body[field];
+        if (val === true || val === false) continue;
+        if (val === "true" || val === "1" || val === 1) req.body[field] = true;
+        else if (val === "false" || val === "0" || val === 0) req.body[field] = false;
+        else {
+          return res.status(400).json({
+            success: false,
+            message: `${field} must be a boolean`
+          });
         }
       }
-
-      await item.update({
-        title: req.body.title || item.title,
-        imageUrl,
-        linkUrl: req.body.linkUrl || item.linkUrl,
-        position: req.body.position !== undefined ? Number(req.body.position) : item.position,
-        status: req.body.status !== undefined ? req.body.status : item.status
-      });
-
-      await redis.del("banners");
-      await redis.del(`banner:${req.params.id}`);
-
-      return res.json(item);
-
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ message: "Error updating banner" });
     }
+
+    // ✅ Update payload
+    await item.update({
+      title: req.body.title || item.title,
+      imageUrl,
+      mobileImageUrl, // 👈 added
+      linkUrl: req.body.linkUrl || item.linkUrl,
+      position:
+        req.body.position !== undefined
+          ? Number(req.body.position)
+          : item.position,
+      status:
+        req.body.status !== undefined ? req.body.status : item.status
+    });
+
+    await redis.del("banners");
+    await redis.del(`banner:${req.params.id}`);
+
+    return res.json(item);
+
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Error updating banner" });
   }
+}
 
 
 

@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import { Loader2, Upload, X } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 
-const API_URL = "https://www.app.api.dikshantias.com/api";
+const API_URL = "https://www.app.api.dikshantias.com//api";
 
 const EditQuizBundle = () => {
   const { id } = useParams();

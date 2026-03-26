@@ -85,6 +85,7 @@ export default function Greet({refreshing}) {
 
 const styles = StyleSheet.create({
   container: {
+    height: "3%",   
     paddingHorizontal: 14,
     paddingVertical: 10, // 🔥 less padding
     marginBottom: 2,
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
   },
 
   greeting: {
-    fontSize: 18, // 🔥 reduced from 22
+    fontSize: 16, // 🔥 reduced from 22
     fontWeight: "700",
     color: "#fff",
     fontFamily: "Geist",
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
   },
 
   goal: {
-    fontSize: 13, // 🔥 smaller
+    fontSize: 11, // 🔥 smaller
     color: "#ffebee",
     marginTop: 4,
     fontFamily: "Geist-Medium",
