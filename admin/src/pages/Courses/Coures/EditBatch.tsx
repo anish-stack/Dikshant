@@ -1069,7 +1069,7 @@ const EditBatch = () => {
                       })
                     }
                     className="text-sm"
-                    min="0"
+                   
                   />
                 </div>
 
@@ -1077,7 +1077,7 @@ const EditBatch = () => {
                 <div>
                   <Label className="text-sm">Installment Fee (₹)</Label>
                   <Input
-                    type="number"
+                 type="text"
                     value={formData.fee_inst}
                     onChange={(e) =>
                       setFormData({
@@ -1086,7 +1086,7 @@ const EditBatch = () => {
                       })
                     }
                     className="text-sm"
-                    min="0"
+                  
                   />
                 </div>
 
