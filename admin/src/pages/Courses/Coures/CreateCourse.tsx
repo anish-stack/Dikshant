@@ -982,14 +982,15 @@ const CreateBatch = () => {
             <div className="space-y-4 mb-6">
               <div>
                 <Label className="text-sm">Short Description</Label>
-                <TextArea
+
+                <JoditEditor
+                  ref={editor}
                   value={formData.shortDescription}
-                  onChange={(value) =>
-                    setFormData({ ...formData, shortDescription: value })
-                  }
-                  rows={2}
-                  className="text-sm"
-                  placeholder="Brief description of the batch"
+                  config={config}
+                  tabIndex={99999} // tabIndex of textarea
+                  onChange={(value) => {
+                    setFormData({ ...formData, shortDescription: value });
+                  }}
                 />
               </div>
               <div>

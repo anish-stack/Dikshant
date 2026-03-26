@@ -1069,7 +1069,7 @@ const EditBatch = () => {
                       })
                     }
                     className="text-sm"
-                   
+
                   />
                 </div>
 
@@ -1077,16 +1077,16 @@ const EditBatch = () => {
                 <div>
                   <Label className="text-sm">Installment Fee (₹)</Label>
                   <Input
-                 type="text"
+                    type="text"
                     value={formData.fee_inst}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        fee_inst:e.target.value,
+                        fee_inst: e.target.value,
                       })
                     }
                     className="text-sm"
-                  
+
                   />
                 </div>
 
@@ -1128,16 +1128,15 @@ const EditBatch = () => {
             <div className="space-y-4 mb-6">
               <div>
                 <Label className="text-sm">Short Description</Label>
-                <TextArea
+
+                <JoditEditor
+                  ref={editor}
                   value={formData.shortDescription}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      shortDescription: value,
-                    })
-                  }
-                  rows={2}
-                  className="text-sm"
+                  config={config}
+                  tabIndex={99999} // tabIndex of textarea
+                  onChange={(value) => {
+                    setFormData({ ...formData, shortDescription: value });
+                  }}
                 />
               </div>
               <div>
