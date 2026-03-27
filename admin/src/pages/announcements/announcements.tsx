@@ -19,7 +19,7 @@ import JoditEditor from "jodit-react";
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
-const API_URL = "https://www.app.api.dikshantias.com//api/announcements";
+const API_URL = "https://www.app.api.dikshantias.com/api/announcements";
 
 interface Announcement {
   id: number;
@@ -124,7 +124,7 @@ export default function Announcements() {
     setLoadingBatches(true);
     try {
       const res = await axios.get<any>(
-        `https://www.app.api.dikshantias.com//api/batchs`,
+        `https://www.app.api.dikshantias.com/api/batchs`,
         {
           params: { page: 1, limit: 500 },
         },

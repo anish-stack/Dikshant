@@ -21,6 +21,7 @@ import * as Haptics from "expo-haptics";
 import { useAuthStore } from "../../stores/auth.store";
 import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 import axios from "axios";
+import WebView from "react-native-webview";
 
 const { fetcher } = require("../../constant/fetcher");
 
@@ -303,6 +304,36 @@ export default function EnrollCourse() {
     }
   };
 
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body {
+       font-size: 14px;
+          line-height: 1.7;
+          color: #333;
+          padding: 0;
+          margin: 0;
+      }
+      p {
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+   <body>
+      ${batchData?.shortDescription}
+      <script>
+        setTimeout(() => {
+          window.ReactNativeWebView.postMessage(
+            document.documentElement.scrollHeight
+          );
+        }, 300);
+      </script>
+    </body>
+  </html>
+`;
   const selectCoupon = (coupon) => {
     setCouponCode(coupon.code);
     setShowCouponsModal(false);
@@ -341,9 +372,25 @@ export default function EnrollCourse() {
             </View>
             <View style={styles.courseInfo}>
               <Text style={styles.courseName}>{batchData?.name}</Text>
-              <Text style={styles.courseSubtitle}>
-                {batchData?.shortDescription}
-              </Text>
+
+              {batchData?.shortDescription && (
+
+                <View style={styles.shortDescription}>
+                  <WebView
+                    originWhitelist={['*']}
+                    androidLayerType="hardware"
+                    nestedScrollEnabled={true}
+                    source={{ html: htmlContent }}
+                  style={{ height: 100 }}
+
+                    scrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                  />
+                </View>
+
+
+              )}
+
             </View>
           </View>
 

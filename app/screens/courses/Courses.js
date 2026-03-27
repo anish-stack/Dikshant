@@ -135,7 +135,7 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
 
   const handlePress = () => {
     if (isPurchased) {
-      const url = batch.category === "online" ? "my-course" : "my-course-subjects"
+      const url =['online', 'offline'].includes(batch.category) ? "my-course" : "my-course-subjects";
       navigation.navigate(url, {
         unlocked: true,
         courseId: batch.id,
@@ -161,12 +161,7 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
           style={styles.courseImage}
           resizeMode="cover"
         />
-        <View style={styles.imageOverlay}>
-          <View style={styles.playButton}>
-            <Feather name="play" size={20} color="#ffffff" />
-          </View>
-        </View>
-
+       
         {/* Subscribed Badge - Top Priority */}
         {isPurchased ? (
           <View style={styles.subscribedBadge}>

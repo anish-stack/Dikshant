@@ -23,7 +23,7 @@ import {
   ShieldOff,
 } from "lucide-react";
 
-const API_BASE = "https://www.app.api.dikshantias.com//api/coupons";
+const API_BASE = "https://www.app.api.dikshantias.com/api/coupons";
 const token = localStorage.getItem("accessToken");
 
 interface Coupon {

@@ -322,11 +322,7 @@ export default function RecordedCourses() {
                       style={styles.thumbnail}
                       resizeMode="cover"
                     />
-                    <View style={styles.playOverlay}>
-                      <View style={styles.playButton}>
-                        <Feather name="play" size={24} color="#ffffff" />
-                      </View>
-                    </View>
+                   
                     {video.duration && (
                       <View style={styles.durationBadge}>
                         <Feather name="clock" size={10} color="#ffffff" />

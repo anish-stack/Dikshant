@@ -16,7 +16,7 @@ import {
 import PageMeta from "../../components/common/PageMeta";
 import PageBreadcrumb from "../../components/common/PageBreadCrumb";
 
-const API_URL = "https://www.app.api.dikshantias.com//api/banners";
+const API_URL = "https://www.app.api.dikshantias.com/api/banners";
 
 interface Banner {
   id: number;

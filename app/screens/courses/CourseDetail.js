@@ -458,6 +458,37 @@ export default function CourseDetail() {
   </html>
 `;
 
+ const htmlContentShort = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body {
+       font-size: 14px;
+          line-height: 1.7;
+          color: #333;
+          padding: 0;
+          margin: 0;
+      }
+      p {
+        margin-bottom: 12px;
+      }
+    </style>
+  </head>
+   <body>
+      ${batchData?.shortDescription}
+      <script>
+        setTimeout(() => {
+          window.ReactNativeWebView.postMessage(
+            document.documentElement.scrollHeight
+          );
+        }, 300);
+      </script>
+    </body>
+  </html>
+`;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {/* Header */}
@@ -519,7 +550,15 @@ export default function CourseDetail() {
           )}
 
           {batchData?.shortDescription && (
-            <Text style={styles.courseSubtitle}>{batchData.shortDescription}</Text>
+            <WebView
+                originWhitelist={['*']}
+                androidLayerType="hardware"
+                nestedScrollEnabled={true}
+                source={{ html: htmlContentShort }}
+                style={{ height: 100 }}
+                scrollEnabled={true}
+                showsVerticalScrollIndicator={true}
+              />
           )}
 
           <View style={styles.statsRow}>
@@ -622,9 +661,7 @@ export default function CourseDetail() {
                           <Feather name="video" size={20} color={colors.white} />
                         </View>
                       )}
-                      <View style={styles.playIcon}>
-                        <Feather name="play" size={14} color={colors.white} />
-                      </View>
+                    
                     </View>
 
                     <View style={styles.videoDetails}>

@@ -32,19 +32,12 @@
       "package": "in.kaksya.dikshant",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adpativ_icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "POST_NOTIFICATIONS",
-        "SCHEDULE_EXACT_ALARM",
-        "RECEIVE_BOOT_COMPLETED",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "WAKE_LOCK",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-        "FOREGROUND_SERVICE",
         "VIBRATE"
       ],
       "intentFilters": [
@@ -114,7 +107,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/adpativ_icon.png"
+      "favicon": "./assets/adaptive-icon.png"
     },
     "plugins": [
       "expo-font",

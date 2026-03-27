@@ -56,7 +56,7 @@ export default function ShareLiveClassMonitor() {
   const chatRef = useRef<HTMLDivElement>(null);
   const autoScroll = useRef(true);
 
-  const API_BASE = "https://www.app.api.dikshantias.com//api/chat";
+  const API_BASE = "https://www.app.api.dikshantias.com/api/chat";
   const DATA_URL = `${API_BASE}/complete-data/${videoId}`;
   const MSG_URL = `${API_BASE}/admin-message`;
 

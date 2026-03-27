@@ -31,7 +31,7 @@ export default function Home() {
   }, []);
 
   const handleJoinUs = () => {
-    navigation.navigate('follow'); 
+    navigation.navigate('follow');
   };
 
   return (
@@ -42,30 +42,30 @@ export default function Home() {
       <Categories refreshing={refreshing} />
       <Scholarship refreshing={refreshing} />
       <Course refreshing={refreshing} />
-      
+
       {/* Join Us Button */}
       <View style={styles.joinUsContainer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleJoinUs}
           style={styles.joinUsButton}
         >
           <LinearGradient
-          colors={['#f1eaea', '#fef9f9']}
+            colors={['#ef4444', '#dc2626']}
 
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradient}
           >
             <View style={styles.buttonContent}>
-              <Feather name="users" size={15} color="#e22222" />
-              <Text style={styles.buttonText}>Follow us on Social media for Daily updates </Text>
-              
+              <Feather name="users" size={15} color="#fff" />
+                <Text style={styles.buttonText}>Join Our Community</Text>
+
             </View>
           </LinearGradient>
         </TouchableOpacity>
         <Text style={styles.subText}>
-          Follow us on social media for daily updates
+       Follow us on Social media for Daily updates 
         </Text>
       </View>
     </Layout>
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   buttonText: {
-    color: '#a50309',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   subText: {
     marginTop: 12,
     fontSize: 13,
-    color: '#64748b',
+    color: '#e22222',
     textAlign: 'center',
   },
 });

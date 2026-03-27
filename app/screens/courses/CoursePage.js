@@ -102,7 +102,7 @@ export default function CoursePage() {
       list = list.filter(
         (b) =>
           b.name?.toLowerCase().includes(q) ||
-          b.shortDescription?.toLowerCase().includes(q) ||
+        
           b.program?.name?.toLowerCase().includes(q)
       );
     }
@@ -148,7 +148,7 @@ export default function CoursePage() {
     const isPurchased = !!status.purchased;
     if (purchased && canAccess) {
       // Go to classroom
-      const screen = batch.category === "online" ? "my-course" : "my-course-subjects";
+      const screen =['online', 'offline'].includes(batch.category) ? "my-course" : "my-course-subjects";
       navigation.navigate(screen, {
         unlocked: true,
         courseId: batch.id,

@@ -33,7 +33,7 @@ import {
 const cn = (...classes: (string | undefined | null | false)[]) =>
   classes.filter(Boolean).join(" ");
 
-const API_URL = "https://www.app.api.dikshantias.com//api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com/api/batchs";
 
 interface Subject {
   id: number;
