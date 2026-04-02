@@ -61,6 +61,8 @@ import Notifications from "../../screens/Others/Notifications";
 import PermissionsScreen from "../../screens/Others/PermissionsScreen";
 import TestSeriesBundleView from "../../pages/TestSeries/Bundle/TestSeriesBundleView";
 import QuizBundleDetails from "../../pages/Quiz/Bundle/QuizBundleDetails";
+import AllPlayList from "../../pages/free_videos/AllPlayList";
+import VideoPlayerFreeScreen from "../../pages/free_videos/VideoPlayerFreeScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -138,8 +140,10 @@ export default function AppRouter({ navigationRef }) {
         <Stack.Screen name="QuizBundleDetails" component={QuizBundleDetails} />
 
 
+        <Stack.Screen name="free_videos" component={AllPlayList} />
+        <Stack.Screen name="VideoPlayerFreeScreen" component={VideoPlayerFreeScreen} />
 
-        
+        {/*  */}
         <Stack.Screen name="ResultScreen" component={ResultScreen} />
 
         {/* Others */}

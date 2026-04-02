@@ -16,6 +16,11 @@ module.exports = (sequelize, DataTypes) => {
         default: "Quiz",
         allowNull: false,
       },
+      position:{
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false,
+      },
       title: {
         type: DataTypes.STRING,
         allowNull: false,

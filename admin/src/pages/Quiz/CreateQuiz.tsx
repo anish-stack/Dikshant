@@ -14,6 +14,7 @@ interface FormData {
   displayIn: "Quiz" | "TestSeries";
   totalQuestions: string;
   time_per_question: string;
+  position?: number;
   durationMinutes: string;
   total_marks: string;
   passing_marks: string;
@@ -47,6 +48,7 @@ const CreateQuiz: React.FC = () => {
     totalQuestions: "",
     time_per_question: "",
     durationMinutes: "",
+    position: 0,
     total_marks: "",
     passing_marks: "",
     negative_marking: false,
@@ -99,6 +101,7 @@ const CreateQuiz: React.FC = () => {
         totalQuestions: String(q.totalQuestions || ""),
         time_per_question: String(q.timePerQuestion || ""),
         durationMinutes: String(q.durationMinutes || ""),
+        position: q.position || 0,
         total_marks: String(q.totalMarks || ""),
         passing_marks: String(q.passingMarks || ""),
         negative_marking: !!q.negativeMarking,
@@ -153,6 +156,7 @@ const CreateQuiz: React.FC = () => {
       });
 
       if (imageFile) formData.append("image", imageFile);
+      
 
       const url =
         mode === "create"
@@ -257,6 +261,25 @@ const CreateQuiz: React.FC = () => {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Keep it clear & attractive for students
+                </p>
+              </div>
+              {/* Position   */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Position 
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.position}
+                  onChange={(e) =>
+                    setForm({ ...form, position: Number(e.target.value) })
+                  }
+                  placeholder="e.g. 1 (for top position)"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Lower number = higher up in the list
                 </p>
               </div>
 

@@ -22,6 +22,7 @@ interface Quiz {
   totalQuestions: number;
   durationMinutes: number;
   totalPurchases: number;
+  position: number;
   totalMarks: number;
   passingMarks: number;
   isFree: boolean;
@@ -204,6 +205,12 @@ const AllQuizzesPage: React.FC = () => {
                     key={quiz.id}
                     className="p-6 hover:bg-gray-50 transition flex items-center gap-6"
                   >
+                    {/* position */}
+                    <div className="flex-shrink-0">
+                      <span className="text-lg font-bold text-gray-700">
+                        #{quiz.position}
+                      </span>
+                    </div>
                     {/* Image */}
                     <div className="flex-shrink-0">
                       {quiz.image ? (

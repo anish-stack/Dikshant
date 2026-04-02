@@ -65,7 +65,7 @@ import CreateQuizBundle from "./pages/Quiz/Bundle/CreateQuizBundle";
 import EditQuizBundle from "./pages/Quiz/Bundle/EditQuizBundle";
 import Transactions from "./pages/Payments/transactions";
 import Coupons from "./pages/Payments/coupons";
-
+import AllPlayList from "./pages/free-videos/AllPlayList";
 export default function App() {
   return (
     <>
@@ -191,6 +191,9 @@ export default function App() {
               
               <Route path="/payments/transactions" element={<Transactions />} />
               <Route path="/payments/coupons" element={<Coupons />} />
+{/* Free v\videos */}
+
+              <Route path="/free-videos" element={<AllPlayList />} />
 
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />

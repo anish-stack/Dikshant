@@ -3,7 +3,6 @@ const { User } = require("../models");
 
 module.exports = async (req, res, next) => {
   try {
-    console.log("====== AUTH MIDDLEWARE START ======");
 
     const header = req.headers.authorization;
 
@@ -25,22 +24,17 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    console.log("User ID:", user.id);
-    console.log("User Role:", user.role);
 
     // 👑 ADMIN → Skip DB token check
     if (user.role === "admin") {
-      console.log("Admin detected → skipping token DB check");
       req.user = user;
       return next();
     }
 
-    console.log("DB Active Token:", user.active_token);
-    console.log("Request Token:", token);
+
 
     // 🟢 CASE 1 → First login (DB token null)
     if (!user.active_token) {
-      console.log("Active token NULL → Saving current token");
 
       user.active_token = token;
       await user.save();
@@ -51,7 +45,6 @@ module.exports = async (req, res, next) => {
 
     // 🔴 CASE 2 → Token mismatch
     if (user.active_token !== token) {
-      console.log("Token mismatch → Session expired");
 
       user.active_token = null;
       user.refresh_token = null;
@@ -62,8 +55,6 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    // 🟢 CASE 3 → Valid session
-    console.log("Token valid → session active");
 
     req.user = user;
 

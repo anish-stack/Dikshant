@@ -9,6 +9,10 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true
     },
 
+    position: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     imageUrl: DataTypes.STRING,
     title: DataTypes.STRING,
     videoSource: DataTypes.ENUM("youtube", "s3"),
@@ -41,8 +45,8 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TIME,
       allowNull: true
     },
-    secureToken:{
-       type: DataTypes.TEXT,
+    secureToken: {
+      type: DataTypes.TEXT,
       allowNull: true
     },
 

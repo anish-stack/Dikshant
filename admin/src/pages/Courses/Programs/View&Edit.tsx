@@ -154,6 +154,7 @@ const ViewEdit = () => {
       toast.success("Program updated successfully!", { id: loadingToast });
       navigate("/all-programs");
     } catch (error: unknown) {
+      // console.error(error.response || error);
       let message = "Failed to update program";
 
       if (axios.isAxiosError(error)) {

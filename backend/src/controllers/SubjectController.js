@@ -3,77 +3,101 @@
 const { Subject } = require('../models');
 const redis = require('../config/redis');
 const { generateSlug } = require('../utils/helpers');
+const { Op } = require('sequelize');
 
 class SubjectController {
 
   // ======================
   // CREATE SUBJECT
   // ======================
-  static async create(req, res) {
-    try {
+static async create(req, res) {
+  try {
 
-      const payload = {
-        name: req.body.name,
-        slug: generateSlug(req.body.name),
-        description: req.body.description,
-      };
+    /* ================= POSITION HANDLING ================= */
 
-      const item = await Subject.create(payload);
+    let position = Number(req.body.position);
 
-     
-      await redis.del("subjects");
-
-      return res.status(201).json(item);
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Error creating subject', error });
+    if (!position || position < 1) {
+      const maxPosition = await Subject.max("position");
+      position = (maxPosition || 0) + 1;
     }
-  }
 
+    const existingSubject = await Subject.findOne({
+      where: { position },
+      attributes: ["id", "name", "position"]
+    });
+
+    if (existingSubject) {
+
+      const maxPosition = await Subject.max("position");
+
+      return res.status(400).json({
+        success: false,
+        message: `Position ${position} is already used by subject "${existingSubject.name}" - Available position: ${(maxPosition || 0) + 1}.`,
+        suggestedPosition: (maxPosition || 0) + 1
+      });
+    }
+
+    /* ================= CREATE ================= */
+
+    const payload = {
+      name: req.body.name,
+      slug: generateSlug(req.body.name),
+      description: req.body.description,
+      position
+    };
+
+    const item = await Subject.create(payload);
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("subjects");
+
+    return res.status(201).json({
+      success: true,
+      message: "Subject created successfully",
+      data: item
+    });
+
+  } catch (error) {
+
+    console.error("Subject Create Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error || "Error creating subject",
+      error: error.message
+    });
+  }
+}
 
 
   // ======================
   // ALL SUBJECTS
   // ======================
-  static async findAll(req, res) {
-    try {
-      // const cacheData = await redis.get("subjects");
+static async findAll(req, res) {
+  try {
 
-    
-      // if (cacheData) {
-      //   return res.json(JSON.parse(cacheData));
-      // }
+    const items = await Subject.findAll({
+      order: [["position", "ASC"]] // ⭐ order by position
+    });
 
-      const items = await Subject.findAll();
+    return res.json(items);
 
-      // Store in Redis for 60 sec
-      // await redis.set("subjects", JSON.stringify(items), "EX", 60);
-
-      return res.json(items);
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Error fetching subjects', error });
-    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      message: "Error fetching subjects",
+      error
+    });
   }
+}
 
 
-
-  // ======================
-  // ONE SUBJECT
-  // ======================
   static async findOne(req, res) {
     try {
       const id = req.params.id;
-      // const cacheKey = `subject:${id}`;
-
-      // const cacheData = await redis.get(cacheKey);
-
     
-      // if (cacheData) {
-      //   return res.json(JSON.parse(cacheData));
-      // }
 
       const item = await Subject.findByPk(id);
 
@@ -97,53 +121,135 @@ class SubjectController {
   // ======================
   // UPDATE SUBJECT
   // ======================
-  static async update(req, res) {
-    try {
-      const item = await Subject.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: 'Subject not found' });
+static async update(req, res) {
+  try {
 
-      const payload = {
-        name: req.body.name,
-        description: req.body.description,
-        slug: req.body.name ? generateSlug(req.body.name) : item.slug,
-      };
+    const item = await Subject.findByPk(req.params.id);
 
-      await item.update(payload);
-
-      await redis.del("subjects");
-      await redis.del(`subject:${req.params.id}`);
-
-      return res.json(item);
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Error updating subject', error });
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found"
+      });
     }
+
+    /* ================= POSITION HANDLING ================= */
+
+    let position =
+      req.body.position !== undefined
+        ? Number(req.body.position)
+        : item.position;
+
+    if (req.body.position !== undefined) {
+
+      if (!position || position < 1) {
+        const maxPosition = await Subject.max("position");
+        position = (maxPosition || 0) + 1;
+      }
+
+      const existingSubject = await Subject.findOne({
+        where: {
+          position,
+          id: { [Op.ne]: item.id }
+        },
+        attributes: ["id", "name", "position"]
+      });
+
+      if (existingSubject) {
+
+        const maxPosition = await Subject.max("position");
+
+        return res.status(400).json({
+          success: false,
+          message: `Position ${position} is already used by subject "${existingSubject.name}" - Available position: ${(maxPosition || 0) + 1}.`,
+          suggestedPosition: (maxPosition || 0) + 1
+        });
+      }
+    }
+
+    /* ================= UPDATE PAYLOAD ================= */
+
+    const payload = {
+      name: req.body.name ?? item.name,
+      description: req.body.description ?? item.description,
+      slug: req.body.name ? generateSlug(req.body.name) : item.slug,
+      position
+    };
+
+    await item.update(payload);
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("subjects");
+    await redis.del(`subject:${req.params.id}`);
+
+    return res.json({
+      success: true,
+      message: "Subject updated successfully",
+      data: item
+    });
+
+  } catch (error) {
+
+    console.error("Subject Update Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error updating subject",
+      error: error.message
+    });
   }
-
-
+}
 
   // ======================
   // DELETE SUBJECT
   // ======================
-  static async delete(req, res) {
-    try {
-      const item = await Subject.findByPk(req.params.id);
-      if (!item) return res.status(404).json({ message: 'Subject not found' });
+static async delete(req, res) {
+  try {
 
-      await item.destroy();
+    const item = await Subject.findByPk(req.params.id);
 
-      
-      await redis.del("subjects");
-      await redis.del(`subject:${req.params.id}`);
-
-      return res.json({ message: 'Subject deleted' });
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: 'Error deleting subject', error });
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found"
+      });
     }
+
+    // DELETE SUBJECT
+    await item.destroy();
+
+    /* ================= REORDER POSITIONS ================= */
+
+    const subjects = await Subject.findAll({
+      order: [["position", "ASC"]]
+    });
+
+    for (let i = 0; i < subjects.length; i++) {
+      await subjects[i].update({ position: i + 1 });
+    }
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("subjects");
+    await redis.del(`subject:${req.params.id}`);
+
+    return res.json({
+      success: true,
+      message: "Subject deleted and positions reordered"
+    });
+
+  } catch (error) {
+
+    console.error("Subject Delete Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error deleting subject",
+      error: error.message
+    });
   }
+}
 }
 
 module.exports = SubjectController;

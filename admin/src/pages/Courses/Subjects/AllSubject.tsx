@@ -21,6 +21,7 @@ const API_URL = "https://www.app.api.dikshantias.com/api/subjects";
 interface Subject {
   id: number;
   name: string;
+  position: number;
   slug: string;
   description: string;
   createdAt: string;
@@ -43,7 +44,7 @@ const AllSubject = () => {
   const [deleteModal, setDeleteModal] = useState<Subject | null>(null);
 
   // Form states
-  const [formData, setFormData] = useState({ name: "", description: "" });
+  const [formData, setFormData] = useState({ name: "", description: "" , position: 0 });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchSubjects = async () => {
@@ -51,10 +52,7 @@ const AllSubject = () => {
     try {
       const res = await axios.get<Subject[]>(API_URL);
 
-      const sortedData = res.data.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+      const sortedData = res.data
 
       setSubjects(sortedData);
       setFilteredSubjects(sortedData);
@@ -104,12 +102,13 @@ const AllSubject = () => {
     try {
       await axios.post(API_URL, {
         name: formData.name,
+        position: formData.position,
         slug: generateSlug(formData.name),
         description: formData.description || "",
       });
       toast.success("Subject created!");
       setCreateModal(false);
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "", position: 0 });
       fetchSubjects();
     } catch (error: unknown) {
       let message = "Failed to create";
@@ -133,11 +132,13 @@ const AllSubject = () => {
       await axios.put(`${API_URL}/${editModal.id}`, {
         name: formData.name,
         slug: generateSlug(formData.name),
+                position: formData.position,
+
         description: formData.description || "",
       });
       toast.success("Subject updated!");
       setEditModal(null);
-      setFormData({ name: "", description: "" });
+      setFormData({ name: "", description: "" , position: 0 });
       fetchSubjects();
     } catch (error: unknown) {
       let message = "Failed to update";
@@ -171,7 +172,7 @@ const AllSubject = () => {
   };
 
   const openEditModal = (subject: Subject) => {
-    setFormData({ name: subject.name, description: subject.description });
+    setFormData({ name: subject.name, description: subject.description  , position: subject.position });
     setEditModal(subject);
   };
 
@@ -215,6 +216,8 @@ const AllSubject = () => {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 dark:bg-white/[0.03]">
+                <TableCell isHeader>#</TableCell>
+
                 <TableCell isHeader>Name</TableCell>
                 <TableCell isHeader>Slug</TableCell>
                 <TableCell isHeader>Description</TableCell>
@@ -256,6 +259,9 @@ const AllSubject = () => {
                     key={subject.id}
                     className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
                   >
+                            <TableCell className="font-medium">
+                      {subject.position || 0}
+                    </TableCell>
                     <TableCell className="font-medium">
                       {subject.name}
                     </TableCell>
@@ -386,6 +392,17 @@ const AllSubject = () => {
                     }
                   />
                 </div>
+                {/* Position */}
+                <div>
+                  <Label>Position</Label>
+                  <Input
+                    type="number"
+                    value={formData.position}
+                    onChange={(e) =>
+                      setFormData({ ...formData, position: parseInt(e.target.value) || 0 })
+                    }
+                  />
+                </div>
                 <div className="relative">
                   <textarea
                     value={formData.description}
@@ -447,6 +464,17 @@ const AllSubject = () => {
                     }
                   />
                 </div>
+                {/* Position */}
+                <div>
+                  <Label>Position</Label>
+                  <Input
+                    type="number"
+                    value={formData.position}
+                    onChange={(e) =>
+                      setFormData({ ...formData, position: parseInt(e.target.value) || 0 })
+                    }
+                  />
+                </div>  
                 <div className="relative">
                   <textarea
                     value={formData.description}

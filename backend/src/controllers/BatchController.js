@@ -33,21 +33,14 @@ class BatchController {
   // CREATE
   // =========================
   static async create(req, res) {
-    console.log("BODY =>", req.body);
-    console.log("FILES =>", req.files);
-
-    console.log("imageUrl =>", req.files?.imageUrl);
-    console.log("mobileImageUrl =>", req.files?.mobileImageUrl);
-
-    console.log("Single image =>", req.files?.imageUrl?.[0]);
-    console.log("Single mobile image =>", req.files?.mobileImageUrl?.[0]);
     try {
+
       let imageUrl = null;
       if (req.file) {
         imageUrl = await uploadToS3(req.file, "batchs");
       }
 
-      // Normalize quizIds & testSeriesIds (already good)
+      // Normalize quizIds
       const quizIds =
         typeof req.body.quizIds === "string"
           ? JSON.parse(req.body.quizIds)
@@ -60,26 +53,43 @@ class BatchController {
 
       const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
-      // ── NEW: Safe date parsing function ──
       const parseDate = (value) => {
-        if (!value || value === '' || value === 'Invalid date') {
-          return null; // or throw new Error('registrationStartDate is required') if mandatory
-        }
+        if (!value || value === "" || value === "Invalid date") return null;
         const date = new Date(value);
-        return isNaN(date.getTime()) ? null : date; // returns valid Date or null
+        return isNaN(date.getTime()) ? null : date;
       };
 
       const registrationStart = parseDate(req.body.registrationStartDate);
       const registrationEnd = parseDate(req.body.registrationEndDate);
-
-      // Optional: Add similar for startDate/endDate if they can also be bad
       const start = parseDate(req.body.startDate);
       const end = parseDate(req.body.endDate);
 
-      // Optional: Business validation
       if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
         return res.status(400).json({
-          message: "Registration end date cannot be before start date"
+          message: "Registration end date cannot be before start date",
+        });
+      }
+
+      // ⭐ POSITION HANDLING
+      let position = Number(req.body.position);
+
+      if (!position || position < 1) {
+        const maxPosition = await Batch.max("position");
+        position = (maxPosition || 0) + 1;
+      }
+
+      // 🔍 Check duplicate position
+      const existingBatch = await Batch.findOne({
+        where: { position },
+        attributes: ["id", "name", "position"],
+      });
+
+      if (existingBatch) {
+        const maxPosition = await Batch.max("position");
+
+        return res.status(400).json({
+          message: `Position ${position} is already assigned to course "${existingBatch.name}". Try position ${(maxPosition || 0) + 1}.`,
+          suggestedPosition: (maxPosition || 0) + 1,
         });
       }
 
@@ -88,6 +98,8 @@ class BatchController {
         slug: generateSlug(req.body.name),
         imageUrl,
         displayOrder: req.body.displayOrder,
+        position, // ⭐ added here
+
         programId: req.body.programId,
         subjectId: req.body.subjectId,
         medium: req.body.medium || "",
@@ -95,7 +107,8 @@ class BatchController {
         fee_one_time: req.body.fee_one_time,
         fee_inst: req.body.fee_inst,
         note: req.body.note,
-        startDate: start,                    // now safe
+
+        startDate: start,
         endDate: end,
         registrationStartDate: registrationStart,
         registrationEndDate: registrationEnd,
@@ -114,7 +127,7 @@ class BatchController {
 
         isEmi: Boolean(req.body.isEmi),
         emiTotal: req.body.emiTotal || null,
-        emiSchedule: emiSchedule,
+        emiSchedule,
 
         category: req.body.category,
       };
@@ -124,27 +137,29 @@ class BatchController {
       await BatchController.clearBatchCache();
 
       return res.status(201).json(item);
+
     } catch (err) {
+
       console.error("Batch Create Error:", err);
 
-      // ── User-friendly error response ──
       let userMessage = "Failed to create batch. Please try again.";
       let status = 500;
 
-      if (err.name === 'SequelizeDatabaseError') {
-        if (err.parent?.sqlMessage?.includes('Incorrect datetime value')) {
-          userMessage = "Invalid date format for start/end or registration dates. Please use valid dates (e.g., YYYY-MM-DD or ISO format).";
+      if (err.name === "SequelizeDatabaseError") {
+        if (err.parent?.sqlMessage?.includes("Incorrect datetime value")) {
+          userMessage =
+            "Invalid date format for start/end or registration dates.";
           status = 400;
         }
-      } else if (err.name === 'SequelizeValidationError') {
-        userMessage = "Validation failed: " + err.errors.map(e => e.message).join(", ");
+      } else if (err.name === "SequelizeValidationError") {
+        userMessage =
+          "Validation failed: " + err.errors.map((e) => e.message).join(", ");
         status = 400;
       }
 
       return res.status(status).json({
         message: userMessage,
-        error: err.message,          // keep for debugging (optional: remove in prod)
-        // details: err.errors       // if you want to send validation details
+        error: err.message,
       });
     }
   }
@@ -174,7 +189,7 @@ class BatchController {
         where,
         limit,
         offset,
-        order: [["displayOrder", "ASC"]],
+        order: [["position", "ASC"]],
         include: [
           {
             model: Program,
@@ -520,130 +535,185 @@ class BatchController {
   // =========================
   // UPDATE
   // =========================
-  static async update(req, res) {
-    console.log("BODY =>", req.body);
-    console.log("FILES =>", req.files);
+static async update(req, res) {
+  try {
+    const batchId = req.params.id;
 
-    console.log("imageUrl =>", req.files?.imageUrl);
-    console.log("mobileImageUrl =>", req.files?.mobileImageUrl);
-
-    console.log("Single image =>", req.files?.imageUrl?.[0]);
-    console.log("Single mobile image =>", req.files?.mobileImageUrl?.[0]);
-
-    try {
-      const batchId = req.params.id;
-
-      const item = await Batch.findByPk(batchId);
-      if (!item) {
-        return res.status(404).json({ message: "Batch not found" });
-      }
-
-      /* ================= IMAGE ================= */
-      let imageUrl = item.imageUrl;
-      if (req.file) {
-        if (item.imageUrl) {
-          await deleteFromS3(item.imageUrl);
-        }
-        imageUrl = await uploadToS3(req.file, "batchs");
-      }
-
-      /* ================= NORMALIZE JSON FIELDS ================= */
-      const quizIds =
-        typeof req.body.quizIds === "string"
-          ? JSON.parse(req.body.quizIds)
-          : req.body.quizIds;
-
-      const testSeriesIds =
-        typeof req.body.testSeriesIds === "string"
-          ? JSON.parse(req.body.testSeriesIds)
-          : req.body.testSeriesIds;
-
-      const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
-      /* ================= UPDATE PAYLOAD ================= */
-      const payload = {
-        name: req.body.name,
-        displayOrder: req.body.displayOrder,
-        programId: req.body.programId,
-        subjectId: req.body.subjectId,
-
-        startDate: req.body.startDate,
-        endDate: req.body.endDate,
-        registrationStartDate: req.body.registrationStartDate,
-        registrationEndDate: req.body.registrationEndDate,
-
-        status: req.body.status,
-        shortDescription: req.body.shortDescription,
-        longDescription: req.body.longDescription,
-        medium: req.body.medium || "",
-        offerText: req.body.offerText,
-        fee_one_time: req.body.fee_one_time,
-        fee_inst: req.body.fee_inst,
-        note: req.body.note,
-        batchPrice: req.body.batchPrice,
-        batchDiscountPrice: req.body.batchDiscountPrice,
-        gst: req.body.gst,
-        offerValidityDays: req.body.offerValidityDays,
-
-        // ✅ NEW FIELDS
-        quizIds: Array.isArray(quizIds) ? quizIds : [],
-        testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
-
-        isEmi: Boolean(req.body.isEmi),
-        emiTotal: req.body.emiTotal || null,
-        emiSchedule: emiSchedule || null,
-
-        category: req.body.category,
-        imageUrl,
-
-        slug: req.body.name
-          ? generateSlug(req.body.name)
-          : item.slug,
-      };
-
-      await item.update(payload);
-
-      await BatchController.clearBatchCache(batchId);
-
-      return res.json(item);
-    } catch (err) {
-      console.error("Batch Update Error:", err);
-      return res.status(500).json({
-        message: "Error updating batch",
-        error: err.message,
-      });
+    const item = await Batch.findByPk(batchId);
+    if (!item) {
+      return res.status(404).json({ message: "Batch not found" });
     }
-  }
 
-  // =========================
-  // DELETE
-  // =========================
-  static async delete(req, res) {
-    try {
-      const batchId = req.params.id;
+    /* ================= IMAGE ================= */
+    let imageUrl = item.imageUrl;
 
-      const item = await Batch.findByPk(batchId);
-      if (!item) {
-        return res.status(404).json({ message: "Batch not found" });
-      }
-
+    if (req.file) {
       if (item.imageUrl) {
         await deleteFromS3(item.imageUrl);
       }
 
-      await item.destroy();
+      imageUrl = await uploadToS3(req.file, "batchs");
+    }
 
-      // await this.clearBatchCache(batchId);
-      await BatchController.clearBatchCache(batchId);
+    /* ================= NORMALIZE JSON ================= */
 
-      return res.json({ message: "Batch deleted successfully" });
-    } catch (err) {
-      console.error("Batch Delete Error:", err);
-      return res.status(500).json({
-        message: "Error deleting batch",
-        error: err.message,
+    const quizIds =
+      typeof req.body.quizIds === "string"
+        ? JSON.parse(req.body.quizIds)
+        : req.body.quizIds;
+
+    const testSeriesIds =
+      typeof req.body.testSeriesIds === "string"
+        ? JSON.parse(req.body.testSeriesIds)
+        : req.body.testSeriesIds;
+
+    const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
+
+    /* ================= POSITION VALIDATION ================= */
+
+    let position = Number(req.body.position);
+
+    if (position) {
+      const existingBatch = await Batch.findOne({
+        where: {
+          position,
+          id: { [Op.ne]: batchId }, // exclude current batch
+        },
+        attributes: ["id", "name", "position"],
+      });
+
+      if (existingBatch) {
+        const maxPosition = await Batch.max("position");
+
+        return res.status(400).json({
+message: `Position ${position} is already assigned to course "${existingBatch.name}". Try position ${(maxPosition || 0) + 1}.`,
+          suggestedPosition: (maxPosition || 0) + 1,
+        });
+      }
+    } else {
+      position = item.position;
+    }
+
+    /* ================= UPDATE PAYLOAD ================= */
+
+    const payload = {
+      name: req.body.name,
+      slug: req.body.name ? generateSlug(req.body.name) : item.slug,
+
+      displayOrder: req.body.displayOrder,
+      position,
+
+      programId: req.body.programId,
+      subjectId: req.body.subjectId,
+
+      startDate: req.body.startDate,
+      endDate: req.body.endDate,
+      registrationStartDate: req.body.registrationStartDate,
+      registrationEndDate: req.body.registrationEndDate,
+
+      status: req.body.status,
+      shortDescription: req.body.shortDescription,
+      longDescription: req.body.longDescription,
+
+      medium: req.body.medium || "",
+      offerText: req.body.offerText,
+      fee_one_time: req.body.fee_one_time,
+      fee_inst: req.body.fee_inst,
+      note: req.body.note,
+
+      batchPrice: req.body.batchPrice,
+      batchDiscountPrice: req.body.batchDiscountPrice,
+      gst: req.body.gst,
+      offerValidityDays: req.body.offerValidityDays,
+
+      quizIds: Array.isArray(quizIds) ? quizIds : [],
+      testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
+
+      isEmi: Boolean(req.body.isEmi),
+      emiTotal: req.body.emiTotal || null,
+      emiSchedule: emiSchedule || null,
+
+      category: req.body.category,
+      imageUrl,
+    };
+
+    await item.update(payload);
+
+    await BatchController.clearBatchCache(batchId);
+
+    return res.json(item);
+
+  } catch (err) {
+    console.error("Batch Update Error:", err);
+
+    return res.status(500).json({
+      message: "Error updating batch",
+      error: err.message,
+    });
+  }
+}
+  // =========================
+  // DELETE
+  // =========================
+static async delete(req, res) {
+  try {
+
+    const batchId = req.params.id;
+
+    const item = await Batch.findByPk(batchId);
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Batch not found"
       });
     }
+
+    /* ================= SAFE S3 DELETE ================= */
+
+    if (item.imageUrl) {
+      try {
+        await deleteFromS3(item.imageUrl);
+      } catch (s3Error) {
+        console.error("S3 Delete Error:", s3Error);
+        // Continue even if S3 delete fails
+      }
+    }
+
+    /* ================= DELETE BATCH ================= */
+
+    await item.destroy();
+
+    /* ================= REORDER POSITIONS ================= */
+
+    const batches = await Batch.findAll({
+      order: [["position", "ASC"]]
+    });
+
+    for (let i = 0; i < batches.length; i++) {
+      await batches[i].update({ position: i + 1 });
+    }
+
+    /* ================= CLEAR CACHE ================= */
+
+    await BatchController.clearBatchCache(batchId);
+
+    return res.json({
+      success: true,
+      message: "Batch deleted and positions reordered successfully"
+    });
+
+  } catch (err) {
+
+    console.error("Batch Delete Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error deleting batch",
+      error: err.message
+    });
   }
+}
 
   // =========================
   // CLEAR REDIS CACHE (FIXED)

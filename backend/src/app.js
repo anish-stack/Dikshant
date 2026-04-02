@@ -1,6 +1,5 @@
 
 const express = require('express');
-const bodyParser = require('body-parser');
 const { sequelize } = require('./models');
 const routes = require('./routes');
 const cors = require('cors');
@@ -91,4 +90,4 @@ async function init() {
 }
 init().catch(err => console.error('DB sync error', err));
 
-module.exports = app;
+;module.exports = app;

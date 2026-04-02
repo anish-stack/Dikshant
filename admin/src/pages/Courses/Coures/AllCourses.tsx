@@ -53,6 +53,8 @@ interface Batch {
   slug: string;
   imageUrl: string;
   displayOrder: number;
+  position: number;
+
   programId: number;
   program: Program;
   subjects: Subject[];
@@ -469,7 +471,7 @@ const AllBatches = () => {
                     className="hover:bg-gray-50 dark:hover:bg-gray-800/30"
                   >
                     <TableCell className="font-semibold text-indigo-600 text-xs">
-                      #{batch.displayOrder}
+                      #{batch.position}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -644,7 +646,7 @@ const AllBatches = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex justify-between items-start gap-2">
                     <h3 className="font-bold text-sm">
-                      #{batch.displayOrder} {batch.name}
+                      #{batch.position} {batch.name}
                     </h3>
                     <span
                       className={cn(

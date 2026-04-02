@@ -44,6 +44,8 @@ interface CreateBatchFormData {
   name: string;
   displayOrder: number;
   programId: string;
+  position: number;
+
   startDate: string;
   endDate: string;
   quizIds: number[];
@@ -134,6 +136,7 @@ const CreateBatch = () => {
     longDescription: "",
     batchPrice: 0,
     batchDiscountPrice: 0,
+    position: 1,
     gst: 18,
     medium: "",
     offerText: "",
@@ -331,6 +334,8 @@ const CreateBatch = () => {
       const data = new FormData();
       data.append("name", formData.name.trim());
       data.append("displayOrder", formData.displayOrder.toString());
+      data.append("displayOrder", formData.position.toString());
+
       data.append("programId", formData.programId);
       data.append("category", formData.category);
       data.append("subjectId", JSON.stringify(selectedSubjectIds));
@@ -432,11 +437,11 @@ const CreateBatch = () => {
                   <Label className="text-sm">Display Order</Label>
                   <Input
                     type="number"
-                    value={formData.displayOrder}
+                    value={formData.position}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        displayOrder: parseInt(e.target.value) || 1,
+                        position: parseInt(e.target.value) || 1,
                       })
                     }
                     className="text-sm"

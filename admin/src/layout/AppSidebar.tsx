@@ -9,7 +9,7 @@ import {
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-import { Bell, CreditCard, ImageDown, ProjectorIcon, School2, Speaker } from "lucide-react";
+import { Bell, CreditCard, FerrisWheelIcon, ImageDown, ProjectorIcon, School2, Speaker } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -28,6 +28,11 @@ const navItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "Student Profiles",
     path: "/profile",
+  },
+    {
+    icon: <FerrisWheelIcon />,
+    name: "Free Videos",
+    path: "/free-videos",
   },
   {
     name: "Courses",

@@ -232,6 +232,9 @@ export const setupForegroundNotifications = (onNotificationReceived) => {
             body: remoteMessage.notification.body,
             data: remoteMessage.data || {},
             sound: true,
+            priority: ExpoNotifications.AndroidNotificationPriority.MAX,
+            sticky: false,
+            autoDismiss: true,
           },
           trigger: null,
         });
@@ -453,6 +456,9 @@ export const scheduleLocalNotification = async (
         data,
         sound: true,
         badge: 1,
+        priority: ExpoNotifications.AndroidNotificationPriority.MAX,
+        sticky: false,
+        autoDismiss: true,
       },
       trigger: trigger || null,
     });

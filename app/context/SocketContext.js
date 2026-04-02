@@ -46,7 +46,7 @@ export const SocketProvider = ({ children, userId }) => {
     })
 
     newSocket.on("connect_error", error => {
-      console.error("💥 Socket connection error:", error)
+    
       setIsConnected(false)
     })
 

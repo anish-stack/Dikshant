@@ -27,6 +27,7 @@ interface TestSeries {
   slug: string;
   displayOrder: number;
   status: string;
+  position: number;
   isActive: boolean;
   totalSubmissions:number
   totalPurchases:number
@@ -518,9 +519,12 @@ const AllTestSeries = () => {
           <>
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-100 border-b">
+                <table className="w-full px-5 py-4">
+                  <thead className="bg-gray-100 px-4 border-b">
                     <tr>
+                      <th>
+                        #
+                      </th>
                       <th className="text-left px-6 py-4 text-sm font-medium text-gray-700">
                         Image
                       </th>
@@ -551,9 +555,12 @@ const AllTestSeries = () => {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y px-4 divide-gray-200">
                     {testSeries.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50 transition">
+                        <td>
+                          <span className="text-gray-500">{item.displayOrder}</span>
+                        </td>
                         <td className="px-6 py-4">
                           <img
                             src={item.imageUrl}

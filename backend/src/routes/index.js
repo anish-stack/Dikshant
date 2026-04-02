@@ -36,6 +36,9 @@ router.use('/support',require("./support.routes"))
 router.use('/doubt',require("./doubt.routes"))
 router.use('/assets',require('./appassets'))
 
+router.use('/free',require('./freeVideo'))
+
+
 // quiz
 router.use('/quiz', require('./quiz'));
 router.use('/quiz/:quizId/questions', require('./quiz.questions'));

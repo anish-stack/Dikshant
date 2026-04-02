@@ -16,7 +16,8 @@ async function deleteFromS3(fileUrl) {
     await s3.send(new DeleteObjectCommand(params));
     console.log("Old File Deleted:", key);
   } catch (error) {
-    console.error("Error deleting file:", error);
+    return error; // return error to be handled by caller
+
   }
 }
 

@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import { Loader2, Eye, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const API_URL = "https://www.app.api.dikshantias.com//api";
+const API_URL = "https://www.app.api.dikshantias.com/api";
 
 const AllTestSeriesBundle = () => {
   const [bundles, setBundles] = useState([]);

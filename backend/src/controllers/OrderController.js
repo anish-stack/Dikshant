@@ -12,6 +12,7 @@ const {
   User,
   Quizzes,
   TestSeries,
+  SystemLog,
   Sequelize,
   sequelize
 } = require("../models");
@@ -22,7 +23,7 @@ const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 const { Op } = Sequelize;
 
-
+// console.log("Chota sequelize instance",sequelize)
 
 const batchPurchaseConfirmationEmail = (order, batch, user) => {
   const userName = user.name?.trim() || user.email?.split('@')[0] || "Student";
@@ -543,10 +544,46 @@ const quizPurchaseConfirmationEmail = (order, quiz, user) => {
 
 
 class OrderController {
-  // ────────────────────────────────────────────────
-  // GRANT ACCESS TO QUIZZES & TESTS INCLUDED IN A BATCH
-  // Always idempotent + supports transaction
-  // ────────────────────────────────────────────────
+
+  static async _logFailure(context, orderId, userId, reason, extra = {}) {
+    try {
+
+      const logPayload = {
+        level: "error",
+        context,
+        orderId,
+        userId,
+        reason,
+        meta: extra,
+      };
+
+      // Save in DB
+      await SystemLog.create(logPayload);
+
+      // Console log for server monitoring
+      console.error(JSON.stringify({
+        ALERT: "POST_PAYMENT_FAILURE",
+        context,
+        orderId,
+        userId,
+        reason,
+        timestamp: new Date().toISOString(),
+        ...extra,
+      }));
+
+    } catch (logError) {
+
+      // Fallback if DB logging fails
+      console.error("SYSTEM_LOG_SAVE_FAILED", {
+        context,
+        orderId,
+        userId,
+        reason,
+        error: logError.message,
+      });
+
+    }
+  }
 
   static async grantBundleChildAccess({
     userId,
@@ -556,45 +593,24 @@ class OrderController {
     isAdmin = false,
     transaction = null,
   }) {
+    // ✅ FIX: use sequelize (instance), not Sequelize (class)
     const t = transaction || (await sequelize.transaction());
     const isExternalTransaction = !!transaction;
 
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("📦 [grantBundleChildAccess] START");
-    console.log("User:", userId);
-    console.log("bundle",bundle)
-    console.log("Bundle Type:", bundleType);
-    console.log("Parent Order:", parentOrderId);
-    console.log("Admin Assign:", isAdmin);
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
     try {
-      /* =====================================================
-         1️⃣ Idempotency Check (Prevent Duplicate Child Orders)
-      ===================================================== */
-
+      // 1️⃣ Idempotency Check
       const existingChildCount = await Order.count({
-        where: {
-          userId,
-          parentOrderId,
-        },
+        where: { userId, parentOrderId },
         transaction: t,
       });
 
       if (existingChildCount > 0) {
-        console.log(
-          `⏭️ Skipped: ${existingChildCount} child orders already exist for parent ${parentOrderId}`
-        );
-
+        console.log(`⏭️ Skipped: ${existingChildCount} child orders already exist for parent ${parentOrderId}`);
         if (!isExternalTransaction) await t.commit();
-
         return { success: true, skipped: true };
       }
 
-      /* =====================================================
-         2️⃣ Extract Child IDs From Association
-      ===================================================== */
-
+      // 2️⃣ Extract Child IDs
       let childIds = [];
       let orderType = null;
 
@@ -602,30 +618,26 @@ class OrderController {
         childIds = bundle.testSeries?.map((ts) => ts.id) || [];
         orderType = "test";
       }
-
       if (bundleType === "quiz_bundle") {
         childIds = bundle.quizzes?.map((q) => q.id) || [];
         orderType = "quiz";
       }
 
-      console.log("🧾 Extracted Child IDs:", childIds);
 
       if (!childIds.length) {
-        console.log("⚠️ No children found inside bundle");
-
+        // ✅ FIX: Log this as a failure — silent skip was hiding the bug
+        OrderController._logFailure(
+          "grantBundleChildAccess",
+          parentOrderId,
+          userId,
+          "No children found in bundle",
+          { bundleType, bundleId: bundle?.id }
+        );
         if (!isExternalTransaction) await t.commit();
-
-        return {
-          success: true,
-          skipped: true,
-          message: "No children in bundle",
-        };
+        return { success: true, skipped: true, message: "No children in bundle" };
       }
 
-      /* =====================================================
-         3️⃣ Prepare Child Orders
-      ===================================================== */
-
+      // 3️⃣ Prepare Child Orders
       const childOrders = childIds.map((childId) => ({
         userId,
         type: orderType,
@@ -639,50 +651,18 @@ class OrderController {
         paymentDate: new Date(),
         enrollmentStatus: "active",
         reason: isAdmin ? "ADMIN_BUNDLE_ASSIGN" : "BUNDLE_PURCHASED",
-        razorpayOrderId: `bundle_${parentOrderId}_${orderType}_${childId}`.slice(
-          0,
-          120
-        ),
+        razorpayOrderId: `bundle_${parentOrderId}_${orderType}_${childId}`.slice(0, 120),
       }));
 
-      console.log(
-        `🛠 Creating ${childOrders.length} child orders for user ${userId}`
-      );
-
-      /* =====================================================
-         4️⃣ Bulk Insert
-      ===================================================== */
-
+      // 4️⃣ Bulk Insert
       await Order.bulkCreate(childOrders, { transaction: t });
 
-      console.log("🎉 Child orders created successfully");
+      if (!isExternalTransaction) await t.commit();
 
-      /* =====================================================
-         5️⃣ Commit If Internal Transaction
-      ===================================================== */
-
-      if (!isExternalTransaction) {
-        await t.commit();
-        console.log("✅ Transaction committed");
-      }
-
-      console.log("📦 [grantBundleChildAccess] END");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-      return {
-        success: true,
-        skipped: false,
-        childrenCreated: childOrders.length,
-      };
+      return { success: true, skipped: false, childrenCreated: childOrders.length };
     } catch (err) {
       console.error("❌ [grantBundleChildAccess] ERROR:", err.message);
-      console.error(err);
-
-      if (!isExternalTransaction) {
-        await t.rollback();
-        console.log("↩️ Transaction rolled back");
-      }
-
+      if (!isExternalTransaction) await t.rollback();
       throw err;
     }
   }
@@ -694,7 +674,9 @@ class OrderController {
     isAdmin = false,
     transaction = null,
   }) {
-    const t = transaction || (await Sequelize.transaction());
+    // ✅ FIX: sequelize (lowercase) — was Sequelize (class), causing crash
+    const t = transaction || (await sequelize.transaction());
+    const isExternalTransaction = !!transaction;
 
     try {
       // Idempotency check
@@ -708,42 +690,38 @@ class OrderController {
       });
 
       if (existing > 0) {
-        console.log(
-          `[grantBatchChildAccess] Skipped – ${existing} child orders already exist for parent ${parentOrderId}`
-        );
-        if (!transaction) await t.commit();
-        return {
-          success: true,
-          skipped: true,
-          message: "Child orders already granted",
-          existingCount: existing,
-        };
+        if (!isExternalTransaction) await t.commit();
+        return { success: true, skipped: true, message: "Child orders already granted", existingCount: existing };
       }
 
-      // ─── Parse quizIds & testSeriesIds correctly ────────────────────────────────
+      // Parse quizIds & testSeriesIds
       let quizIds = [];
       let testIds = [];
 
       try {
-        const quizRaw = batch.quizIds || '[]';
-        const testRaw = batch.testSeriesIds || '[]';
-
+        const quizRaw = batch.quizIds || "[]";
+        const testRaw = batch.testSeriesIds || "[]";
         quizIds = JSON.parse(quizRaw);
         testIds = JSON.parse(testRaw);
       } catch (parseErr) {
-        console.error(
-          `[grantBatchChildAccess] JSON parse error for batch ${batch?.id || 'unknown'}:`,
-          parseErr,
-          { quizIdsRaw: batch?.quizIds, testIdsRaw: batch?.testSeriesIds }
-        );
+        console.error(`[grantBatchChildAccess] JSON parse error for batch ${batch?.id || "unknown"}:`, parseErr);
       }
 
-      // Ensure arrays & convert IDs to numbers
-      quizIds = Array.isArray(quizIds) ? quizIds.map(Number).filter(n => !isNaN(n)) : [];
-      testIds = Array.isArray(testIds) ? testIds.map(Number).filter(n => !isNaN(n)) : [];
+      quizIds = Array.isArray(quizIds) ? quizIds.map(Number).filter((n) => !isNaN(n)) : [];
+      testIds = Array.isArray(testIds) ? testIds.map(Number).filter((n) => !isNaN(n)) : [];
 
-      console.log(`Quiz Ids after parse:`, quizIds);
-      console.log(`Test  Ids after parse:`, testIds);
+      // ✅ FIX: Log clearly if batch has no content — this was the silent failure
+      if (!quizIds.length && !testIds.length) {
+        OrderController._logFailure(
+          "grantBatchChildAccess",
+          parentOrderId,
+          userId,
+          "Batch has no quizIds or testSeriesIds — check DB data for this batch",
+          { batchId: batch?.id, quizIdsRaw: batch?.quizIds, testIdsRaw: batch?.testSeriesIds }
+        );
+        if (!isExternalTransaction) await t.commit();
+        return { success: true, skipped: true, message: "Batch has no child items" };
+      }
 
       // Prepare bulk data
       const quizOrders = quizIds.map((quizId) => ({
@@ -778,48 +756,26 @@ class OrderController {
         razorpayOrderId: `batch_${parentOrderId}_t_${testId}`.slice(0, 120),
       }));
 
-      // Bulk insert
-      if (quizOrders.length > 0) {
-        await Order.bulkCreate(quizOrders, { transaction: t });
-      }
-      if (testOrders.length > 0) {
-        await Order.bulkCreate(testOrders, { transaction: t });
-      }
+      if (quizOrders.length > 0) await Order.bulkCreate(quizOrders, { transaction: t });
+      if (testOrders.length > 0) await Order.bulkCreate(testOrders, { transaction: t });
 
-      if (!transaction) await t.commit();
+      if (!isExternalTransaction) await t.commit();
 
-      console.log(
-        `[grantBatchChildAccess] Success – parent=${parentOrderId}, quizzes=${quizOrders.length}, tests=${testOrders.length}`
-      );
 
-      return {
-        success: true,
-        skipped: false,
-        quizzesCreated: quizOrders.length,
-        testsCreated: testOrders.length,
-      };
+      return { success: true, skipped: false, quizzesCreated: quizOrders.length, testsCreated: testOrders.length };
     } catch (err) {
-      if (!transaction) await t.rollback();
+      if (!isExternalTransaction) await t.rollback();
       console.error("[grantBatchChildAccess] ERROR:", err);
       throw err;
     }
   }
 
-  // ────────────────────────────────────────────────
-  // CREATE RAZORPAY ORDER + DB ENTRY
-  // ────────────────────────────────────────────────
   static async createOrder(req, res) {
     console.log("🟡 CREATE ORDER API HIT", { body: req.body });
 
     const {
-      userId,
-      type,
-      itemId,
-      amount,
-      gst = 0,
-      couponCode,
-      accessValidityDays,
-      isFree = false, // optional flag for free/promo items
+      userId, type, itemId, amount,
+      gst = 0, couponCode, accessValidityDays, isFree = false,
     } = req.body;
 
     if (!userId || !type || !itemId || amount == null) {
@@ -830,34 +786,23 @@ class OrderController {
     if (!validTypes.includes(type)) {
       return res.status(400).json({ success: false, message: "Invalid order type" });
     }
+
     const t = await sequelize.transaction();
 
     try {
       let discount = 0;
-      let couponSnapshot = {
-        couponId: null,
-        couponCode: null,
-        couponDiscount: null,
-        couponDiscountType: null,
-      };
+      let couponSnapshot = { couponId: null, couponCode: null, couponDiscount: null, couponDiscountType: null };
 
-      // Coupon logic
       if (couponCode) {
         const coupon = await Coupon.findOne({
           where: { code: couponCode.toUpperCase() },
           transaction: t,
         });
 
-        if (!coupon) {
-          await t.rollback();
-          return res.status(404).json({ success: false, message: "Invalid coupon code" });
-        }
+        if (!coupon) { await t.rollback(); return res.status(404).json({ success: false, message: "Invalid coupon code" }); }
 
         const now = new Date();
-        if (now > coupon.validTill) {
-          await t.rollback();
-          return res.status(400).json({ success: false, message: "Coupon expired" });
-        }
+        if (now > coupon.validTill) { await t.rollback(); return res.status(400).json({ success: false, message: "Coupon expired" }); }
 
         couponSnapshot = {
           couponId: coupon.id,
@@ -870,21 +815,15 @@ class OrderController {
           discount = coupon.discount;
         } else if (coupon.discountType === "percentage") {
           discount = (amount * coupon.discount) / 100;
-          if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-            discount = coupon.maxDiscount;
-          }
+          if (coupon.maxDiscount && discount > coupon.maxDiscount) discount = coupon.maxDiscount;
         }
       }
 
       const finalAmount = Math.max(0, amount - discount + gst);
 
-      // Prevent invalid Razorpay amounts (except explicit free items)
       if (finalAmount <= 0 && !isFree) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Final amount cannot be zero or negative for paid orders",
-        });
+        return res.status(400).json({ success: false, message: "Final amount cannot be zero or negative for paid orders" });
       }
 
       const razorOrder = await razorpay.orders.create({
@@ -896,67 +835,162 @@ class OrderController {
       let quiz = null;
       if (type === "quiz") {
         quiz = await Quizzes.findByPk(itemId, { transaction: t });
-        if (!quiz) {
-          await t.rollback();
-          return res.status(404).json({ success: false, message: "Quiz not found" });
-        }
+        if (!quiz) { await t.rollback(); return res.status(404).json({ success: false, message: "Quiz not found" }); }
 
-        await QuizPayments.create(
-          {
-            userId,
-            quizId: itemId,
-            razorpayOrderId: razorOrder.id,
-            amount: finalAmount,
-            currency: "INR",
-            status: "pending",
-          },
-          { transaction: t }
-        );
+        await QuizPayments.create({
+          userId, quizId: itemId, razorpayOrderId: razorOrder.id,
+          amount: finalAmount, currency: "INR", status: "pending",
+        }, { transaction: t });
       }
 
-      const test = await TestSeries.findByPk(itemId);
-      console.log("test", test)
-      const newOrder = await Order.create(
-        {
-          userId,
-          type,
-          itemId,
-          amount,
-          discount,
-          gst,
-          totalAmount: finalAmount,
-          quiz_limit: type === "quiz" ? (quiz?.attemptLimit ?? 3) : null,
-          razorpayOrderId: razorOrder.id,
-          status: "pending",
-          couponId: couponSnapshot.couponId,
-          couponCode: couponSnapshot.couponCode,
-          couponDiscount: couponSnapshot.couponDiscount,
-          couponDiscountType: couponSnapshot.couponDiscountType,
-          accessValidityDays: accessValidityDays || null,
-          enrollmentStatus: "active",
-        },
-        { transaction: t }
-      );
+      // ✅ FIX: Removed dead `TestSeries.findByPk(itemId)` call that had no transaction
+      // and whose result was never used.
+
+      const newOrder = await Order.create({
+        userId, type, itemId, amount, discount, gst,
+        totalAmount: finalAmount,
+        quiz_limit: type === "quiz" ? (quiz?.attemptLimit ?? 3) : null,
+        razorpayOrderId: razorOrder.id,
+        status: "pending",
+        couponId: couponSnapshot.couponId,
+        couponCode: couponSnapshot.couponCode,
+        couponDiscount: couponSnapshot.couponDiscount,
+        couponDiscountType: couponSnapshot.couponDiscountType,
+        accessValidityDays: accessValidityDays || null,
+        enrollmentStatus: "active",
+      }, { transaction: t });
 
       await t.commit();
-
       await redis.del(`orders:${userId}`);
 
-      return res.json({
-        success: true,
-        message: "Order created successfully",
-        razorOrder,
-        key: process.env.RAZORPAY_KEY,
-        order: newOrder,
-      });
+      return res.json({ success: true, message: "Order created successfully", razorOrder, key: process.env.RAZORPAY_KEY, order: newOrder });
     } catch (error) {
       await t.rollback();
       console.error("[createOrder] ERROR:", error);
-      return res.status(500).json({
-        success: false,
-        message: "Order creation failed",
-        error: error.message,
-      });
+      return res.status(500).json({ success: false, message: "Order creation failed", error: error.message });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // handlePostPaymentLogic — with fallback retry for batch/bundle access
+  // ─────────────────────────────────────────────────────────────────────────────
+  static async handlePostPaymentLogic(order, transaction) {
+    try {
+      const user = await User.findByPk(order.userId, { raw: true });
+      if (!user) {
+        OrderController._logFailure("handlePostPaymentLogic", order.id, order.userId, "User not found");
+        return;
+      }
+
+      switch (order.type) {
+
+        case "batch": {
+          const batch = await Batch.findByPk(order.itemId, { transaction });
+          if (!batch) {
+            OrderController._logFailure("handlePostPaymentLogic:batch", order.id, order.userId, "Batch not found", { itemId: order.itemId });
+            break;
+          }
+
+          const result = await OrderController.grantBatchChildAccess({
+            userId: order.userId, batch, parentOrderId: order.id, transaction,
+          });
+
+          // ✅ FIX: Log if access was not actually granted
+          if (result.skipped && !result.existingCount) {
+            OrderController._logFailure(
+              "handlePostPaymentLogic:batch",
+              order.id, order.userId,
+              "grantBatchChildAccess skipped with no existing orders — likely empty batch data",
+              { batchId: batch.id, quizIds: batch.quizIds, testSeriesIds: batch.testSeriesIds }
+            );
+          }
+
+          sendEmail(
+            batchPurchaseConfirmationEmail(order, batch, user),
+            { receiver_email: user.email, subject: `Batch Enrollment Confirmed – ${batch.name}` }
+          ).catch(console.error);
+          break;
+        }
+
+        case "quiz": {
+          const quiz = await Quizzes.findByPk(order.itemId, { transaction });
+          if (!quiz) {
+            OrderController._logFailure("handlePostPaymentLogic:quiz", order.id, order.userId, "Quiz not found", { itemId: order.itemId });
+            break;
+          }
+
+          const quizPayment = await QuizPayments.findOne({
+            where: { razorpayOrderId: order.razorpayOrderId },
+            transaction,
+          });
+
+          if (quizPayment) {
+            await quizPayment.update({ status: "completed", razorpayPaymentId: order.razorpayPaymentId }, { transaction });
+          }
+
+          sendEmail(
+            quizPurchaseConfirmationEmail(order, quiz, user),
+            { receiver_email: user.email, subject: `Quiz Unlocked: ${quiz.title} – Dikshant IAS` }
+          ).catch(console.error);
+          break;
+        }
+
+        case "test": {
+          const testSeries = await TestSeries.findByPk(order.itemId, { transaction });
+          if (!testSeries) {
+            OrderController._logFailure("handlePostPaymentLogic:test", order.id, order.userId, "TestSeries not found", { itemId: order.itemId });
+            break;
+          }
+
+          sendEmail(
+            testSeriesPurchaseConfirmationEmail(order, testSeries, user),
+            { receiver_email: user.email, subject: `Test Series Unlocked: ${testSeries.title}` }
+          ).catch(console.error);
+          break;
+        }
+
+        case "quiz_bundle":
+        case "test_series_bundle": {
+          let bundle = null;
+
+          if (order.type === "test_series_bundle") {
+            bundle = await TestSeriesBundle.findByPk(order.itemId, {
+              include: [{ model: TestSeries, as: "testSeries", attributes: ["id", "title", "price", "discountPrice", "imageUrl"], through: { attributes: [] } }],
+              transaction,
+            });
+          }
+
+          if (order.type === "quiz_bundle") {
+            bundle = await QuizesBundle.findByPk(order.itemId, {
+              include: [{ model: Quizzes, as: "quizzes" }],
+              transaction,
+            });
+          }
+
+          if (!bundle) {
+            OrderController._logFailure("handlePostPaymentLogic:bundle", order.id, order.userId, "Bundle not found", { itemId: order.itemId, type: order.type });
+            break;
+          }
+
+          await OrderController.grantBundleChildAccess({
+            userId: order.userId, bundle, bundleType: order.type, parentOrderId: order.id, transaction,
+          });
+          break;
+        }
+
+        default:
+          console.warn("Unknown order type:", order.type);
+      }
+
+    } catch (err) {
+      // ✅ FIX: Structured failure log so you KNOW what failed and why
+      OrderController._logFailure(
+        "handlePostPaymentLogic",
+        order?.id, order?.userId,
+        err.message,
+        { orderType: order?.type, itemId: order?.itemId }
+      );
+      // Don't throw — payment already succeeded
     }
   }
 
@@ -1033,11 +1067,7 @@ class OrderController {
   static async adminReverseAssignCourse(req, res) {
     const { userId, orderId, reason } = req.body;
 
-    console.log("[adminReverseAssignCourse] REQUEST:", {
-      userId,
-      orderId,
-      reason: reason || "ADMIN_DELETED",
-    });
+
 
     if (!userId || !orderId) {
       return res.status(400).json({
@@ -1062,10 +1092,7 @@ class OrderController {
         });
       }
 
-      console.log("[adminReverseAssignCourse] ORDER FOUND:", {
-        orderId: order.id,
-        type: order.type,
-      });
+
 
       // ✅ If batch -> delete child orders first
       if (order.type === "batch") {
@@ -1078,9 +1105,6 @@ class OrderController {
           transaction: t,
         });
 
-        console.log("[adminReverseAssignCourse] CHILD ORDERS DELETED:", {
-          deletedChildCount,
-        });
       }
 
       // ✅ Delete main order
@@ -1105,10 +1129,7 @@ class OrderController {
       await redis.del(`orders:${userId}`);
       await redis.del(`user:courses:${userId}`);
 
-      console.log("[adminReverseAssignCourse] SUCCESS: ORDER DELETED", {
-        userId,
-        orderId,
-      });
+
 
       return res.json({
         success: true,
@@ -1126,176 +1147,162 @@ class OrderController {
     }
   }
 
-static async handlePostPaymentLogic(order, transaction) {
-  try {
-    const user = await User.findByPk(order.userId, { raw: true });
-    if (!user) return;
+  // static async handlePostPaymentLogic(order, transaction) {
+  //   try {
+  //     const user = await User.findByPk(order.userId, { raw: true });
+  //     if (!user) return;
 
-    switch (order.type) {
+  //     switch (order.type) {
 
-      /* ===============================
-         BATCH
-      =============================== */
-      case "batch": {
-        const batch = await Batch.findByPk(order.itemId, { transaction });
-        if (!batch) break;
+  //       /* ===============================
+  //          BATCH
+  //       =============================== */
+  //       case "batch": {
+  //         const batch = await Batch.findByPk(order.itemId, { transaction });
+  //         if (!batch) break;
 
-        await OrderController.grantBatchChildAccess({
-          userId: order.userId,
-          batch,
-          parentOrderId: order.id,
-          transaction,
-        });
+  //         await OrderController.grantBatchChildAccess({
+  //           userId: order.userId,
+  //           batch,
+  //           parentOrderId: order.id,
+  //           transaction,
+  //         });
 
-        sendEmail(
-          batchPurchaseConfirmationEmail(order, batch, user),
-          {
-            receiver_email: user.email,
-            subject: `Batch Enrollment Confirmed – ${batch.name}`,
-          }
-        ).catch(console.error);
+  //         sendEmail(
+  //           batchPurchaseConfirmationEmail(order, batch, user),
+  //           {
+  //             receiver_email: user.email,
+  //             subject: `Batch Enrollment Confirmed – ${batch.name}`,
+  //           }
+  //         ).catch(console.error);
 
-        break;
-      }
+  //         break;
+  //       }
 
-      /* ===============================
-         SINGLE QUIZ
-      =============================== */
-      case "quiz": {
-        const quiz = await Quizzes.findByPk(order.itemId, { transaction });
-        if (!quiz) break;
+  //       /* ===============================
+  //          SINGLE QUIZ
+  //       =============================== */
+  //       case "quiz": {
+  //         const quiz = await Quizzes.findByPk(order.itemId, { transaction });
+  //         if (!quiz) break;
 
-        const quizPayment = await QuizPayments.findOne({
-          where: { razorpayOrderId: order.razorpayOrderId },
-          transaction,
-        });
+  //         const quizPayment = await QuizPayments.findOne({
+  //           where: { razorpayOrderId: order.razorpayOrderId },
+  //           transaction,
+  //         });
 
-        if (quizPayment) {
-          await quizPayment.update(
-            {
-              status: "completed",
-              razorpayPaymentId: order.razorpayPaymentId,
-            },
-            { transaction }
-          );
-        }
+  //         if (quizPayment) {
+  //           await quizPayment.update(
+  //             {
+  //               status: "completed",
+  //               razorpayPaymentId: order.razorpayPaymentId,
+  //             },
+  //             { transaction }
+  //           );
+  //         }
 
-        sendEmail(
-          quizPurchaseConfirmationEmail(order, quiz, user),
-          {
-            receiver_email: user.email,
-            subject: `Quiz Unlocked: ${quiz.title} – Dikshant IAS`,
-          }
-        ).catch(console.error);
+  //         sendEmail(
+  //           quizPurchaseConfirmationEmail(order, quiz, user),
+  //           {
+  //             receiver_email: user.email,
+  //             subject: `Quiz Unlocked: ${quiz.title} – Dikshant IAS`,
+  //           }
+  //         ).catch(console.error);
 
-        break;
-      }
+  //         break;
+  //       }
 
-      /* ===============================
-         SINGLE TEST SERIES
-      =============================== */
-      case "test": {
-        const testSeries = await TestSeries.findByPk(order.itemId, { transaction });
-        if (!testSeries) break;
+  //       /* ===============================
+  //          SINGLE TEST SERIES
+  //       =============================== */
+  //       case "test": {
+  //         const testSeries = await TestSeries.findByPk(order.itemId, { transaction });
+  //         if (!testSeries) break;
 
-        sendEmail(
-          testSeriesPurchaseConfirmationEmail(order, testSeries, user),
-          {
-            receiver_email: user.email,
-            subject: `Test Series Unlocked: ${testSeries.title}`,
-          }
-        ).catch(console.error);
+  //         sendEmail(
+  //           testSeriesPurchaseConfirmationEmail(order, testSeries, user),
+  //           {
+  //             receiver_email: user.email,
+  //             subject: `Test Series Unlocked: ${testSeries.title}`,
+  //           }
+  //         ).catch(console.error);
 
-        break;
-      }
+  //         break;
+  //       }
 
-      /* ===============================
-         BUNDLES (QUIZ / TEST SERIES)
-      =============================== */
-      case "quiz_bundle":
-      case "test_series_bundle": {
+  //       /* ===============================
+  //          BUNDLES (QUIZ / TEST SERIES)
+  //       =============================== */
+  //       case "quiz_bundle":
+  //       case "test_series_bundle": {
 
-        let bundle = null;
+  //         let bundle = null;
 
-        // ✅ TEST SERIES BUNDLE (needs include)
-        if (order.type === "test_series_bundle") {
-          bundle = await TestSeriesBundle.findByPk(order.itemId, {
-            include: [
-              {
-                model: TestSeries,
-                as: "testSeries", // MUST match association
-                attributes: ["id", "title", "price", "discountPrice", "imageUrl"],
-                through: { attributes: [] },
-              },
-            ],
-            transaction,
-          });
-        }
+  //         // ✅ TEST SERIES BUNDLE (needs include)
+  //         if (order.type === "test_series_bundle") {
+  //           bundle = await TestSeriesBundle.findByPk(order.itemId, {
+  //             include: [
+  //               {
+  //                 model: TestSeries,
+  //                 as: "testSeries", // MUST match association
+  //                 attributes: ["id", "title", "price", "discountPrice", "imageUrl"],
+  //                 through: { attributes: [] },
+  //               },
+  //             ],
+  //             transaction,
+  //           });
+  //         }
 
-        // ✅ QUIZ BUNDLE (no include)
-        if (order.type === "quiz_bundle") {
-          bundle = await QuizesBundle.findByPk(order.itemId, {
-                        include: [
-              {
-                model: Quizzes,
-                as: "quizzes", // MUST match association
-              },
-            ],
-            transaction,
-          });
-        }
+  //         // ✅ QUIZ BUNDLE (no include)
+  //         if (order.type === "quiz_bundle") {
+  //           bundle = await QuizesBundle.findByPk(order.itemId, {
+  //             include: [
+  //               {
+  //                 model: Quizzes,
+  //                 as: "quizzes", // MUST match association
+  //               },
+  //             ],
+  //             transaction,
+  //           });
+  //         }
 
-        if (!bundle) break;
+  //         if (!bundle) break;
 
-        await OrderController.grantBundleChildAccess({
-          userId: order.userId,
-          bundle,
-          bundleType: order.type,
-          parentOrderId: order.id,
-          transaction,
-        });
+  //         await OrderController.grantBundleChildAccess({
+  //           userId: order.userId,
+  //           bundle,
+  //           bundleType: order.type,
+  //           parentOrderId: order.id,
+  //           transaction,
+  //         });
 
-        break;
-      }
+  //         break;
+  //       }
 
-      default:
-        console.warn("Unknown order type:", order.type);
-    }
+  //       default:
+  //         console.warn("Unknown order type:", order.type);
+  //     }
 
-  } catch (err) {
-    console.error("Post payment logic failed:", err);
-    // ❗ Don't throw — payment already succeeded
-  }
-}
+  //   } catch (err) {
+  //     console.error("Post payment logic failed:", err);
+  //     // ❗ Don't throw — payment already succeeded
+  //   }
+  // }
   static async verifyPayment(req, res) {
     console.log("🟢 VERIFY PAYMENT API HIT");
 
     const t = await sequelize.transaction();
 
     try {
-      /* =====================================================
-         1️⃣ Normalize & Validate Input
-      ===================================================== */
-      const razorpay_order_id =
-        req.body.razorpay_order_id || req.body.razorpayOrderId;
-
-      const razorpay_payment_id =
-        req.body.razorpay_payment_id || req.body.razorpayPaymentId;
-
-      const razorpay_signature =
-        req.body.razorpay_signature || req.body.razorpaySignature;
+      const razorpay_order_id = req.body.razorpay_order_id || req.body.razorpayOrderId;
+      const razorpay_payment_id = req.body.razorpay_payment_id || req.body.razorpayPaymentId;
+      const razorpay_signature = req.body.razorpay_signature || req.body.razorpaySignature;
 
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Payment verification failed. Missing required payment details.",
-        });
+        return res.status(400).json({ success: false, message: "Payment verification failed. Missing required payment details." });
       }
 
-      /* =====================================================
-         2️⃣ Verify Razorpay Signature
-      ===================================================== */
       const generatedSignature = crypto
         .createHmac("sha256", process.env.RAZORPAY_SECRET)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -1303,58 +1310,27 @@ static async handlePostPaymentLogic(order, transaction) {
 
       if (generatedSignature !== razorpay_signature) {
         await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Payment verification failed. Invalid payment signature.",
-        });
+        return res.status(400).json({ success: false, message: "Payment verification failed. Invalid payment signature." });
       }
 
-      /* =====================================================
-         3️⃣ Lock Order (Idempotency Protection)
-      ===================================================== */
       const [updatedRows] = await Order.update(
         { status: "verifying" },
         {
-          where: {
-            razorpayOrderId: razorpay_order_id,
-            status: { [Op.in]: ["pending", "created"] },
-          },
+          where: { razorpayOrderId: razorpay_order_id, status: { [Op.in]: ["pending", "created"] } },
           transaction: t,
         }
       );
 
       if (updatedRows === 0) {
-        const existingOrder = await Order.findOne({
-          where: { razorpayOrderId: razorpay_order_id },
-          transaction: t,
-        });
-
+        const existingOrder = await Order.findOne({ where: { razorpayOrderId: razorpay_order_id }, transaction: t });
         await t.commit();
 
-        if (!existingOrder) {
-          return res.status(404).json({
-            success: false,
-            message: "Order not found.",
-          });
-        }
+        if (!existingOrder) return res.status(404).json({ success: false, message: "Order not found." });
+        if (existingOrder.status === "success") return res.json({ success: true, message: "Payment already verified.", orderId: existingOrder.id });
 
-        if (existingOrder.status === "success") {
-          return res.json({
-            success: true,
-            message: "Payment already verified.",
-            orderId: existingOrder.id,
-          });
-        }
-
-        return res.status(409).json({
-          success: false,
-          message: `Order already processed. Current status: ${existingOrder.status}`,
-        });
+        return res.status(409).json({ success: false, message: `Order already processed. Current status: ${existingOrder.status}` });
       }
 
-      /* =====================================================
-         4️⃣ Fetch Locked Order
-      ===================================================== */
       const order = await Order.findOne({
         where: { razorpayOrderId: razorpay_order_id },
         transaction: t,
@@ -1363,65 +1339,32 @@ static async handlePostPaymentLogic(order, transaction) {
 
       if (!order) {
         await t.rollback();
-        return res.status(404).json({
-          success: false,
-          message: "Order not found.",
-        });
+        return res.status(404).json({ success: false, message: "Order not found." });
       }
 
-      /* =====================================================
-         5️⃣ Mark Order as Success
-      ===================================================== */
-      await order.update(
-        {
-          status: "success",
-          razorpayPaymentId: razorpay_payment_id,
-          razorpaySignature: razorpay_signature,
-          paymentDate: new Date(),
-        },
-        { transaction: t }
-      );
+      await order.update({
+        status: "success",
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+        paymentDate: new Date(),
+      }, { transaction: t });
 
-      /* =====================================================
-         6️⃣ Grant Access Based on Order Type
-      ===================================================== */
       await OrderController.handlePostPaymentLogic(order, t);
 
-      /* =====================================================
-         7️⃣ Commit Transaction
-      ===================================================== */
       await t.commit();
 
-      /* =====================================================
-         8️⃣ Clear Cache (Post Commit Only)
-      ===================================================== */
       await Promise.all([
         redis.del(`orders:${order.userId}`),
         redis.del(`user:courses:${order.userId}`),
         redis.del(`user:quizzes:${order.userId}`),
       ]);
 
-      return res.json({
-        success: true,
-        message: "Payment verified successfully.",
-        orderId: order.id,
-        order,
-      });
+      return res.json({ success: true, message: "Payment verified successfully.", orderId: order.id, order });
 
     } catch (err) {
       console.error("[verifyPayment] ERROR:", err);
-
-      try {
-        await t.rollback();
-      } catch (rollbackErr) {
-        console.error("Rollback failed:", rollbackErr);
-      }
-
-      return res.status(500).json({
-        success: false,
-        message:
-          "We were unable to verify your payment at the moment. Please contact support if the amount was deducted.",
-      });
+      try { await t.rollback(); } catch (rollbackErr) { console.error("Rollback failed:", rollbackErr); }
+      return res.status(500).json({ success: false, message: "We were unable to verify your payment at the moment. Please contact support if the amount was deducted." });
     }
   }
 
@@ -1557,7 +1500,6 @@ static async handlePostPaymentLogic(order, transaction) {
       const userId = req.user?.id || req.query.userId;
 
       const { itemId, type } = req.query;
-      console.log(req.query)
 
       if (!userId || !itemId || !type) {
         return res.status(400).json({ success: false, message: "userId, itemId and type required" });
@@ -1573,7 +1515,6 @@ static async handlePostPaymentLogic(order, transaction) {
         },
       });
 
-      console.log(order)
       if (!order) {
         return res.json({ success: true, purchased: false });
       }

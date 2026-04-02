@@ -45,7 +45,8 @@ interface Batch {
   slug: string;
   imageUrl: string;
   displayOrder: number;
-  programId: number;
+  position: number;
+    programId: number;
   program: Program;
   subjects: Subject[];
   startDate: string;
@@ -243,7 +244,7 @@ const ViewBatch = () => {
             <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-medium">
-                  #{batch.displayOrder}
+                  #{batch.position}
                 </span>
                 <span
                   className={`px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${getStatusStyle(

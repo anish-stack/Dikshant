@@ -22,7 +22,9 @@ import {
   Lock,
   Unlock,
   CheckCircle,
+  Loader2,
   ChevronDown,
+  Download,
   X,
 } from "lucide-react";
 import Input from "../components/form/input/InputField";
@@ -91,6 +93,73 @@ const ASSIGNMENT_REASONS = [
   "Teacher/Staff Access",
 ];
 
+
+const convertToCSV = (data: User[]): string => {
+  if (data.length === 0) return "";
+
+  const headers = [
+    "ID",
+    "Name",
+    "Email",
+    "Mobile",
+    "Active",
+    "Verified",
+    "Joined Date",
+  ];
+
+  const rows = data.map((user) => [
+    user.id,
+    `"${user.name.replace(/"/g, '""')}"`,           // escape quotes
+    `"${user.email}"`,
+    `"${user.mobile}"`,
+    user.is_active ? "Yes" : "No",
+    user.is_verified ? "Yes" : "No",
+    new Date(user.createdAt).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }),
+  ]);
+
+  return [headers, ...rows]
+    .map((row) => row.join(","))
+    .join("\n");
+};
+
+const downloadCSV = (data: User[], fileNamePrefix: string = "users") => {
+  const csvContent = convertToCSV(data);
+  if (!csvContent) {
+    toast.error("No data to download");
+    return;
+  }
+
+  const now = new Date();
+  const timestamp = now.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).replace(/[:,\s]/g, "-");
+
+  const fileName = `${fileNamePrefix}_${timestamp}.csv`;
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  toast.success(`Downloaded: ${fileName}`);
+};
+
+
 export default function UserProfiles() {
   const router = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
@@ -100,7 +169,7 @@ export default function UserProfiles() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [limit, setLimit] = useState(10);
-
+  const [isDownloading, setIsDownloading] = useState(false);
   // Modal states
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isViewCoursesOpen, setIsViewCoursesOpen] = useState(false);
@@ -136,6 +205,7 @@ export default function UserProfiles() {
         params,
       });
 
+      console.log("Fetched users:", res.data);
       setUsers(res.data.data);
       setTotalPages(res.data.totalPages);
       setTotalUsers(res.data.total);
@@ -433,59 +503,99 @@ export default function UserProfiles() {
       setReverseReason("");
 
       fetchUsers(page, searchTerm, limit);
-    }catch (err) {
-  const error = err as AxiosError<{ message?: string }>;
+    } catch (err) {
+      const error = err as AxiosError<{ message?: string }>;
 
-  console.error("Failed to remove course:", error.response?.data);
+      console.error("Failed to remove course:", error.response?.data);
 
-  // 🌐 Network / No response
-  if (!error.response) {
-    const msg = "Network error. Please check your internet.";
-    toast.error(msg);
-    alert(msg);
-    return;
-  }
-
-  const { status, data } = error.response;
-
-  let message = "Failed to remove course";
-
-  switch (status) {
-    case 401:
-      message = "Unauthorized. Please login again.";
-      break;
-
-    case 403:
-      message = data?.message || "You are not allowed to remove courses";
-      break;
-
-    case 404:
-      message = data?.message || "User or course not found";
-      break;
-
-    case 409:
-      message = data?.message || "Cannot remove course";
-      break;
-
-    default:
-      if (status >= 500) {
-        message = "Server error. Please try again later.";
-      } else {
-        message = data?.message || message;
+      // 🌐 Network / No response
+      if (!error.response) {
+        const msg = "Network error. Please check your internet.";
+        toast.error(msg);
+        alert(msg);
+        return;
       }
-      break;
-  }
 
-  // 🔔 Toast + Alert
-  toast.error(message);
-  alert(message);
+      const { status, data } = error.response;
 
-} finally {
-  setReverseLoading(false);
-}
+      let message = "Failed to remove course";
+
+      switch (status) {
+        case 401:
+          message = "Unauthorized. Please login again.";
+          break;
+
+        case 403:
+          message = data?.message || "You are not allowed to remove courses";
+          break;
+
+        case 404:
+          message = data?.message || "User or course not found";
+          break;
+
+        case 409:
+          message = data?.message || "Cannot remove course";
+          break;
+
+        default:
+          if (status >= 500) {
+            message = "Server error. Please try again later.";
+          } else {
+            message = data?.message || message;
+          }
+          break;
+      }
+
+      // 🔔 Toast + Alert
+      toast.error(message);
+      alert(message);
+
+    } finally {
+      setReverseLoading(false);
+    }
 
   };
 
+  const handleDownloadAllUsers = async () => {
+    if (totalUsers === 0) {
+      toast.error("No users found to download");
+      return;
+    }
+    setIsDownloading(true);
+    const toastId = toast.loading(`Downloading all ${totalUsers} users... (Page 1/${totalPages})`);
+
+    try {
+      let allUsers: User[] = [];
+      const itemsPerPage = 100; // बैकएंड को ज्यादा limit देकर तेजी से fetch करें
+
+      for (let currentPage = 1; currentPage <= totalPages; currentPage++) {
+        const res = await axios.get<ApiResponse>(`${API_URL}/auth/all-profile`, {
+          params: {
+            limit: itemsPerPage,
+            page: currentPage,
+            ...(searchTerm && { search: searchTerm }),
+          },
+        });
+
+        allUsers = [...allUsers, ...res.data.data];
+
+        // Progress update
+        toast.loading(
+          `Downloaded ${allUsers.length} of ${totalUsers} users... (${currentPage}/${totalPages})`,
+          { id: toastId }
+        );
+      }
+
+      downloadCSV(allUsers, "all_users");
+      toast.success(`Successfully downloaded all ${allUsers.length} users!`, { id: toastId });
+
+    } catch (error) {
+      console.error("Download failed:", error);
+      toast.error("Failed to download all users. Please try again.", { id: toastId });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   const filteredBatches = batches.filter(
     (batch) =>
       batch.name.toLowerCase().includes(batchSearchTerm.toLowerCase()) ||
@@ -536,6 +646,24 @@ export default function UserProfiles() {
                 className="pl-10 w-full sm:w-80"
               />
             </div>
+            <Button
+              onClick={handleDownloadAllUsers}
+              variant="outline"
+              className="flex items-center gap-2 whitespace-nowrap"
+              disabled={loading || isDownloading || totalUsers === 0}
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Download All Users (CSV)
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -687,7 +815,7 @@ export default function UserProfiles() {
                             variant="outline"
                             className="p-1 flex items-center justify-center"
                             onClick={() => openAssignModal(user)}
-                          
+
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
@@ -698,7 +826,7 @@ export default function UserProfiles() {
                               variant="outline"
                               className="p-1 flex items-center justify-center"
                               onClick={() => openReverseAssignModal(user)}
-                            
+
                             >
                               <X className="w-4 h-4 text-red-500" />
                             </Button>
@@ -709,7 +837,7 @@ export default function UserProfiles() {
                             variant="outline"
                             className="p-1 flex items-center justify-center"
                             onClick={() => handleToggleBlock(user)}
-                         
+
                           >
                             {user.is_active ? (
                               <Lock className="w-4 h-4" />
@@ -726,7 +854,7 @@ export default function UserProfiles() {
                               setSelectedUser(user);
                               setIsDeleteModalOpen(true);
                             }}
-                           
+
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -804,65 +932,86 @@ export default function UserProfiles() {
         onClose={() => setIsViewCoursesOpen(false)}
         title={`Courses - ${selectedUser?.name}`}
       >
-        {selectedUser?.courses?.length ? (
-          <div className="space-y-3">
-            {selectedUser.courses.map((course) => {
-              const batch = course?.batch;
-              const hasValidBatch = batch && batch?.name;
+     {selectedUser.courses.map((course) => {
+  const batch = course?.batch;
+  const hasValidBatch = batch && batch?.name;
 
-              return (
-                <div
-                  key={course.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4
-                     dark:border-gray-700 dark:bg-white/[0.03]"
-                >
-                  <div className="flex items-center gap-3">
-                    {batch?.imageUrl && (
-                      <img
-                        src={batch.imageUrl}
-                        alt={batch.name}
-                        className="h-12 w-12 rounded-md object-cover border"
-                      />
-                    )}
+  // 📅 Calculate expiry
+  const paymentDate = new Date(course.paymentDate);
+  const validityDays = course.accessValidityDays || 0;
 
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {batch?.name || "N/A"}
-                      </p>
+  const expiryDate = new Date(paymentDate);
+  expiryDate.setDate(expiryDate.getDate() + validityDays);
 
-                      {batch && (
-                        <p className="text-sm text-gray-500">
-                          <span className="line-through mr-2">
-                            ₹{batch.batchPrice}
-                          </span>
-                          <span className="text-green-600 font-semibold">
-                            ₹{batch.batchDiscountPrice}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                  </div>
+  const today = new Date();
 
-                  {hasValidBatch && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        router(`/all-courses/view/${batch.id}`);
-                      }}
-                    >
-                      View Course
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-center text-gray-500 py-10">
-            No courses enrolled yet.
-          </p>
+  const remainingDays = Math.ceil(
+    (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  const isExpired = remainingDays <= 0;
+
+  return (
+    <div
+      key={course.id}
+      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4
+      dark:border-gray-700 dark:bg-white/[0.03]"
+    >
+      <div className="flex items-center gap-3">
+        {batch?.imageUrl && (
+          <img
+            src={batch.imageUrl}
+            alt={batch.name}
+            className="h-12 w-12 rounded-md object-cover border"
+          />
         )}
+
+        <div>
+          <p className="font-medium text-gray-900 dark:text-white">
+            {batch?.name || "N/A"}
+          </p>
+
+          {batch && (
+            <p className="text-sm text-gray-500">
+              <span className="line-through mr-2">
+                ₹{batch.batchPrice}
+              </span>
+              <span className="text-green-600 font-semibold">
+                ₹{batch.batchDiscountPrice}
+              </span>
+            </p>
+          )}
+
+          {/* ⭐ Expiry Info */}
+          <p className="text-xs mt-1">
+            {isExpired ? (
+              <span className="text-red-600 font-semibold">
+                Expired on {expiryDate.toLocaleDateString()}
+              </span>
+            ) : (
+              <span className="text-blue-600 font-medium">
+                {remainingDays} days left • Expires on{" "}
+                {expiryDate.toLocaleDateString()}
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {hasValidBatch && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            router(`/all-courses/view/${batch.id}`);
+          }}
+        >
+          View Course
+        </Button>
+      )}
+    </div>
+  );
+})}
       </Modal>
 
       {/* Assign Course Modal */}
@@ -903,10 +1052,9 @@ export default function UserProfiles() {
                   key={batch.id}
                   onClick={() => setSelectedBatch(batch.id)}
                   className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-2 transition-all
-                    ${
-                      selectedBatch === batch.id
-                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                    ${selectedBatch === batch.id
+                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                     }`}
                 >
                   <img
@@ -978,10 +1126,9 @@ export default function UserProfiles() {
                     type="button"
                     onClick={() => setAssignReason(reason)}
                     className={`px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-all
-                      ${
-                        assignReason === reason
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300"
-                          : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                      ${assignReason === reason
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
                       }`}
                   >
                     {reason}
@@ -1090,10 +1237,9 @@ export default function UserProfiles() {
                       key={course.id}
                       onClick={() => setSelectedCourseToRemove(course)}
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border-2 transition-all
-                        ${
-                          selectedCourseToRemove?.id === course.id
-                            ? "border-red-500 bg-red-50 dark:bg-red-900/20"
-                            : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                        ${selectedCourseToRemove?.id === course.id
+                          ? "border-red-500 bg-red-50 dark:bg-red-900/20"
+                          : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                         }`}
                     >
                       {batch?.imageUrl && (

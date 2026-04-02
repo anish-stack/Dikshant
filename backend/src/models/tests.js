@@ -26,7 +26,11 @@ module.exports = (sequelize, DataTypes) => {
     solutionFileUrl: DataTypes.STRING,
 
     languages: DataTypes.JSON,
-
+    position:{
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+    },
     subjectId: DataTypes.JSON,
     noOfQuestions: DataTypes.JSON,
 

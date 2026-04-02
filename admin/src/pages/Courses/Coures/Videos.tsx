@@ -39,6 +39,7 @@ interface VideoItem {
   url: string;
   subjectId: number;
   isDownloadable: boolean;
+  position:number;
   isDemo: boolean;
   status: "active" | "inactive";
   batchId: number;
@@ -55,6 +56,7 @@ interface FormData {
   videoSource: "youtube" | "s3" | "vimeo";
   url: string;
   isLive: boolean;
+  position: number;
   DateOfLive: string;
   TimeOfLIve: string;
   dateOfClass: string;
@@ -113,6 +115,7 @@ export default function CourseVideos() {
     title: "",
     videoSource: "youtube",
     url: "",
+    position: 0,
     isLive: false,
     DateOfLive: getCurrentDate(),
     TimeOfLIve: getCurrentTime(),
@@ -192,6 +195,7 @@ export default function CourseVideos() {
       isLive: false,
       DateOfLive: getCurrentDate(),
       TimeOfLIve: getCurrentTime(),
+      position: 0,
       dateOfClass: "",
       TimeOfClass: "",
       subjectId: "",
@@ -210,6 +214,7 @@ export default function CourseVideos() {
       title: v.title,
       videoSource: v.videoSource,
       url: v.url,
+      position: v.position,
       subjectId: v.subjectId.toString(),
       isDownloadable: v.isDownloadable,
       dateOfClass: v.dateOfClass || "",
@@ -281,6 +286,8 @@ export default function CourseVideos() {
     data.append("videoSource", form.videoSource);
     data.append("url", form.url);
     data.append("batchId", String(batchId));
+    data.append("position", String(form.position));
+
     data.append("subjectId", form.subjectId);
     data.append("isDownloadable", String(form.isDownloadable));
     data.append("isDemo", String(form.isDemo));
@@ -309,8 +316,8 @@ export default function CourseVideos() {
       setShowModal(false);
       fetchVideos();
     } catch (err) {
-      console.error(err);
-      alert("Failed to save video");
+      console.error(err.response.data.message || err);
+      alert(err.response.data.message || "Failed to save video. Please try again.");
     }
   };
 
@@ -439,7 +446,7 @@ export default function CourseVideos() {
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Image
+                     #
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
                       Title
@@ -487,11 +494,8 @@ export default function CourseVideos() {
                         className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
                       >
                         <td className="px-3 py-2">
-                          <img
-                            src={v.imageUrl || "https://via.placeholder.com/50x30"}
-                            alt={v.title}
-                            className="w-12 h-7 object-cover rounded"
-                          />
+                          <span>#{v.position || 0}</span>
+                          
                         </td>
                         <td className="px-3 py-2">
                           <div>
@@ -832,6 +836,19 @@ export default function CourseVideos() {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              {/* Position */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Position *
+                </label>
+                <input
+                  type="number"
+                  value={form.position}
+                  onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) })}
                   className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   required
                 />

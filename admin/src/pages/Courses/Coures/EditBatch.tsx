@@ -36,6 +36,7 @@ type BatchStatus = "active" | "inactive";
 interface EditBatchFormData {
   name: string;
   displayOrder: number;
+  position: number;
   programId: string;
   startDate: string;
   endDate: string;
@@ -64,6 +65,8 @@ interface Batch {
   name: string;
   imageUrl: string;
   displayOrder: number;
+  position: number;
+
   programId: number;
   subjectId: string;
   subjects: Subject[];
@@ -150,6 +153,8 @@ const EditBatch = () => {
     programId: "",
     startDate: "",
     endDate: "",
+    position: 1,
+
     registrationStartDate: "",
     registrationEndDate: "",
     status: "active",
@@ -328,7 +333,7 @@ const EditBatch = () => {
           fee_inst: data?.fee_inst || "",
           note: data?.note || "",
           status: data.status || "inactive",
-
+          position: data.position || 1,
           quizIds: Array.isArray(data.quizIds) ? data.quizIds : [],
           testSeriesIds: Array.isArray(data.testSeriesIds)
             ? data.testSeriesIds
@@ -508,6 +513,8 @@ const EditBatch = () => {
       const data = new FormData();
       data.append("name", formData.name);
       data.append("displayOrder", formData.displayOrder.toString());
+      data.append("position", formData.position.toString());
+
       data.append("programId", formData.programId);
       data.append("category", formData.category);
       data.append("subjectId", JSON.stringify(selectedSubjectIds));
@@ -648,11 +655,11 @@ const EditBatch = () => {
                   <Label className="text-sm">Display Order</Label>
                   <Input
                     type="number"
-                    value={formData.displayOrder}
+                    value={formData.position}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        displayOrder: parseInt(e.target.value) || 1,
+                        position: parseInt(e.target.value) || 1,
                       })
                     }
                     className="text-sm"
