@@ -39,7 +39,7 @@ interface VideoItem {
   url: string;
   subjectId: number;
   isDownloadable: boolean;
-  position:number;
+  position: number;
   isDemo: boolean;
   status: "active" | "inactive";
   batchId: number;
@@ -85,7 +85,7 @@ export default function CourseVideos() {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-
+  const [deleteLoading, setDeleteLoading] = useState(false)
   // Read from URL or defaults
   const initialPage = Number(searchParams.get("page")) || 1;
   const initialLimit = Number(searchParams.get("limit")) || 10;
@@ -260,6 +260,7 @@ export default function CourseVideos() {
 
   const removeVideo = async () => {
     if (!deleteVideo) return;
+    setDeleteLoading(true)
     try {
       await axios.delete(`${API_URL}/${deleteVideo.id}`);
       setVideos((prev) => prev.filter((v) => v.id !== deleteVideo.id));
@@ -267,6 +268,9 @@ export default function CourseVideos() {
       fetchVideos(); // refresh list
     } catch (err) {
       console.error(err);
+    } finally {
+      setDeleteLoading(false)
+
     }
   };
 
@@ -446,7 +450,7 @@ export default function CourseVideos() {
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                     #
+                      #
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
                       Title
@@ -495,7 +499,7 @@ export default function CourseVideos() {
                       >
                         <td className="px-3 py-2">
                           <span>#{v.position || 0}</span>
-                          
+
                         </td>
                         <td className="px-3 py-2">
                           <div>
@@ -602,11 +606,10 @@ export default function CourseVideos() {
 
                         <td className="px-3 py-2">
                           <span
-                            className={`text-xs px-2 py-1 rounded font-semibold ${
-                              v.status === "active"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                            }`}
+                            className={`text-xs px-2 py-1 rounded font-semibold ${v.status === "active"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                              }`}
                           >
                             {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
                           </span>
@@ -643,11 +646,10 @@ export default function CourseVideos() {
                                 <button
                                   onClick={() => !v.isLiveEnded && endLiveSession(v)}
                                   disabled={v.isLiveEnded}
-                                  className={`p-1.5 rounded text-xs font-medium ${
-                                    v.isLiveEnded
-                                      ? "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
-                                      : "bg-yellow-100 dark:bg-yellow-900/40 hover:bg-yellow-200"
-                                  }`}
+                                  className={`p-1.5 rounded text-xs font-medium ${v.isLiveEnded
+                                    ? "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
+                                    : "bg-yellow-100 dark:bg-yellow-900/40 hover:bg-yellow-200"
+                                    }`}
                                 >
                                   {v.isLiveEnded ? "Ended" : "End Live"}
                                 </button>
@@ -1122,12 +1124,14 @@ export default function CourseVideos() {
             <div className="flex gap-2">
               <button
                 onClick={removeVideo}
+                disabled={deleteLoading}
                 className="flex-1 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
               >
-                Delete
+                {deleteLoading ? "Please Wait ....." : "Delete"}
               </button>
               <button
                 onClick={() => setDeleteVideo(null)}
+                disabled={deleteLoading}
                 className="flex-1 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
               >
                 Cancel
