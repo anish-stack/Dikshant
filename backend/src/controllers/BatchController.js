@@ -1,6 +1,6 @@
 "use strict";
 
-const { Batch, Program, Subject, Sequelize, Quizzes, TestSeries } = require("../models");
+const { Batch, Program, Subject, Sequelize, Quizzes, TestSeries, sequelize } = require("../models");
 const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
@@ -33,14 +33,20 @@ class BatchController {
   // CREATE
   // =========================
   static async create(req, res) {
+    const t = await sequelize.transaction();
+
     try {
 
+      /* ================= IMAGE ================= */
+
       let imageUrl = null;
+
       if (req.file) {
         imageUrl = await uploadToS3(req.file, "batchs");
       }
 
-      // Normalize quizIds
+      /* ================= JSON NORMALIZE ================= */
+
       const quizIds =
         typeof req.body.quizIds === "string"
           ? JSON.parse(req.body.quizIds)
@@ -53,9 +59,13 @@ class BatchController {
 
       const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
+      /* ================= DATE PARSING ================= */
+
       const parseDate = (value) => {
         if (!value || value === "" || value === "Invalid date") return null;
+
         const date = new Date(value);
+
         return isNaN(date.getTime()) ? null : date;
       };
 
@@ -65,80 +75,115 @@ class BatchController {
       const end = parseDate(req.body.endDate);
 
       if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
+        await t.rollback();
+
         return res.status(400).json({
-          message: "Registration end date cannot be before start date",
+          message: "Registration end date cannot be before start date"
         });
       }
 
-      // ⭐ POSITION HANDLING
+      /* ================= POSITION HANDLING ================= */
+
       let position = Number(req.body.position);
 
       if (!position || position < 1) {
+
         const maxPosition = await Batch.max("position");
         position = (maxPosition || 0) + 1;
+
+      } else {
+
+        // shift existing batches
+        await Batch.increment(
+          { position: 1 },
+          {
+            where: {
+              position: { [Op.gte]: position }
+            },
+            transaction: t
+          }
+        );
+
       }
 
-      // 🔍 Check duplicate position
-      const existingBatch = await Batch.findOne({
-        where: { position },
-        attributes: ["id", "name", "position"],
-      });
-
-      if (existingBatch) {
-        const maxPosition = await Batch.max("position");
-
-        return res.status(400).json({
-          message: `Position ${position} is already assigned to course "${existingBatch.name}". Try position ${(maxPosition || 0) + 1}.`,
-          suggestedPosition: (maxPosition || 0) + 1,
-        });
-      }
+      /* ================= PAYLOAD ================= */
 
       const payload = {
+
         name: req.body.name,
+
         slug: generateSlug(req.body.name),
+
         imageUrl,
+
         displayOrder: req.body.displayOrder,
-        position, // ⭐ added here
+
+        position,
 
         programId: req.body.programId,
+
         subjectId: req.body.subjectId,
+
         medium: req.body.medium || "",
+
         offerText: req.body.offerText,
+
         fee_one_time: req.body.fee_one_time,
+
         fee_inst: req.body.fee_inst,
+
         note: req.body.note,
 
         startDate: start,
+
         endDate: end,
+
         registrationStartDate: registrationStart,
+
         registrationEndDate: registrationEnd,
 
         status: req.body.status,
+
         shortDescription: req.body.shortDescription,
+
         longDescription: req.body.longDescription,
 
         batchPrice: req.body.batchPrice,
+
         batchDiscountPrice: req.body.batchDiscountPrice,
+
         gst: req.body.gst,
+
         offerValidityDays: req.body.offerValidityDays,
 
         quizIds: Array.isArray(quizIds) ? quizIds : [],
+
         testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
 
         isEmi: Boolean(req.body.isEmi),
+
         emiTotal: req.body.emiTotal || null,
+
         emiSchedule,
 
-        category: req.body.category,
+        category: req.body.category
       };
 
-      const item = await Batch.create(payload);
+      const item = await Batch.create(payload, { transaction: t });
+
+      await t.commit();
 
       await BatchController.clearBatchCache();
 
-      return res.status(201).json(item);
+      return res.status(201).json({
+        success: true,
+        message: "Batch created successfully",
+        data: item
+      });
 
     } catch (err) {
+
+      await t.rollback();
 
       console.error("Batch Create Error:", err);
 
@@ -146,20 +191,26 @@ class BatchController {
       let status = 500;
 
       if (err.name === "SequelizeDatabaseError") {
+
         if (err.parent?.sqlMessage?.includes("Incorrect datetime value")) {
+
           userMessage =
             "Invalid date format for start/end or registration dates.";
+
           status = 400;
         }
+
       } else if (err.name === "SequelizeValidationError") {
+
         userMessage =
           "Validation failed: " + err.errors.map((e) => e.message).join(", ");
+
         status = 400;
       }
 
       return res.status(status).json({
         message: userMessage,
-        error: err.message,
+        error: err.message
       });
     }
   }
@@ -535,185 +586,185 @@ class BatchController {
   // =========================
   // UPDATE
   // =========================
-static async update(req, res) {
-  try {
-    const batchId = req.params.id;
+  static async update(req, res) {
+    try {
+      const batchId = req.params.id;
 
-    const item = await Batch.findByPk(batchId);
-    if (!item) {
-      return res.status(404).json({ message: "Batch not found" });
-    }
-
-    /* ================= IMAGE ================= */
-    let imageUrl = item.imageUrl;
-
-    if (req.file) {
-      if (item.imageUrl) {
-        await deleteFromS3(item.imageUrl);
+      const item = await Batch.findByPk(batchId);
+      if (!item) {
+        return res.status(404).json({ message: "Batch not found" });
       }
 
-      imageUrl = await uploadToS3(req.file, "batchs");
-    }
+      /* ================= IMAGE ================= */
+      let imageUrl = item.imageUrl;
 
-    /* ================= NORMALIZE JSON ================= */
+      if (req.file) {
+        if (item.imageUrl) {
+          await deleteFromS3(item.imageUrl);
+        }
 
-    const quizIds =
-      typeof req.body.quizIds === "string"
-        ? JSON.parse(req.body.quizIds)
-        : req.body.quizIds;
+        imageUrl = await uploadToS3(req.file, "batchs");
+      }
 
-    const testSeriesIds =
-      typeof req.body.testSeriesIds === "string"
-        ? JSON.parse(req.body.testSeriesIds)
-        : req.body.testSeriesIds;
+      /* ================= NORMALIZE JSON ================= */
 
-    const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
+      const quizIds =
+        typeof req.body.quizIds === "string"
+          ? JSON.parse(req.body.quizIds)
+          : req.body.quizIds;
 
-    /* ================= POSITION VALIDATION ================= */
+      const testSeriesIds =
+        typeof req.body.testSeriesIds === "string"
+          ? JSON.parse(req.body.testSeriesIds)
+          : req.body.testSeriesIds;
 
-    let position = Number(req.body.position);
+      const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
-    if (position) {
-      const existingBatch = await Batch.findOne({
-        where: {
-          position,
-          id: { [Op.ne]: batchId }, // exclude current batch
-        },
-        attributes: ["id", "name", "position"],
-      });
+      /* ================= POSITION VALIDATION ================= */
 
-      if (existingBatch) {
-        const maxPosition = await Batch.max("position");
+      let position = Number(req.body.position);
 
-        return res.status(400).json({
-message: `Position ${position} is already assigned to course "${existingBatch.name}". Try position ${(maxPosition || 0) + 1}.`,
-          suggestedPosition: (maxPosition || 0) + 1,
+      if (position) {
+
+        const existingBatch = await Batch.findOne({
+          where: {
+            position,
+            id: { [Op.ne]: batchId }
+          }
         });
+
+        if (existingBatch) {
+
+          // swap positions
+          await existingBatch.update({
+            position: item.position
+          });
+
+        }
+
+      } else {
+        position = item.position;
       }
-    } else {
-      position = item.position;
+      /* ================= UPDATE PAYLOAD ================= */
+
+      const payload = {
+        name: req.body.name,
+        slug: req.body.name ? generateSlug(req.body.name) : item.slug,
+
+        displayOrder: req.body.displayOrder,
+        position,
+
+        programId: req.body.programId,
+        subjectId: req.body.subjectId,
+
+        startDate: req.body.startDate,
+        endDate: req.body.endDate,
+        registrationStartDate: req.body.registrationStartDate,
+        registrationEndDate: req.body.registrationEndDate,
+
+        status: req.body.status,
+        shortDescription: req.body.shortDescription,
+        longDescription: req.body.longDescription,
+
+        medium: req.body.medium || "",
+        offerText: req.body.offerText,
+        fee_one_time: req.body.fee_one_time,
+        fee_inst: req.body.fee_inst,
+        note: req.body.note,
+
+        batchPrice: req.body.batchPrice,
+        batchDiscountPrice: req.body.batchDiscountPrice,
+        gst: req.body.gst,
+        offerValidityDays: req.body.offerValidityDays,
+
+        quizIds: Array.isArray(quizIds) ? quizIds : [],
+        testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
+
+        isEmi: Boolean(req.body.isEmi),
+        emiTotal: req.body.emiTotal || null,
+        emiSchedule: emiSchedule || null,
+
+        category: req.body.category,
+        imageUrl,
+      };
+
+      await item.update(payload);
+
+      await BatchController.clearBatchCache(batchId);
+
+      return res.json(item);
+
+    } catch (err) {
+      console.error("Batch Update Error:", err);
+
+      return res.status(500).json({
+        message: "Error updating batch",
+        error: err.message,
+      });
     }
-
-    /* ================= UPDATE PAYLOAD ================= */
-
-    const payload = {
-      name: req.body.name,
-      slug: req.body.name ? generateSlug(req.body.name) : item.slug,
-
-      displayOrder: req.body.displayOrder,
-      position,
-
-      programId: req.body.programId,
-      subjectId: req.body.subjectId,
-
-      startDate: req.body.startDate,
-      endDate: req.body.endDate,
-      registrationStartDate: req.body.registrationStartDate,
-      registrationEndDate: req.body.registrationEndDate,
-
-      status: req.body.status,
-      shortDescription: req.body.shortDescription,
-      longDescription: req.body.longDescription,
-
-      medium: req.body.medium || "",
-      offerText: req.body.offerText,
-      fee_one_time: req.body.fee_one_time,
-      fee_inst: req.body.fee_inst,
-      note: req.body.note,
-
-      batchPrice: req.body.batchPrice,
-      batchDiscountPrice: req.body.batchDiscountPrice,
-      gst: req.body.gst,
-      offerValidityDays: req.body.offerValidityDays,
-
-      quizIds: Array.isArray(quizIds) ? quizIds : [],
-      testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
-
-      isEmi: Boolean(req.body.isEmi),
-      emiTotal: req.body.emiTotal || null,
-      emiSchedule: emiSchedule || null,
-
-      category: req.body.category,
-      imageUrl,
-    };
-
-    await item.update(payload);
-
-    await BatchController.clearBatchCache(batchId);
-
-    return res.json(item);
-
-  } catch (err) {
-    console.error("Batch Update Error:", err);
-
-    return res.status(500).json({
-      message: "Error updating batch",
-      error: err.message,
-    });
   }
-}
   // =========================
   // DELETE
   // =========================
-static async delete(req, res) {
-  try {
+  static async delete(req, res) {
+    try {
 
-    const batchId = req.params.id;
+      const batchId = req.params.id;
 
-    const item = await Batch.findByPk(batchId);
+      const item = await Batch.findByPk(batchId);
 
-    if (!item) {
-      return res.status(404).json({
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: "Batch not found"
+        });
+      }
+
+      /* ================= SAFE S3 DELETE ================= */
+
+      if (item.imageUrl) {
+        try {
+          await deleteFromS3(item.imageUrl);
+        } catch (s3Error) {
+          console.error("S3 Delete Error:", s3Error);
+          // Continue even if S3 delete fails
+        }
+      }
+
+      /* ================= DELETE BATCH ================= */
+
+      await item.destroy();
+
+      /* ================= REORDER POSITIONS ================= */
+
+      const batches = await Batch.findAll({
+        order: [["position", "ASC"]]
+      });
+
+      for (let i = 0; i < batches.length; i++) {
+        await batches[i].update({ position: i + 1 });
+      }
+
+      /* ================= CLEAR CACHE ================= */
+
+      await BatchController.clearBatchCache(batchId);
+
+      return res.json({
+        success: true,
+        message: "Batch deleted and positions reordered successfully"
+      });
+
+    } catch (err) {
+
+      console.error("Batch Delete Error:", err);
+
+      return res.status(500).json({
         success: false,
-        message: "Batch not found"
+        message: "Error deleting batch",
+        error: err.message
       });
     }
-
-    /* ================= SAFE S3 DELETE ================= */
-
-    if (item.imageUrl) {
-      try {
-        await deleteFromS3(item.imageUrl);
-      } catch (s3Error) {
-        console.error("S3 Delete Error:", s3Error);
-        // Continue even if S3 delete fails
-      }
-    }
-
-    /* ================= DELETE BATCH ================= */
-
-    await item.destroy();
-
-    /* ================= REORDER POSITIONS ================= */
-
-    const batches = await Batch.findAll({
-      order: [["position", "ASC"]]
-    });
-
-    for (let i = 0; i < batches.length; i++) {
-      await batches[i].update({ position: i + 1 });
-    }
-
-    /* ================= CLEAR CACHE ================= */
-
-    await BatchController.clearBatchCache(batchId);
-
-    return res.json({
-      success: true,
-      message: "Batch deleted and positions reordered successfully"
-    });
-
-  } catch (err) {
-
-    console.error("Batch Delete Error:", err);
-
-    return res.status(500).json({
-      success: false,
-      message: "Error deleting batch",
-      error: err.message
-    });
   }
-}
 
   // =========================
   // CLEAR REDIS CACHE (FIXED)

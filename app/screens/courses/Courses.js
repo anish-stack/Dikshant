@@ -304,9 +304,7 @@ export default function Course({ refreshing }) {
     }
   }, [refreshing, mutate]);
 
-  const sortedCourses = [...courses].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
+  const sortedCourses = [...courses];
 
   // Filter categories + take first 6
   const liveCourses = sortedCourses.filter(c => c.category === "online").slice(0, 6);
