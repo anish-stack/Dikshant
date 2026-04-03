@@ -10,6 +10,7 @@ const { Op } = Sequelize;
 
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
+const PositionService = require("../utils/position.service");
 
 class QuizController {
   /* =========================
@@ -22,29 +23,7 @@ class QuizController {
 
       /* ================= POSITION HANDLING ================= */
 
-      let position = Number(req.body.position);
-
-      if (!position || position < 1) {
-        const maxPosition = await Quizzes.max("position");
-        position = (maxPosition || 0) + 1;
-      }
-
-      const existingQuiz = await Quizzes.findOne({
-        where: { position },
-        attributes: ["id", "title", "position"]
-      });
-
-      if (existingQuiz) {
-
-        const maxPosition = await Quizzes.max("position");
-
-        return res.status(400).json({
-          success: false,
-          message: `Position ${position} is already used by quiz "${existingQuiz.title}" - Available position: ${(maxPosition || 0) + 1}.`,
-          suggestedPosition: (maxPosition || 0) + 1
-        });
-      }
-
+      let position = await PositionService.insert(Quizzes,"position",req.body.position)
       /* ================= NORMALIZE BODY ================= */
 
       const body = {
@@ -126,186 +105,156 @@ class QuizController {
   /* =========================
      UPDATE QUIZ
   ========================== */
-static async updateQuiz(req, res) {
-  try {
+  static async updateQuiz(req, res) {
+    try {
 
-    const { id } = req.params;
-    const file = req.file;
+      const { id } = req.params;
+      const file = req.file;
 
-    const quiz = await Quizzes.findByPk(id);
+      const quiz = await Quizzes.findByPk(id);
 
-    if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: "Quiz not found"
-      });
-    }
-
-    /* ================= POSITION HANDLING ================= */
-
-    let position =
-      req.body.position !== undefined
-        ? Number(req.body.position)
-        : quiz.position;
-
-    if (req.body.position !== undefined) {
-
-      if (!position || position < 1) {
-        const maxPosition = await Quizzes.max("position");
-        position = (maxPosition || 0) + 1;
-      }
-
-      const existingQuiz = await Quizzes.findOne({
-        where: {
-          position,
-          id: { [Op.ne]: quiz.id }
-        },
-        attributes: ["id", "title", "position"]
-      });
-
-      if (existingQuiz) {
-
-        const maxPosition = await Quizzes.max("position");
-        console.log("Existing Quiz with Same Position:", existingQuiz.toJSON());
-        return res.status(400).json({
+      if (!quiz) {
+        return res.status(404).json({
           success: false,
-          message: `Position ${position} is already used by quiz "${existingQuiz.title}" - Available position: ${(maxPosition || 0) + 1}.`,
-          suggestedPosition: (maxPosition || 0) + 1
+          message: "Quiz not found"
         });
       }
-    }
 
-    /* ================= NORMALIZE BODY ================= */
+      /* ================= POSITION HANDLING ================= */
 
-    const body = {
+      let position = await PositionService.swap(Quizzes, id,"position", req.body.position)
 
-      title: req.body.title ?? quiz.title,
+      /* ================= NORMALIZE BODY ================= */
 
-      description: req.body.description ?? quiz.description,
+      const body = {
 
-      totalQuestions:
-        req.body.totalQuestions !== undefined
-          ? Number(req.body.totalQuestions)
-          : quiz.totalQuestions,
+        title: req.body.title ?? quiz.title,
 
-      timePerQuestion:
-        req.body.time_per_question !== undefined
-          ? Number(req.body.time_per_question)
-          : quiz.timePerQuestion,
+        description: req.body.description ?? quiz.description,
 
-      durationMinutes:
-        req.body.durationMinutes !== undefined
-          ? Number(req.body.durationMinutes)
-          : quiz.durationMinutes,
+        totalQuestions:
+          req.body.totalQuestions !== undefined
+            ? Number(req.body.totalQuestions)
+            : quiz.totalQuestions,
 
-      totalMarks:
-        req.body.total_marks !== undefined
-          ? Number(req.body.total_marks)
-          : quiz.totalMarks,
+        timePerQuestion:
+          req.body.time_per_question !== undefined
+            ? Number(req.body.time_per_question)
+            : quiz.timePerQuestion,
 
-      passingMarks:
-        req.body.passing_marks !== undefined
-          ? Number(req.body.passing_marks)
-          : quiz.passingMarks,
+        durationMinutes:
+          req.body.durationMinutes !== undefined
+            ? Number(req.body.durationMinutes)
+            : quiz.durationMinutes,
 
-      negativeMarking:
-        req.body.negative_marking !== undefined
-          ? req.body.negative_marking === "true"
-          : quiz.negativeMarking,
+        totalMarks:
+          req.body.total_marks !== undefined
+            ? Number(req.body.total_marks)
+            : quiz.totalMarks,
 
-      negativeMarksPerQuestion:
-        req.body.negative_marking === "true"
-          ? Number(req.body.negative_marks_per_question)
-          : null,
+        passingMarks:
+          req.body.passing_marks !== undefined
+            ? Number(req.body.passing_marks)
+            : quiz.passingMarks,
 
-      isFree:
-        req.body.is_free !== undefined
-          ? req.body.is_free === "true"
-          : quiz.isFree,
+        negativeMarking:
+          req.body.negative_marking !== undefined
+            ? req.body.negative_marking === "true"
+            : quiz.negativeMarking,
 
-      price:
-        req.body.is_free === "true"
-          ? null
-          : req.body.price !== undefined
-            ? Number(req.body.price)
-            : quiz.price,
+        negativeMarksPerQuestion:
+          req.body.negative_marking === "true"
+            ? Number(req.body.negative_marks_per_question)
+            : null,
 
-      attemptLimit:
-        req.body.attempt_limit !== undefined
-          ? Number(req.body.attempt_limit)
-          : quiz.attemptLimit,
+        isFree:
+          req.body.is_free !== undefined
+            ? req.body.is_free === "true"
+            : quiz.isFree,
 
-      status: req.body.status ?? quiz.status,
+        price:
+          req.body.is_free === "true"
+            ? null
+            : req.body.price !== undefined
+              ? Number(req.body.price)
+              : quiz.price,
 
-      displayIn: req.body.displayIn ?? quiz.displayIn,
+        attemptLimit:
+          req.body.attempt_limit !== undefined
+            ? Number(req.body.attempt_limit)
+            : quiz.attemptLimit,
 
-      showHints:
-        req.body.show_hints !== undefined
-          ? req.body.show_hints === "true"
-          : quiz.showHints,
+        status: req.body.status ?? quiz.status,
 
-      showExplanations:
-        req.body.show_explanations !== undefined
-          ? req.body.show_explanations === "true"
-          : quiz.showExplanations,
+        displayIn: req.body.displayIn ?? quiz.displayIn,
 
-      shuffleQuestions:
-        req.body.shuffle_questions !== undefined
-          ? req.body.shuffle_questions === "true"
-          : quiz.shuffleQuestions,
+        showHints:
+          req.body.show_hints !== undefined
+            ? req.body.show_hints === "true"
+            : quiz.showHints,
 
-      shuffleOptions:
-        req.body.shuffle_options !== undefined
-          ? req.body.shuffle_options === "true"
-          : quiz.shuffleOptions,
+        showExplanations:
+          req.body.show_explanations !== undefined
+            ? req.body.show_explanations === "true"
+            : quiz.showExplanations,
 
-      position
-    };
+        shuffleQuestions:
+          req.body.shuffle_questions !== undefined
+            ? req.body.shuffle_questions === "true"
+            : quiz.shuffleQuestions,
 
-    /* ================= IMAGE HANDLING ================= */
+        shuffleOptions:
+          req.body.shuffle_options !== undefined
+            ? req.body.shuffle_options === "true"
+            : quiz.shuffleOptions,
 
-    let imageUrl = quiz.image;
+        position
+      };
 
-    if (file) {
+      /* ================= IMAGE HANDLING ================= */
 
-      if (quiz.image) {
-        try {
-          await deleteFromS3(quiz.image);
-        } catch (s3Error) {
-          console.error("S3 Delete Error:", s3Error);
+      let imageUrl = quiz.image;
+
+      if (file) {
+
+        if (quiz.image) {
+          try {
+            await deleteFromS3(quiz.image);
+          } catch (s3Error) {
+            console.error("S3 Delete Error:", s3Error);
+          }
         }
+
+        imageUrl = await uploadToS3(file, "quizzes");
       }
 
-      imageUrl = await uploadToS3(file, "quizzes");
+      body.image = imageUrl;
+
+      /* ================= UPDATE ================= */
+
+      await quiz.update(body);
+
+      /* ================= CACHE CLEAR ================= */
+
+      await deleteQuizCache(id);
+      await clearAllQuizCache();
+
+      return res.json({
+        success: true,
+        message: "Quiz updated successfully",
+        data: quiz
+      });
+
+    } catch (error) {
+
+      console.error("Update Quiz Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error"
+      });
     }
-
-    body.image = imageUrl;
-
-    /* ================= UPDATE ================= */
-
-    await quiz.update(body);
-
-    /* ================= CACHE CLEAR ================= */
-
-    await deleteQuizCache(id);
-    await clearAllQuizCache();
-
-    return res.json({
-      success: true,
-      message: "Quiz updated successfully",
-      data: quiz
-    });
-
-  } catch (error) {
-
-    console.error("Update Quiz Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error"
-    });
   }
-}
 
   /* =========================
      DELETE QUIZ
@@ -341,14 +290,7 @@ static async updateQuiz(req, res) {
 
       /* ================= REORDER POSITIONS ================= */
 
-      const quizzes = await Quizzes.findAll({
-        order: [["position", "ASC"]]
-      });
-
-      for (let i = 0; i < quizzes.length; i++) {
-        await quizzes[i].update({ position: i + 1 });
-      }
-
+      await PositionService.reorder(Quizzes,"position");
       /* ================= CACHE CLEAR ================= */
 
       await deleteQuizCache(id);

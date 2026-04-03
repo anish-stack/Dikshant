@@ -3,6 +3,7 @@
 const { Op } = require("sequelize");
 const slugify = require("slugify");
 const { TestSeriesBundle, TestSeries, sequelize } = require("../models");
+const PositionService = require("../utils/position.service");
 
 // helper: safe slug
 const makeSlug = (text) =>
@@ -52,6 +53,11 @@ module.exports = {
 
       const ids = normalizeIds(testSeriesIds);
 
+      payload.displayOrder = await PositionService.insert(
+        TestSeriesBundle,
+        "displayOrder",
+        payload.displayOrder
+      );
       // Create bundle
       const bundle = await TestSeriesBundle.create(payload, { transaction: t });
 
@@ -241,7 +247,7 @@ module.exports = {
       }
 
       await t.commit();
-
+      await PositionService.swap(TestSeriesBundle, "displayOrder", payload.displayOrder, t);
       const updated = await TestSeriesBundle.findByPk(bundle.id, {
         include: [{ model: TestSeries, as: "testSeries", through: { attributes: [] } }],
       });

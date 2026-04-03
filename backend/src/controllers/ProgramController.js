@@ -12,70 +12,71 @@ class ProgramController {
   // =========================
   // CREATE PROGRAM
   // =========================
-  static async create(req, res) {
-    try {
+static async create(req, res) {
+  try {
 
-      let imageUrl = null;
+    /* ================= IMAGE ================= */
 
-      if (req.file) {
-        imageUrl = await uploadToS3(req.file, "programs");
-      }
+    let imageUrl = null;
 
-      /* ================= POSITION HANDLING ================= */
-
-      let position = Number(req.body.position);
-
-      if (!position || position < 1) {
-        const maxPosition = await Program.max("position");
-        position = (maxPosition || 0) + 1;
-      }
-
-      const existingProgram = await Program.findOne({
-        where: { position },
-        attributes: ["id", "name", "position"]
-      });
-
-      if (existingProgram) {
-
-        const maxPosition = await Program.max("position");
-
-        return res.status(400).json({
-          success: false,
-          message: `Position ${position} is already used by program "${existingProgram.name}" - Available position: ${(maxPosition || 0) + 1}.`,
-          suggestedPosition: (maxPosition || 0) + 1
-        });
-      }
-
-      /* ================= CREATE ================= */
-
-      const program = await Program.create({
-        name: req.body.name,
-        slug: generateSlug(req.body.name),
-        description: req.body.description,
-        position,
-        imageUrl
-      });
-
-      await redis.del("programs");
-
-      return res.status(201).json({
-        success: true,
-        message: "Program created successfully",
-        data: program
-      });
-
-    } catch (error) {
-
-      console.error("Program Create Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Error creating program",
-        error: error.message
-      });
+    if (req.file) {
+      imageUrl = await uploadToS3(req.file, "programs");
     }
-  }
 
+    /* ================= POSITION HANDLING ================= */
+
+    let position = Number(req.body.position);
+
+    if (!position || position < 1) {
+
+      const maxPosition = await Program.max("position");
+      position = (maxPosition || 0) + 1;
+
+    } else {
+
+      // shift existing programs down
+      await Program.increment(
+        { position: 1 },
+        {
+          where: {
+            position: { [Op.gte]: position }
+          }
+        }
+      );
+
+    }
+
+    /* ================= CREATE ================= */
+
+    const program = await Program.create({
+      name: req.body.name,
+      slug: generateSlug(req.body.name),
+      description: req.body.description,
+      position,
+      imageUrl
+    });
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("programs");
+
+    return res.status(201).json({
+      success: true,
+      message: "Program created successfully",
+      data: program
+    });
+
+  } catch (error) {
+
+    console.error("Program Create Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error creating program",
+      error: error.message
+    });
+  }
+}
 
 
   // =========================
@@ -181,96 +182,97 @@ class ProgramController {
   // =========================
   // UPDATE PROGRAM
   // =========================
-  static async update(req, res) {
-    try {
+static async update(req, res) {
+  try {
 
-      const program = await Program.findByPk(req.params.id);
+    const program = await Program.findByPk(req.params.id);
 
-      if (!program) {
-        return res.status(404).json({
-          success: false,
-          message: "Program not found"
-        });
-      }
-
-      /* ================= IMAGE ================= */
-
-      let imageUrl = program.imageUrl;
-
-      if (req.file) {
-        if (program.imageUrl) {
-          await deleteFromS3(program.imageUrl);
-        }
-
-        imageUrl = await uploadToS3(req.file, "programs");
-      }
-
-      /* ================= POSITION HANDLING ================= */
-
-      let position =
-        req.body.position !== undefined
-          ? Number(req.body.position)
-          : program.position;
-
-      if (req.body.position !== undefined) {
-
-        if (!position || position < 1) {
-          const maxPosition = await Program.max("position");
-          position = (maxPosition || 0) + 1;
-        }
-
-        const existingProgram = await Program.findOne({
-          where: {
-            position,
-            id: { [Op.ne]: program.id } // exclude current
-          },
-          attributes: ["id", "name", "position"]
-        });
-
-        if (existingProgram) {
-
-          const maxPosition = await Program.max("position");
-
-          return res.status(400).json({
-            success: false,
-            message: `Position ${position} is already used by program "${existingProgram.name}" - Available position: ${(maxPosition || 0) + 1}.`,
-            suggestedPosition: (maxPosition || 0) + 1
-          });
-        }
-      }
-
-      /* ================= UPDATE ================= */
-
-      await program.update({
-        name: req.body.name ?? program.name,
-        slug: req.body.name ? generateSlug(req.body.name) : program.slug,
-        description: req.body.description ?? program.description,
-        position,
-        imageUrl
-      });
-
-      /* ================= CACHE CLEAR ================= */
-
-      await redis.del("programs");
-      await redis.del(`program:${req.params.id}`);
-
-      return res.json({
-        success: true,
-        message: "Program updated successfully",
-        data: program
-      });
-
-    } catch (error) {
-
-      console.error("Program Update Error:", error);
-
-      return res.status(500).json({
+    if (!program) {
+      return res.status(404).json({
         success: false,
-        message: error,
-        error: error.message
+        message: "Program not found"
       });
     }
+
+    /* ================= IMAGE ================= */
+
+    let imageUrl = program.imageUrl;
+
+    if (req.file) {
+      if (program.imageUrl) {
+        try {
+          await deleteFromS3(program.imageUrl);
+        } catch (err) {
+          console.error("S3 Delete Error:", err);
+        }
+      }
+
+      imageUrl = await uploadToS3(req.file, "programs");
+    }
+
+    /* ================= POSITION SWAP ================= */
+
+    let position =
+      req.body.position !== undefined
+        ? Number(req.body.position)
+        : program.position;
+
+    if (req.body.position !== undefined && position !== program.position) {
+
+      if (!position || position < 1) {
+        const maxPosition = await Program.max("position");
+        position = (maxPosition || 0) + 1;
+      }
+
+      const existingProgram = await Program.findOne({
+        where: {
+          position,
+          id: { [Op.ne]: program.id }
+        }
+      });
+
+      if (existingProgram) {
+
+        // swap positions
+        await existingProgram.update({
+          position: program.position
+        });
+
+      }
+    }
+
+    /* ================= UPDATE ================= */
+
+    await program.update({
+      name: req.body.name ?? program.name,
+      slug: req.body.name ? generateSlug(req.body.name) : program.slug,
+      description: req.body.description ?? program.description,
+      position,
+      imageUrl
+    });
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("programs");
+    await redis.del(`program:${req.params.id}`);
+
+    return res.json({
+      success: true,
+      message: "Program updated successfully",
+      data: program
+    });
+
+  } catch (error) {
+
+    console.error("Program Update Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error updating program",
+      error: error.message
+    });
   }
+}
 
 
   // =========================

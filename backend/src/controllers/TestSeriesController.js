@@ -5,12 +5,13 @@ const redis = require('../config/redis');
 const uploadToS3 = require('../utils/s3Upload');
 const deleteFromS3 = require('../utils/s3Delete');
 const { generateSlug } = require('../utils/helpers');
+const PositionService = require('../utils/position.service');
 const { Op } = Sequelize;
 class TestSeriesController {
 
   /* -------------------- CREATE -------------------- */
-static async create(req, res) {
- try {
+  static async create(req, res) {
+    try {
       const {
         title,
         displayOrder = 0,
@@ -80,15 +81,15 @@ static async create(req, res) {
       };
 
       // Parse ALL date/time fields consistently
-      const parsedTestStartDate       = safeDate(testStartDate);
-      const parsedTestStartTime       = safeDate(testStartTime);
-      const parsedAnswerSubmitStart   = safeDate(AnswerSubmitDateAndTime);
-      const parsedAnswerSubmitLast    = safeDate(AnswerLastSubmitDateAndTime);
-      const parsedExpiry              = safeDate(expirSeries);
+      const parsedTestStartDate = safeDate(testStartDate);
+      const parsedTestStartTime = safeDate(testStartTime);
+      const parsedAnswerSubmitStart = safeDate(AnswerSubmitDateAndTime);
+      const parsedAnswerSubmitLast = safeDate(AnswerLastSubmitDateAndTime);
+      const parsedExpiry = safeDate(expirSeries);
 
       // ── Logical date validations ──
       if (parsedAnswerSubmitStart && parsedAnswerSubmitLast &&
-          parsedAnswerSubmitLast < parsedAnswerSubmitStart) {
+        parsedAnswerSubmitLast < parsedAnswerSubmitStart) {
         return res.status(400).json({
           success: false,
           message: "Last answer submission time must be after start submission time",
@@ -107,13 +108,14 @@ static async create(req, res) {
       if (req.file) {
         imageUrl = await uploadToS3(req.file, "testseries");
       }
+      let position = await PositionService.insert(TestSeries,"displayOrder", req.body.displayOrder)
 
       // ── Create the record ──
       const item = await TestSeries.create({
         imageUrl,
         title: title.trim(),
         slug: generateSlug(title),
-        displayOrder: Number(displayOrder) || 0,
+        displayOrder: Number(position) || 0,
         status: normalizedStatus,
         isActive: Boolean(isActive),
         description: description?.trim() || null,
@@ -122,14 +124,14 @@ static async create(req, res) {
         gst: Number(gst) || 0,
 
         // All date fields are now safely parsed (null if invalid/empty)
-        testStartDate:      parsedTestStartDate,
-        testStartTime:      parsedTestStartTime,
+        testStartDate: parsedTestStartDate,
+        testStartTime: parsedTestStartTime,
         AnswerSubmitDateAndTime: parsedAnswerSubmitStart,
         AnswerLastSubmitDateAndTime: parsedAnswerSubmitLast,
-        expirSeries:        parsedExpiry,
+        expirSeries: parsedExpiry,
 
         timeDurationForTest: timeDurationForTest ? Number(timeDurationForTest) : null,
-        passing_marks:      passing_marks ? Number(passing_marks) : null,
+        passing_marks: passing_marks ? Number(passing_marks) : null,
       });
 
       // ── Clear cache ──
@@ -174,7 +176,7 @@ static async create(req, res) {
         // error: error.message,   // keep only during development
       });
     }
-}
+  }
 
   /* -------------------- ADMIN: UPLOAD QUESTION SHEET -------------------- */
   static async uploadQuestionSheet(req, res) {
@@ -594,84 +596,84 @@ static async create(req, res) {
   }
 
 
- static async findOneUser(req, res) {
-  try {
-    const testSeriesId = req.params.id;
-    const userId = req.user?.id;
+  static async findOneUser(req, res) {
+    try {
+      const testSeriesId = req.params.id;
+      const userId = req.user?.id;
 
-    /* ---------- Fetch Test Series ---------- */
-    const item = await TestSeries.findByPk(testSeriesId);
+      /* ---------- Fetch Test Series ---------- */
+      const item = await TestSeries.findByPk(testSeriesId);
 
-    if (!item) {
-      return res.status(404).json({
-        success: false,
-        message: "Test series not found",
-      });
-    }
-
-    let isPurchased = false;
-    let hasSubmitted = false;
-    let subsmissionId = null
-    let resultGenerated = false; // Default to false
-
-    /* ---------- Check Purchase (Order) ---------- */
-    if (userId) {
-      const order = await Order.findOne({
-        where: {
-          userId,
-          itemId: testSeriesId,
-          type: "test",
-          status: "success",
-          enrollmentStatus: "active",
-        },
-      });
-
-      isPurchased = !!order;
-    }
-
-    /* ---------- Check Answer Submission ---------- */
-    if (userId) {
-      const submission = await StudentAnswerSubmission.findOne({
-        where: {
-          testSeriesId,
-          userId,
-        },
-      });
-
-      hasSubmitted = !!submission;
-
-      // SAFE ACCESS: Only read resultGenerated if submission exists
-      if (submission) {
-        subsmissionId= submission.id
-        resultGenerated = submission.resultGenerated === true; // Explicit boolean
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: "Test series not found",
+        });
       }
-      // If no submission → resultGenerated remains false
+
+      let isPurchased = false;
+      let hasSubmitted = false;
+      let subsmissionId = null
+      let resultGenerated = false; // Default to false
+
+      /* ---------- Check Purchase (Order) ---------- */
+      if (userId) {
+        const order = await Order.findOne({
+          where: {
+            userId,
+            itemId: testSeriesId,
+            type: "test",
+            status: "success",
+            enrollmentStatus: "active",
+          },
+        });
+
+        isPurchased = !!order;
+      }
+
+      /* ---------- Check Answer Submission ---------- */
+      if (userId) {
+        const submission = await StudentAnswerSubmission.findOne({
+          where: {
+            testSeriesId,
+            userId,
+          },
+        });
+
+        hasSubmitted = !!submission;
+
+        // SAFE ACCESS: Only read resultGenerated if submission exists
+        if (submission) {
+          subsmissionId = submission.id
+          resultGenerated = submission.resultGenerated === true; // Explicit boolean
+        }
+        // If no submission → resultGenerated remains false
+      }
+
+      /* ---------- Response ---------- */
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...item.toJSON(),
+          isPurchased,
+          hasSubmitted,
+          subsmissionId,
+          resultGenerated, // Safe: always boolean, never undefined/null
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching test series:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching test series",
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : undefined,
+      });
     }
-
-    /* ---------- Response ---------- */
-    return res.status(200).json({
-      success: true,
-      data: {
-        ...item.toJSON(),
-        isPurchased,
-        hasSubmitted,
-        subsmissionId,
-        resultGenerated, // Safe: always boolean, never undefined/null
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching test series:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching test series",
-      error:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : undefined,
-    });
   }
-}
 
 
   /* -------------------- GET ONE -------------------- */
@@ -691,185 +693,186 @@ static async create(req, res) {
   }
 
   /* -------------------- UPDATE -------------------- */
-static async update(req, res) {
-  try {
-    const { id } = req.params;
-    const item = await TestSeries.findByPk(id);
+  static async update(req, res) {
+    try {
+      const { id } = req.params;
+      const item = await TestSeries.findByPk(id);
 
-    if (!item) {
-      return res.status(404).json({
-        success: false,
-        message: "Test series not found",
-      });
-    }
-
-    const {
-      title,
-      displayOrder,
-      status,
-      isActive,
-      description,
-      price,
-      discountPrice,
-      gst,
-      testStartDate,
-      testStartTime,
-      AnswerSubmitDateAndTime,
-      AnswerLastSubmitDateAndTime,
-      timeDurationForTest,
-      passing_marks,
-      expirSeries,
-    } = req.body;
-
-    // ── Status validation (match ENUM) ──
-    const allowedStatuses = ['new', 'normal', 'popular', 'featured'];
-    let normalizedStatus = item.status;
-
-    if (status !== undefined) {
-      normalizedStatus = (status || 'new').trim().toLowerCase();
-      if (!allowedStatuses.includes(normalizedStatus)) {
-        return res.status(400).json({
+      if (!item) {
+        return res.status(404).json({
           success: false,
-          message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
+          message: "Test series not found",
         });
       }
-    }
 
-    // ── Number & basic validations ──
-    if (discountPrice !== undefined && price !== undefined) {
-      if (Number(discountPrice) > Number(price)) {
+      const {
+        title,
+        displayOrder,
+        status,
+        isActive,
+        description,
+        price,
+        discountPrice,
+        gst,
+        testStartDate,
+        testStartTime,
+        AnswerSubmitDateAndTime,
+        AnswerLastSubmitDateAndTime,
+        timeDurationForTest,
+        passing_marks,
+        expirSeries,
+      } = req.body;
+
+      // ── Status validation (match ENUM) ──
+      const allowedStatuses = ['new', 'normal', 'popular', 'featured'];
+      let normalizedStatus = item.status;
+
+      if (status !== undefined) {
+        normalizedStatus = (status || 'new').trim().toLowerCase();
+        if (!allowedStatuses.includes(normalizedStatus)) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid status. Allowed values: ${allowedStatuses.join(', ')}`,
+          });
+        }
+      }
+
+      // ── Number & basic validations ──
+      if (discountPrice !== undefined && price !== undefined) {
+        if (Number(discountPrice) > Number(price)) {
+          return res.status(400).json({
+            success: false,
+            message: "Discount price cannot be greater than original price",
+          });
+        }
+      }
+
+      if (gst !== undefined && Number(gst) < 0) {
         return res.status(400).json({
           success: false,
-          message: "Discount price cannot be greater than original price",
+          message: "GST cannot be negative",
         });
       }
-    }
 
-    if (gst !== undefined && Number(gst) < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "GST cannot be negative",
-      });
-    }
-
-    if (timeDurationForTest !== undefined && Number(timeDurationForTest) <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Test duration must be greater than 0 minutes",
-      });
-    }
-
-    // ── Date sanitization helper ──
-    const safeDate = (value, currentValue) => {
-      // If not provided → keep existing
-      if (value === undefined || value === null) {
-        return currentValue;
+      if (timeDurationForTest !== undefined && Number(timeDurationForTest) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Test duration must be greater than 0 minutes",
+        });
       }
-      // Handle empty / invalid cases
-      if (value === '' || value === 'Invalid date' || String(value).trim() === '') {
-        return null;
-      }
-      const date = new Date(value);
-      return isNaN(date.getTime()) ? null : date;
-    };
 
-    // Parse all date fields safely (keep old value if not sent)
-    const parsedTestStartDate       = safeDate(testStartDate, item.testStartDate);
-    const parsedTestStartTime       = safeDate(testStartTime, item.testStartTime);
-    const parsedAnswerSubmitStart   = safeDate(AnswerSubmitDateAndTime, item.AnswerSubmitDateAndTime);
-    const parsedAnswerSubmitLast    = safeDate(AnswerLastSubmitDateAndTime, item.AnswerLastSubmitDateAndTime);
-    const parsedExpiry              = safeDate(expirSeries, item.expirSeries);
+      // ── Date sanitization helper ──
+      const safeDate = (value, currentValue) => {
+        // If not provided → keep existing
+        if (value === undefined || value === null) {
+          return currentValue;
+        }
+        // Handle empty / invalid cases
+        if (value === '' || value === 'Invalid date' || String(value).trim() === '') {
+          return null;
+        }
+        const date = new Date(value);
+        return isNaN(date.getTime()) ? null : date;
+      };
 
-    // Optional: Add logical validation (only if both dates are present)
-    if (parsedAnswerSubmitStart && parsedAnswerSubmitLast &&
+      // Parse all date fields safely (keep old value if not sent)
+      const parsedTestStartDate = safeDate(testStartDate, item.testStartDate);
+      const parsedTestStartTime = safeDate(testStartTime, item.testStartTime);
+      const parsedAnswerSubmitStart = safeDate(AnswerSubmitDateAndTime, item.AnswerSubmitDateAndTime);
+      const parsedAnswerSubmitLast = safeDate(AnswerLastSubmitDateAndTime, item.AnswerLastSubmitDateAndTime);
+      const parsedExpiry = safeDate(expirSeries, item.expirSeries);
+
+      // Optional: Add logical validation (only if both dates are present)
+      if (parsedAnswerSubmitStart && parsedAnswerSubmitLast &&
         parsedAnswerSubmitLast < parsedAnswerSubmitStart) {
-      return res.status(400).json({
-        success: false,
-        message: "Last answer submission time must be after start submission time",
+        return res.status(400).json({
+          success: false,
+          message: "Last answer submission time must be after start submission time",
+        });
+      }
+
+      if (parsedExpiry && parsedTestStartDate && parsedExpiry < parsedTestStartDate) {
+        return res.status(400).json({
+          success: false,
+          message: "Expiry date cannot be before test start date",
+        });
+      }
+
+      // ── Image handling ──
+      let imageUrl = item.imageUrl;
+      if (req.file) {
+        // Delete old image if exists (optional – uncomment if you want cleanup)
+        // if (item.imageUrl) {
+        //   await deleteFromS3(item.imageUrl).catch(err => console.warn("Old image delete failed:", err));
+        // }
+        imageUrl = await uploadToS3(req.file, "testseries");
+      }
+      let position = await PositionService.swap(TestSeries,id,"displayOrder", displayOrder)
+
+      // ── Perform update ──
+      await item.update({
+        imageUrl,
+        title: title?.trim() ?? item.title,
+        slug: title ? generateSlug(title) : item.slug,
+        displayOrder: position !== undefined ? Number(position) : item.displayOrder,
+        status: normalizedStatus,
+        isActive: isActive !== undefined ? Boolean(isActive) : item.isActive,
+        description: description !== undefined ? (description?.trim() || null) : item.description,
+        price: price !== undefined ? Number(price) : item.price,
+        discountPrice: discountPrice !== undefined ? Number(discountPrice) : item.discountPrice,
+        gst: gst !== undefined ? Number(gst) : item.gst,
+
+        testStartDate: parsedTestStartDate,
+        testStartTime: parsedTestStartTime,
+        AnswerSubmitDateAndTime: parsedAnswerSubmitStart,
+        AnswerLastSubmitDateAndTime: parsedAnswerSubmitLast,
+        expirSeries: parsedExpiry,
+
+        timeDurationForTest: timeDurationForTest !== undefined ? Number(timeDurationForTest) : item.timeDurationForTest,
+        passing_marks: passing_marks !== undefined ? Number(passing_marks) : item.passing_marks,
       });
-    }
 
-    if (parsedExpiry && parsedTestStartDate && parsedExpiry < parsedTestStartDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Expiry date cannot be before test start date",
+      // ── Invalidate cache ──
+      await redis.del("testseries");
+      await redis.del(`testseries:${id}`);
+
+      return res.status(200).json({
+        success: true,
+        message: "Test series updated successfully",
+        data: item,
       });
-    }
 
-    // ── Image handling ──
-    let imageUrl = item.imageUrl;
-    if (req.file) {
-      // Delete old image if exists (optional – uncomment if you want cleanup)
-      // if (item.imageUrl) {
-      //   await deleteFromS3(item.imageUrl).catch(err => console.warn("Old image delete failed:", err));
-      // }
-      imageUrl = await uploadToS3(req.file, "testseries");
-    }
+    } catch (error) {
+      console.error("TestSeries update error:", error);
 
-    // ── Perform update ──
-    await item.update({
-      imageUrl,
-      title: title?.trim() ?? item.title,
-      slug: title ? generateSlug(title) : item.slug,
-      displayOrder: displayOrder !== undefined ? Number(displayOrder) : item.displayOrder,
-      status: normalizedStatus,
-      isActive: isActive !== undefined ? Boolean(isActive) : item.isActive,
-      description: description !== undefined ? (description?.trim() || null) : item.description,
-      price: price !== undefined ? Number(price) : item.price,
-      discountPrice: discountPrice !== undefined ? Number(discountPrice) : item.discountPrice,
-      gst: gst !== undefined ? Number(gst) : item.gst,
+      let message = "Failed to update test series. Please try again later.";
+      let statusCode = 500;
 
-      testStartDate: parsedTestStartDate,
-      testStartTime: parsedTestStartTime,
-      AnswerSubmitDateAndTime: parsedAnswerSubmitStart,
-      AnswerLastSubmitDateAndTime: parsedAnswerSubmitLast,
-      expirSeries: parsedExpiry,
+      if (error.name === 'SequelizeDatabaseError') {
+        const sqlMsg = error.parent?.sqlMessage || '';
 
-      timeDurationForTest: timeDurationForTest !== undefined ? Number(timeDurationForTest) : item.timeDurationForTest,
-      passing_marks: passing_marks !== undefined ? Number(passing_marks) : item.passing_marks,
-    });
-
-    // ── Invalidate cache ──
-    await redis.del("testseries");
-    await redis.del(`testseries:${id}`);
-
-    return res.status(200).json({
-      success: true,
-      message: "Test series updated successfully",
-      data: item,
-    });
-
-  } catch (error) {
-    console.error("TestSeries update error:", error);
-
-    let message = "Failed to update test series. Please try again later.";
-    let statusCode = 500;
-
-    if (error.name === 'SequelizeDatabaseError') {
-      const sqlMsg = error.parent?.sqlMessage || '';
-
-      if (sqlMsg.includes('Data truncated for column \'status\'')) {
-        message = "Invalid status value provided.";
-        statusCode = 400;
-      } else if (sqlMsg.includes('Incorrect datetime value') || sqlMsg.includes('Invalid date')) {
-        message = "One or more date/time fields are invalid. Please use correct format (YYYY-MM-DD or YYYY-MM-DDTHH:mm).";
-        statusCode = 400;
-      } else if (sqlMsg.includes('Data too long')) {
-        message = "Some field value is too long (title, description, etc.).";
+        if (sqlMsg.includes('Data truncated for column \'status\'')) {
+          message = "Invalid status value provided.";
+          statusCode = 400;
+        } else if (sqlMsg.includes('Incorrect datetime value') || sqlMsg.includes('Invalid date')) {
+          message = "One or more date/time fields are invalid. Please use correct format (YYYY-MM-DD or YYYY-MM-DDTHH:mm).";
+          statusCode = 400;
+        } else if (sqlMsg.includes('Data too long')) {
+          message = "Some field value is too long (title, description, etc.).";
+          statusCode = 400;
+        }
+      } else if (error.name === 'SequelizeValidationError') {
+        message = error.errors?.map(e => e.message).join(", ") || "Validation failed";
         statusCode = 400;
       }
-    } else if (error.name === 'SequelizeValidationError') {
-      message = error.errors?.map(e => e.message).join(", ") || "Validation failed";
-      statusCode = 400;
-    }
 
-    return res.status(statusCode).json({
-      success: false,
-      message,
-      // error: error.message,   // keep only for development
-    });
+      return res.status(statusCode).json({
+        success: false,
+        message,
+        // error: error.message,   // keep only for development
+      });
+    }
   }
-}
   /* -------------------- DELETE -------------------- */
   static async delete(req, res) {
     try {
@@ -881,6 +884,7 @@ static async update(req, res) {
       if (item.imageUrl) {
         await deleteFromS3(item.imageUrl);
       }
+    await PositionService.reorder(TestSeries,"displayOrder")
 
       await item.destroy();
 
