@@ -2,6 +2,7 @@
 
 const { FreeVideoPlaylist, FreeVideo } = require("../models");
 const { Op } = require("sequelize");
+const PositionService = require("../utils/position.service");
 
 class FreeVideoController {
 
@@ -19,14 +20,8 @@ class FreeVideoController {
         position = (maxPosition || 0) + 1;
       }
 
-      const existing = await FreeVideoPlaylist.findOne({ where: { position } });
+      position = await PositionService.insert(FreeVideoPlaylist, "position", req.body.position)
 
-      if (existing) {
-        const maxPosition = await FreeVideoPlaylist.max("position");
-        return res.status(400).json({
-          message: `Position ${position} already used by "${existing.title}". Suggested ${(maxPosition || 0) + 1}`
-        });
-      }
 
       const item = await FreeVideoPlaylist.create({
         title: req.body.title,
@@ -68,28 +63,14 @@ class FreeVideoController {
 
       let position = req.body.position ?? item.position;
 
-      if (req.body.position !== undefined) {
+      position = await PositionService.swap(FreeVideoPlaylist, req.params.id, "position", req.body.position)
 
-        const existing = await FreeVideoPlaylist.findOne({
-          where: {
-            position,
-            id: { [Op.ne]: item.id }
-          }
-        });
-
-        if (existing) {
-          const maxPosition = await FreeVideoPlaylist.max("position");
-          return res.status(400).json({
-            message: `Position ${position} already used by "${existing.title}". Suggested ${(maxPosition || 0) + 1}`
-          });
-        }
-      }
 
       await item.update({
         title: req.body.title ?? item.title,
         description: req.body.description ?? item.description,
         subjectId: req.body.subjectId ?? item.subjectId,
-        position
+        position: newPo
       });
 
       return res.json(item);
@@ -137,16 +118,7 @@ class FreeVideoController {
         position = (maxPosition || 0) + 1;
       }
 
-      const existing = await FreeVideo.findOne({
-        where: { playlistId, position }
-      });
-
-      if (existing) {
-        const maxPosition = await FreeVideo.max("position", { where: { playlistId } });
-        return res.status(400).json({
-          message: `Position ${position} already used by "${existing.title}". Suggested ${(maxPosition || 0) + 1}`
-        });
-      }
+      const newPos = await PositionService.insert(FreeVideo, "position", req.body.position)
 
       const videoId = req.body.youtubeUrl.split("v=")[1]?.split("&")[0];
 
@@ -155,9 +127,9 @@ class FreeVideoController {
         title: req.body.title,
         youtubeUrl: req.body.youtubeUrl,
         youtubeVideoId: videoId,
-        description:req.body?.description || null,
+        description: req.body?.description || null,
         duration: req.body.duration,
-        position
+        position: newPos
       });
 
       return res.status(201).json(item);
@@ -191,33 +163,14 @@ class FreeVideoController {
 
       let position = req.body.position ?? item.position;
 
-      if (req.body.position !== undefined) {
-
-        const existing = await FreeVideo.findOne({
-          where: {
-            playlistId: item.playlistId,
-            position,
-            id: { [Op.ne]: item.id }
-          }
-        });
-
-        if (existing) {
-          const maxPosition = await FreeVideo.max("position", {
-            where: { playlistId: item.playlistId }
-          });
-
-          return res.status(400).json({
-            message: `Position ${position} already used by "${existing.title}". Suggested ${(maxPosition || 0) + 1}`
-          });
-        }
-      }
+      const newPosition = await PositionService.swap(FreeVideo, req.params.id, "position", req.body.position)
 
       await item.update({
         title: req.body.title ?? item.title,
         youtubeUrl: req.body.youtubeUrl ?? item.youtubeUrl,
         duration: req.body.duration ?? item.duration,
-        description:req.body.description ?? item.description,
-        position
+        description: req.body.description ?? item.description,
+        position: newPosition
       });
 
       return res.json(item);

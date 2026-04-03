@@ -6,6 +6,7 @@ const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
 const { encryptVideoPayload, decryptVideoToken } = require("../utils/videoCrypto");
 const { Op } = require("sequelize");
+const PositionService = require("../utils/position.service");
 // const NotificationController = require("./NotificationController");
 
 class VideoCourseController {
@@ -13,161 +14,134 @@ class VideoCourseController {
   /* ======================
       CREATE
   ====================== */
- static async create(req, res) {
-  try {
+  static async create(req, res) {
+    try {
 
-    const requiredFields = [
-      "title",
-      "videoSource",
-      "url",
-      "batchId",
-      "subjectId",
-    ];
+      const requiredFields = [
+        "title",
+        "videoSource",
+        "url",
+        "batchId",
+        "subjectId",
+      ];
 
-    for (const field of requiredFields) {
-      if (!req.body[field]) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} is required`,
-        });
+      for (const field of requiredFields) {
+        if (!req.body[field]) {
+          return res.status(400).json({
+            success: false,
+            message: `${field} is required`,
+          });
+        }
       }
-    }
 
-    const batchId = Number(req.body.batchId);
+      const batchId = Number(req.body.batchId);
 
-    /* ================= POSITION HANDLING ================= */
+      /* ================= POSITION HANDLING ================= */
 
-    let position = Number(req.body.position);
+      let position = await PositionService.insert(VideoCourse, "position", req.body.position)
 
-    if (!position || position < 1) {
-      const maxPosition = await VideoCourse.max("position", {
-        where: { batchId },
-      });
 
-      position = (maxPosition || 0) + 1;
-    }
+      /* ================= LIVE VALIDATION ================= */
 
-    const existingVideo = await VideoCourse.findOne({
-      where: {
+      const isLive = req.body.isLive === true || req.body.isLive === "true";
+
+      if (isLive) {
+        if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "DateOfLive and TimeOfLIve are required when the video is live",
+          });
+        }
+      }
+
+      /* ================= IMAGE ================= */
+
+      let imageUrl = null;
+
+      if (req.file) {
+        imageUrl = await uploadToS3(req.file, "videocourses");
+      }
+
+      /* ================= PAYLOAD ================= */
+
+      const payload = {
+        title: req.body.title.trim(),
+        videoSource: req.body.videoSource,
+        url: req.body.url.trim(),
+
         batchId,
-        position,
-      },
-      attributes: ["id", "title", "position"],
-    });
+        subjectId: Number(req.body.subjectId),
 
-    if (existingVideo) {
-      const maxPosition = await VideoCourse.max("position", {
-        where: { batchId },
+        position, // ⭐ added
+
+        isDownloadable:
+          req.body.isDownloadable === true ||
+          req.body.isDownloadable === "true",
+
+        isDemo:
+          req.body.isDemo === true ||
+          req.body.isDemo === "true",
+
+        isLive,
+        DateOfLive: isLive ? req.body.DateOfLive : null,
+        TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
+
+        dateOfClass: req.body.dateOfClass ?? null,
+        TimeOfClass: req.body.TimeOfClass ?? null,
+
+        status: "active",
+        imageUrl,
+      };
+
+      /* ================= CREATE VIDEO ================= */
+
+      const item = await VideoCourse.create(payload);
+
+      /* ================= TOKEN ================= */
+
+      const secureToken = encryptVideoPayload({
+        videoId: item.id,
+        batchId: item.batchId,
+        videoSource: item.videoSource,
+        exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
       });
 
-      return res.status(400).json({
+      await item.update({ secureToken });
+
+      /* ================= CACHE CLEAR ================= */
+
+      const redis = require("../config/redis");
+
+      await redis.del("videocourses");
+      await redis.del(`videocourses:batch:${batchId}`);
+
+      /* ================= RESPONSE ================= */
+
+      return res.status(201).json({
+        success: true,
+        message: "Video course created successfully",
+        data: {
+          ...item.toJSON(),
+          secureToken,
+        },
+      });
+
+    } catch (error) {
+      console.error("VideoCourse Create Error:", error);
+
+      return res.status(500).json({
         success: false,
-        message: `Position ${position} is already used by video "${existingVideo.title}" ${(maxPosition || 0) + 1}.`,
-        suggestedPosition: (maxPosition || 0) + 1,
+        message: "Server error",
       });
     }
-
-    /* ================= LIVE VALIDATION ================= */
-
-    const isLive = req.body.isLive === true || req.body.isLive === "true";
-
-    if (isLive) {
-      if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "DateOfLive and TimeOfLIve are required when the video is live",
-        });
-      }
-    }
-
-    /* ================= IMAGE ================= */
-
-    let imageUrl = null;
-
-    if (req.file) {
-      imageUrl = await uploadToS3(req.file, "videocourses");
-    }
-
-    /* ================= PAYLOAD ================= */
-
-    const payload = {
-      title: req.body.title.trim(),
-      videoSource: req.body.videoSource,
-      url: req.body.url.trim(),
-
-      batchId,
-      subjectId: Number(req.body.subjectId),
-
-      position, // ⭐ added
-
-      isDownloadable:
-        req.body.isDownloadable === true ||
-        req.body.isDownloadable === "true",
-
-      isDemo:
-        req.body.isDemo === true ||
-        req.body.isDemo === "true",
-
-      isLive,
-      DateOfLive: isLive ? req.body.DateOfLive : null,
-      TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
-
-      dateOfClass: req.body.dateOfClass ?? null,
-      TimeOfClass: req.body.TimeOfClass ?? null,
-
-      status: "active",
-      imageUrl,
-    };
-
-    /* ================= CREATE VIDEO ================= */
-
-    const item = await VideoCourse.create(payload);
-
-    /* ================= TOKEN ================= */
-
-    const secureToken = encryptVideoPayload({
-      videoId: item.id,
-      batchId: item.batchId,
-      videoSource: item.videoSource,
-      exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-    });
-
-    await item.update({ secureToken });
-
-    /* ================= CACHE CLEAR ================= */
-
-    const redis = require("../config/redis");
-
-    await redis.del("videocourses");
-    await redis.del(`videocourses:batch:${batchId}`);
-
-    /* ================= RESPONSE ================= */
-
-    return res.status(201).json({
-      success: true,
-      message: "Video course created successfully",
-      data: {
-        ...item.toJSON(),
-        secureToken,
-      },
-    });
-
-  } catch (error) {
-    console.error("VideoCourse Create Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
   }
-}
   /* ======================
       GET ALL
   ====================== */
   static async findAll(req, res) {
     try {
-     
+
       const items = await VideoCourse.findAll();
       return res.json(items);
     } catch (error) {
@@ -181,7 +155,7 @@ class VideoCourseController {
   static async findOne(req, res) {
     try {
       const { id } = req.params;
-  
+
       const item = await VideoCourse.findByPk(id);
       if (!item) {
         return res.status(404).json({ message: "Not found" });
@@ -498,317 +472,274 @@ class VideoCourseController {
     }
   }
 
- static async update(req, res) {
-  try {
+  static async update(req, res) {
+    try {
 
-    const item = await VideoCourse.findByPk(req.params.id);
+      const item = await VideoCourse.findByPk(req.params.id);
 
-    if (!item) {
-      return res.status(404).json({
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: "Video course not found",
+        });
+      }
+
+      /* ================= HELPERS ================= */
+
+      const toBool = (val) =>
+        val === true || val === "true" || val === 1 || val === "1";
+
+      const toIntOrNull = (val) => {
+        if (val === undefined || val === null || val === "") return null;
+        const n = Number(val);
+        return Number.isFinite(n) ? n : null;
+      };
+
+      const normalizeDate = (val) => {
+        if (val === undefined) return undefined;
+        if (!val || val === "null" || val === "0000-00-00") return null;
+        return val;
+      };
+
+      const normalizeTime = (val) => {
+        if (val === undefined) return undefined;
+        if (!val || val === "null" || val === "00:00:00") return null;
+        return val;
+      };
+
+      const trimOrUndefined = (val) => {
+        if (val === undefined || val === null) return undefined;
+        if (typeof val !== "string") return val;
+        return val.trim();
+      };
+
+      /* ================= DATE INPUT FIX ================= */
+
+      const incomingDateOfLive =
+        req.body.DateOfLive ?? req.body.dateOfLive;
+
+      const incomingTimeOfLive =
+        req.body.TimeOfLive ?? req.body.TimeOfLIve ?? req.body.timeOfLive;
+
+      const incomingDateOfClass =
+        req.body.dateOfClass ?? req.body.DateOfClass;
+
+      const incomingTimeOfClass =
+        req.body.TimeOfClass ?? req.body.timeOfClass;
+
+      /* ================= BOOLEAN FLAGS ================= */
+
+      const isDemo =
+        req.body.isDemo !== undefined ? toBool(req.body.isDemo) : item.isDemo;
+
+      const isLive =
+        req.body.isLive !== undefined ? toBool(req.body.isLive) : item.isLive;
+
+      const isLiveEnded =
+        req.body.isLiveEnded !== undefined
+          ? toBool(req.body.isLiveEnded)
+          : item.isLiveEnded;
+
+      const shouldClearDates = isLive === false;
+
+      /* ================= LIVE VALIDATION ================= */
+
+      if (isLive === true && isDemo === false) {
+
+        const finalDate = incomingDateOfLive ?? item.DateOfLive;
+
+        const finalTime =
+          incomingTimeOfLive ?? item.TimeOfLive ?? item.TimeOfLIve;
+
+        if (!finalDate) {
+          return res.status(400).json({
+            success: false,
+            message: "DateOfLive is required when isLive is true",
+          });
+        }
+
+        if (!finalTime) {
+          return res.status(400).json({
+            success: false,
+            message: "TimeOfLive is required when isLive is true",
+          });
+        }
+      }
+
+      /* ================= IMAGE ================= */
+
+      let imageUrl = item.imageUrl;
+
+      if (req.file) {
+        if (item.imageUrl) {
+          await deleteFromS3(item.imageUrl);
+        }
+
+        imageUrl = await uploadToS3(req.file, "videocourses");
+      }
+
+      /* ================= BATCH ================= */
+
+      const batchId =
+        req.body.batchId !== undefined
+          ? Number(req.body.batchId)
+          : item.batchId;
+
+      /* ================= POSITION VALIDATION ================= */
+
+      let position = await PositionService.swap(VideoCourse, id, "position", req.body.position)
+
+      /* ================= UPDATE PAYLOAD ================= */
+
+      const updateData = {
+
+        title: trimOrUndefined(req.body.title) ?? item.title,
+
+        videoSource: req.body.videoSource ?? item.videoSource,
+
+        url: trimOrUndefined(req.body.url) ?? item.url,
+
+        batchId,
+
+        subjectId:
+          req.body.subjectId !== undefined
+            ? toIntOrNull(req.body.subjectId)
+            : item.subjectId,
+
+        position,
+
+        isDownloadable:
+          req.body.isDownloadable !== undefined
+            ? toBool(req.body.isDownloadable)
+            : item.isDownloadable,
+
+        isDemo,
+        isLive,
+        isLiveEnded,
+
+        DateOfLive: shouldClearDates
+          ? null
+          : normalizeDate(incomingDateOfLive) !== undefined
+            ? normalizeDate(incomingDateOfLive)
+            : item.DateOfLive,
+
+        TimeOfLive: shouldClearDates
+          ? null
+          : normalizeTime(incomingTimeOfLive) !== undefined
+            ? normalizeTime(incomingTimeOfLive)
+            : item.TimeOfLive,
+
+        TimeOfLIve: shouldClearDates
+          ? null
+          : normalizeTime(incomingTimeOfLive) !== undefined
+            ? normalizeTime(incomingTimeOfLive)
+            : item.TimeOfLIve,
+
+        dateOfClass: shouldClearDates
+          ? null
+          : normalizeDate(incomingDateOfClass) !== undefined
+            ? normalizeDate(incomingDateOfClass)
+            : item.dateOfClass,
+
+        TimeOfClass: shouldClearDates
+          ? null
+          : normalizeTime(incomingTimeOfClass) !== undefined
+            ? normalizeTime(incomingTimeOfClass)
+            : item.TimeOfClass,
+
+        LiveEndAt:
+          req.body.isLiveEnded !== undefined && toBool(req.body.isLiveEnded)
+            ? new Date()
+            : item.LiveEndAt,
+
+        status:
+          req.body.status !== undefined
+            ? req.body.status === "active" || req.body.status === true
+              ? "active"
+              : "inactive"
+            : item.status,
+
+        imageUrl,
+      };
+
+      /* ================= UPDATE ================= */
+
+      await item.update(updateData);
+
+      /* ================= CACHE CLEAR ================= */
+
+      await redis.del("videocourses");
+      await redis.del(`videocourse:${item.id}`);
+      await redis.del(`videocourses:batch:${batchId}`);
+
+      return res.json({
+        success: true,
+        message: "Video course updated successfully",
+        data: item,
+      });
+
+    } catch (error) {
+
+      console.error("VideoCourse Update Error:", error);
+
+      return res.status(500).json({
         success: false,
-        message: "Video course not found",
+        message: "Update failed",
+        error: error.message,
       });
     }
+  }
 
-    /* ================= HELPERS ================= */
+  static async delete(req, res) {
+    try {
 
-    const toBool = (val) =>
-      val === true || val === "true" || val === 1 || val === "1";
+      const item = await VideoCourse.findByPk(req.params.id);
 
-    const toIntOrNull = (val) => {
-      if (val === undefined || val === null || val === "") return null;
-      const n = Number(val);
-      return Number.isFinite(n) ? n : null;
-    };
-
-    const normalizeDate = (val) => {
-      if (val === undefined) return undefined;
-      if (!val || val === "null" || val === "0000-00-00") return null;
-      return val;
-    };
-
-    const normalizeTime = (val) => {
-      if (val === undefined) return undefined;
-      if (!val || val === "null" || val === "00:00:00") return null;
-      return val;
-    };
-
-    const trimOrUndefined = (val) => {
-      if (val === undefined || val === null) return undefined;
-      if (typeof val !== "string") return val;
-      return val.trim();
-    };
-
-    /* ================= DATE INPUT FIX ================= */
-
-    const incomingDateOfLive =
-      req.body.DateOfLive ?? req.body.dateOfLive;
-
-    const incomingTimeOfLive =
-      req.body.TimeOfLive ?? req.body.TimeOfLIve ?? req.body.timeOfLive;
-
-    const incomingDateOfClass =
-      req.body.dateOfClass ?? req.body.DateOfClass;
-
-    const incomingTimeOfClass =
-      req.body.TimeOfClass ?? req.body.timeOfClass;
-
-    /* ================= BOOLEAN FLAGS ================= */
-
-    const isDemo =
-      req.body.isDemo !== undefined ? toBool(req.body.isDemo) : item.isDemo;
-
-    const isLive =
-      req.body.isLive !== undefined ? toBool(req.body.isLive) : item.isLive;
-
-    const isLiveEnded =
-      req.body.isLiveEnded !== undefined
-        ? toBool(req.body.isLiveEnded)
-        : item.isLiveEnded;
-
-    const shouldClearDates = isLive === false;
-
-    /* ================= LIVE VALIDATION ================= */
-
-    if (isLive === true && isDemo === false) {
-
-      const finalDate = incomingDateOfLive ?? item.DateOfLive;
-
-      const finalTime =
-        incomingTimeOfLive ?? item.TimeOfLive ?? item.TimeOfLIve;
-
-      if (!finalDate) {
-        return res.status(400).json({
+      if (!item) {
+        return res.status(404).json({
           success: false,
-          message: "DateOfLive is required when isLive is true",
+          message: "Video course not found"
         });
       }
 
-      if (!finalTime) {
-        return res.status(400).json({
-          success: false,
-          message: "TimeOfLive is required when isLive is true",
-        });
-      }
-    }
-
-    /* ================= IMAGE ================= */
-
-    let imageUrl = item.imageUrl;
-
-    if (req.file) {
       if (item.imageUrl) {
         await deleteFromS3(item.imageUrl);
       }
 
-      imageUrl = await uploadToS3(req.file, "videocourses");
-    }
+      const batchId = item.batchId;
 
-    /* ================= BATCH ================= */
+      // DELETE VIDEO
+      await item.destroy();
 
-    const batchId =
-      req.body.batchId !== undefined
-        ? Number(req.body.batchId)
-        : item.batchId;
+      /* ================= REORDER POSITIONS (BATCH-WISE) ================= */
 
-    /* ================= POSITION VALIDATION ================= */
+      await PositionService.reorder(VideoCourse, "position")
 
-    let position =
-      req.body.position !== undefined
-        ? Number(req.body.position)
-        : item.position;
 
-    if (req.body.position !== undefined) {
+      /* ================= CLEAR CACHE ================= */
 
-      if (!position || position < 1) {
+      await Promise.all([
+        redis.del("videocourses"),
+        redis.del(`videocourse:${req.params.id}`),
+        redis.del(`videocourses:batch:${batchId}`)
+      ]);
 
-        const maxPosition = await VideoCourse.max("position", {
-          where: { batchId },
-        });
-
-        position = (maxPosition || 0) + 1;
-      }
-
-      const existingVideo = await VideoCourse.findOne({
-        where: {
-          batchId,
-          position,
-          id: { [Op.ne]: item.id },
-        },
-        attributes: ["id", "title", "position"],
+      return res.json({
+        success: true,
+        message: "Video course deleted and positions reordered successfully"
       });
 
-      if (existingVideo) {
+    } catch (error) {
 
-        const maxPosition = await VideoCourse.max("position", {
-          where: { batchId },
-        });
+      console.error("Delete Error:", error);
 
-        return res.status(400).json({
-          success: false,
-          message: `Position ${position} is already used by video "${existingVideo.title} - Available position: ${(maxPosition || 0) + 1}".`,
-          suggestedPosition: (maxPosition || 0) + 1,
-        });
-      }
-    }
-
-    /* ================= UPDATE PAYLOAD ================= */
-
-    const updateData = {
-
-      title: trimOrUndefined(req.body.title) ?? item.title,
-
-      videoSource: req.body.videoSource ?? item.videoSource,
-
-      url: trimOrUndefined(req.body.url) ?? item.url,
-
-      batchId,
-
-      subjectId:
-        req.body.subjectId !== undefined
-          ? toIntOrNull(req.body.subjectId)
-          : item.subjectId,
-
-      position,
-
-      isDownloadable:
-        req.body.isDownloadable !== undefined
-          ? toBool(req.body.isDownloadable)
-          : item.isDownloadable,
-
-      isDemo,
-      isLive,
-      isLiveEnded,
-
-      DateOfLive: shouldClearDates
-        ? null
-        : normalizeDate(incomingDateOfLive) !== undefined
-          ? normalizeDate(incomingDateOfLive)
-          : item.DateOfLive,
-
-      TimeOfLive: shouldClearDates
-        ? null
-        : normalizeTime(incomingTimeOfLive) !== undefined
-          ? normalizeTime(incomingTimeOfLive)
-          : item.TimeOfLive,
-
-      TimeOfLIve: shouldClearDates
-        ? null
-        : normalizeTime(incomingTimeOfLive) !== undefined
-          ? normalizeTime(incomingTimeOfLive)
-          : item.TimeOfLIve,
-
-      dateOfClass: shouldClearDates
-        ? null
-        : normalizeDate(incomingDateOfClass) !== undefined
-          ? normalizeDate(incomingDateOfClass)
-          : item.dateOfClass,
-
-      TimeOfClass: shouldClearDates
-        ? null
-        : normalizeTime(incomingTimeOfClass) !== undefined
-          ? normalizeTime(incomingTimeOfClass)
-          : item.TimeOfClass,
-
-      LiveEndAt:
-        req.body.isLiveEnded !== undefined && toBool(req.body.isLiveEnded)
-          ? new Date()
-          : item.LiveEndAt,
-
-      status:
-        req.body.status !== undefined
-          ? req.body.status === "active" || req.body.status === true
-            ? "active"
-            : "inactive"
-          : item.status,
-
-      imageUrl,
-    };
-
-    /* ================= UPDATE ================= */
-
-    await item.update(updateData);
-
-    /* ================= CACHE CLEAR ================= */
-
-    await redis.del("videocourses");
-    await redis.del(`videocourse:${item.id}`);
-    await redis.del(`videocourses:batch:${batchId}`);
-
-    return res.json({
-      success: true,
-      message: "Video course updated successfully",
-      data: item,
-    });
-
-  } catch (error) {
-
-    console.error("VideoCourse Update Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Update failed",
-      error: error.message,
-    });
-  }
-}
-
-static async delete(req, res) {
-  try {
-
-    const item = await VideoCourse.findByPk(req.params.id);
-
-    if (!item) {
-      return res.status(404).json({
+      return res.status(500).json({
         success: false,
-        message: "Video course not found"
+        message: "Delete failed",
+        error: error.message
       });
     }
-
-    if (item.imageUrl) {
-      await deleteFromS3(item.imageUrl);
-    }
-
-    const batchId = item.batchId;
-
-    // DELETE VIDEO
-    await item.destroy();
-
-    /* ================= REORDER POSITIONS (BATCH-WISE) ================= */
-
-    const videos = await VideoCourse.findAll({
-      where: { batchId },
-      order: [["position", "ASC"]]
-    });
-
-    for (let i = 0; i < videos.length; i++) {
-      await videos[i].update({ position: i + 1 });
-    }
-
-    /* ================= CLEAR CACHE ================= */
-
-    await Promise.all([
-      redis.del("videocourses"),
-      redis.del(`videocourse:${req.params.id}`),
-      redis.del(`videocourses:batch:${batchId}`)
-    ]);
-
-    return res.json({
-      success: true,
-      message: "Video course deleted and positions reordered successfully"
-    });
-
-  } catch (error) {
-
-    console.error("Delete Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Delete failed",
-      error: error.message
-    });
   }
-}
 }
 
 module.exports = VideoCourseController;
