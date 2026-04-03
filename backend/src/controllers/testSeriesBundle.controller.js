@@ -247,7 +247,7 @@ module.exports = {
       }
 
       await t.commit();
-      await PositionService.swap(TestSeriesBundle, "displayOrder", payload.displayOrder, t);
+      await PositionService.swap(TestSeriesBundle,id, "displayOrder", payload.displayOrder, t);
       const updated = await TestSeriesBundle.findByPk(bundle.id, {
         include: [{ model: TestSeries, as: "testSeries", through: { attributes: [] } }],
       });

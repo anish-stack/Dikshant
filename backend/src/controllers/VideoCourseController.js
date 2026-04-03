@@ -587,7 +587,7 @@ class VideoCourseController {
 
       /* ================= POSITION VALIDATION ================= */
 
-      let position = await PositionService.swap(VideoCourse, id, "position", req.body.position)
+      let position = await PositionService.swap(VideoCourse, req.params.id, "position", req.body.position)
 
       /* ================= UPDATE PAYLOAD ================= */
 
