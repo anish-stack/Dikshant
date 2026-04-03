@@ -191,7 +191,7 @@ class VideoCourseController {
       const buildQueryOptions = (where) => {
         const queryOptions = {
           where,
-          order: [["position", "ASC"]],
+          order: [["position", "DESC"]],
         };
 
         if (isAdmin) {
