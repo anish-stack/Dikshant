@@ -77,7 +77,7 @@ class SubjectController {
     try {
 
       const items = await Subject.findAll({
-        order: [["position", "ASC"]] // ⭐ order by position
+        order: [["position", "DESC"]] // ⭐ order by position
       });
 
       return res.json(items);
