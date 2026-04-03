@@ -7,6 +7,28 @@ import PageBreadcrumb from "../../../components/common/PageBreadCrumb";
 import Input from "../../../components/form/input/InputField";
 import TextArea from "../../../components/form/input/TextArea";
 import Form from "../../../components/form/Form";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+
+import {
+  useSortable,
+} from "@dnd-kit/sortable";
+
+import { CSS } from "@dnd-kit/utilities";
 import Label from "../../../components/form/Label";
 import {
   Loader2,
@@ -33,6 +55,10 @@ interface Subject {
 
 type BatchStatus = "active" | "inactive";
 
+interface SortableSubjectProps {
+  id: number;
+  name: string;
+}
 interface EditBatchFormData {
   name: string;
   displayOrder: number;
@@ -110,6 +136,40 @@ interface Program {
   slug: string;
 }
 
+
+const SortableSubjectItem = ({ id, name }: SortableSubjectProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`flex items-center gap-3 p-3 mb-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all ${isDragging ? "ring-2 ring-indigo-500 shadow-lg" : ""
+        }`}
+    >
+      <div className="text-gray-400">
+        ☰
+      </div>
+      <span className="flex-1 text-sm font-medium">{name}</span>
+      <div className="text-xs text-gray-400">drag to reorder</div>
+    </div>
+  );
+};
 const EditBatch = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -200,6 +260,23 @@ const EditBatch = () => {
 
     setEmiSchedule(schedule);
   }, [isEmi, emiMonths, finalPrice]);
+
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) return;
+
+    setSelectedSubjectIds((items) => {
+      const oldIndex = items.indexOf(active.id as number);
+      const newIndex = items.indexOf(over.id as number);
+
+      if (oldIndex === -1 || newIndex === -1) return items;
+
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  };
+
 
   const totalEmi = emiSchedule.reduce((sum, item) => sum + item.amount, 0);
 
@@ -574,7 +651,16 @@ const EditBatch = () => {
       setSubmitting(false);
     }
   };
-
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,        // prevents accidental drag on click
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
   // Loading state
   if (loading) {
     return (
@@ -786,6 +872,42 @@ const EditBatch = () => {
               </div>
             </div>
 
+            {/* Reorderable Subjects */}
+            {/* Reorderable Subjects */}
+            {selectedSubjectIds.length > 0 && (
+              <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-xl p-5 bg-gray-50 dark:bg-gray-900">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4 flex items-center gap-2">
+                  <span>Drag to reorder subjects</span>
+                  <span className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
+                    {selectedSubjectIds.length} selected
+                  </span>
+                </p>
+
+                <DndContext
+                  sensors={sensors}                    // ← Use the sensors defined above
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={selectedSubjectIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-2">
+                      {selectedSubjectIds.map((id) => {
+                        const subject = allSubjects.find((s) => s.id === id);
+                        return subject ? (
+                          <SortableSubjectItem
+                            key={id}
+                            id={id}
+                            name={subject.name}
+                          />
+                        ) : null;
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            )}
             <div className="mb-6">
               <Label className="text-sm">
                 Included Quizzes{" "}
