@@ -927,92 +927,133 @@ export default function UserProfiles() {
       </div>
 
       {/* View Courses Modal */}
-      <Modal
-        isOpen={isViewCoursesOpen}
-        onClose={() => setIsViewCoursesOpen(false)}
-        title={`Courses - ${selectedUser?.name}`}
+<Modal
+  isOpen={isViewCoursesOpen}
+  onClose={() => setIsViewCoursesOpen(false)}
+  title={`Courses - ${selectedUser?.name || "User"}`}
+>
+
+  {(selectedUser?.courses || []).length === 0 && (
+    <p className="text-center text-gray-500 py-4">
+      No courses found
+    </p>
+  )}
+
+  {(selectedUser?.courses || []).map((course) => {
+
+    const batch = course?.batch || {};
+    const hasValidBatch = Boolean(batch?.id && batch?.name);
+
+    /* ================= DATE SAFE HANDLING ================= */
+
+    const paymentDate = course?.paymentDate
+      ? new Date(course.paymentDate)
+      : null;
+
+    const validityDays = Number(course?.accessValidityDays || 0);
+
+    let expiryDate = null;
+    let remainingDays = 0;
+    let isExpired = false;
+
+    if (paymentDate && !isNaN(paymentDate)) {
+
+      expiryDate = new Date(paymentDate);
+      expiryDate.setDate(expiryDate.getDate() + validityDays);
+
+      const today = new Date();
+
+      remainingDays = Math.ceil(
+        (expiryDate.getTime() - today.getTime()) /
+        (1000 * 60 * 60 * 24)
+      );
+
+      isExpired = remainingDays <= 0;
+    }
+
+    return (
+      <div
+        key={course?.id || Math.random()}
+        className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4
+        dark:border-gray-700 dark:bg-white/[0.03]"
       >
-     {selectedUser.courses.map((course) => {
-  const batch = course?.batch;
-  const hasValidBatch = batch && batch?.name;
 
-  // 📅 Calculate expiry
-  const paymentDate = new Date(course.paymentDate);
-  const validityDays = course.accessValidityDays || 0;
+        <div className="flex items-center gap-3">
 
-  const expiryDate = new Date(paymentDate);
-  expiryDate.setDate(expiryDate.getDate() + validityDays);
-
-  const today = new Date();
-
-  const remainingDays = Math.ceil(
-    (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  const isExpired = remainingDays <= 0;
-
-  return (
-    <div
-      key={course.id}
-      className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4
-      dark:border-gray-700 dark:bg-white/[0.03]"
-    >
-      <div className="flex items-center gap-3">
-        {batch?.imageUrl && (
-          <img
-            src={batch.imageUrl}
-            alt={batch.name}
-            className="h-12 w-12 rounded-md object-cover border"
-          />
-        )}
-
-        <div>
-          <p className="font-medium text-gray-900 dark:text-white">
-            {batch?.name || "N/A"}
-          </p>
-
-          {batch && (
-            <p className="text-sm text-gray-500">
-              <span className="line-through mr-2">
-                ₹{batch.batchPrice}
-              </span>
-              <span className="text-green-600 font-semibold">
-                ₹{batch.batchDiscountPrice}
-              </span>
-            </p>
+          {batch?.imageUrl && (
+            <img
+              src={batch.imageUrl}
+              alt={batch?.name || "Course"}
+              className="h-12 w-12 rounded-md object-cover border"
+              onError={(e) => {
+                e.currentTarget.src =
+                  "https://via.placeholder.com/48";
+              }}
+            />
           )}
 
-          {/* ⭐ Expiry Info */}
-          <p className="text-xs mt-1">
-            {isExpired ? (
-              <span className="text-red-600 font-semibold">
-                Expired on {expiryDate.toLocaleDateString()}
-              </span>
-            ) : (
-              <span className="text-blue-600 font-medium">
-                {remainingDays} days left • Expires on{" "}
-                {expiryDate.toLocaleDateString()}
-              </span>
-            )}
-          </p>
-        </div>
-      </div>
+          <div>
 
-      {hasValidBatch && (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            router(`/all-courses/view/${batch.id}`);
-          }}
-        >
-          View Course
-        </Button>
-      )}
-    </div>
-  );
-})}
-      </Modal>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {batch?.name || "Unknown Course"}
+            </p>
+
+            {batch?.batchPrice && (
+              <p className="text-sm text-gray-500">
+
+                {batch?.batchPrice && (
+                  <span className="line-through mr-2">
+                    ₹{batch.batchPrice}
+                  </span>
+                )}
+
+                {batch?.batchDiscountPrice && (
+                  <span className="text-green-600 font-semibold">
+                    ₹{batch.batchDiscountPrice}
+                  </span>
+                )}
+
+              </p>
+            )}
+
+            {/* Expiry Info */}
+            {expiryDate && (
+              <p className="text-xs mt-1">
+
+                {isExpired ? (
+                  <span className="text-red-600 font-semibold">
+                    Expired on {expiryDate.toLocaleDateString()}
+                  </span>
+                ) : (
+                  <span className="text-blue-600 font-medium">
+                    {remainingDays} days left • Expires on{" "}
+                    {expiryDate.toLocaleDateString()}
+                  </span>
+                )}
+
+              </p>
+            )}
+
+          </div>
+        </div>
+
+        {hasValidBatch && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              router(`/all-courses/view/${batch.id}`)
+            }
+          >
+            View Course
+          </Button>
+        )}
+
+      </div>
+    );
+  })}
+
+</Modal>
 
       {/* Assign Course Modal */}
       <Modal
