@@ -4,30 +4,35 @@ const { Op } = require("sequelize");
 
 class PositionService {
 
-    static async insert(Model, column, value, transaction = null) {
+  static async insert(Model, column, value, where = {}, transaction = null) {
 
-        let newPosition = Number(value);
+    let newPosition = Number(value);
 
-        if (!newPosition || newPosition < 1) {
+    if (!newPosition || newPosition < 1) {
 
-            const maxPosition = await Model.max(column, { transaction });
-            newPosition = (maxPosition || 0) + 1;
+        const maxPosition = await Model.max(column, {
+            where,
+            transaction
+        });
 
-        } else {
+        newPosition = (maxPosition || 0) + 1;
 
-            await Model.increment(
-                { [column]: 1 },
-                {
-                    where: {
-                        [column]: { [Op.gte]: newPosition }
-                    },
-                    transaction
-                }
-            );
-        }
+    } else {
 
-        return newPosition;
+        await Model.increment(
+            { [column]: 1 },
+            {
+                where: {
+                    ...where,
+                    [column]: { [Op.gte]: newPosition }
+                },
+                transaction
+            }
+        );
     }
+
+    return newPosition;
+}
 
     static async swap(Model, id, column, newValue, transaction = null) {
 

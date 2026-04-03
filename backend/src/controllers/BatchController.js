@@ -582,137 +582,137 @@ class BatchController {
   // =========================
   // UPDATE
   // =========================
-static async update(req, res) {
-  try {
-    const batchId = req.params.id;
+  static async update(req, res) {
+    try {
+      const batchId = req.params.id;
 
-    const item = await Batch.findByPk(batchId);
-    if (!item) {
-      return res.status(404).json({ message: "Batch not found" });
-    }
-
-    const { Op } = require("sequelize");
-
-    /* ================= IMAGE ================= */
-
-    let imageUrl = item.imageUrl;
-
-    if (req.file) {
-      if (item.imageUrl) {
-        await deleteFromS3(item.imageUrl);
+      const item = await Batch.findByPk(batchId);
+      if (!item) {
+        return res.status(404).json({ message: "Batch not found" });
       }
 
-      imageUrl = await uploadToS3(req.file, "batchs");
-    }
+      const { Op } = require("sequelize");
 
-    /* ================= NORMALIZE ARRAYS ================= */
+      /* ================= IMAGE ================= */
 
-    const quizIds =
-      typeof req.body.quizIds === "string"
-        ? JSON.parse(req.body.quizIds)
-        : req.body.quizIds;
+      let imageUrl = item.imageUrl;
 
-    const testSeriesIds =
-      typeof req.body.testSeriesIds === "string"
-        ? JSON.parse(req.body.testSeriesIds)
-        : req.body.testSeriesIds;
-
-    /* ================= SUBJECT ORDER ================= */
-
-    let subjectIds =
-      typeof req.body.subjectId === "string"
-        ? JSON.parse(req.body.subjectId)
-        : req.body.subjectId;
-
-    subjectIds = Array.isArray(subjectIds) ? subjectIds.map(Number) : [];
-
-    /* ================= EMI ================= */
-
-    const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
-
-    /* ================= POSITION VALIDATION ================= */
-
-    let position = Number(req.body.position);
-
-    if (position) {
-
-      const existingBatch = await Batch.findOne({
-        where: {
-          position,
-          id: { [Op.ne]: batchId }
+      if (req.file) {
+        if (item.imageUrl) {
+          await deleteFromS3(item.imageUrl);
         }
-      });
 
-      if (existingBatch) {
+        imageUrl = await uploadToS3(req.file, "batchs");
+      }
 
-        await existingBatch.update({
-          position: item.position
+      /* ================= NORMALIZE ARRAYS ================= */
+
+      const quizIds =
+        typeof req.body.quizIds === "string"
+          ? JSON.parse(req.body.quizIds)
+          : req.body.quizIds;
+
+      const testSeriesIds =
+        typeof req.body.testSeriesIds === "string"
+          ? JSON.parse(req.body.testSeriesIds)
+          : req.body.testSeriesIds;
+
+      /* ================= SUBJECT ORDER ================= */
+
+      let subjectIds =
+        typeof req.body.subjectId === "string"
+          ? JSON.parse(req.body.subjectId)
+          : req.body.subjectId;
+
+      subjectIds = Array.isArray(subjectIds) ? subjectIds.map(Number) : [];
+
+      /* ================= EMI ================= */
+
+      const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
+
+      /* ================= POSITION VALIDATION ================= */
+
+      let position = Number(req.body.position);
+
+      if (position) {
+
+        const existingBatch = await Batch.findOne({
+          where: {
+            position,
+            id: { [Op.ne]: batchId }
+          }
         });
 
+        if (existingBatch) {
+
+          await existingBatch.update({
+            position: item.position
+          });
+
+        }
+
+      } else {
+        position = item.position;
       }
 
-    } else {
-      position = item.position;
+      /* ================= UPDATE PAYLOAD ================= */
+
+      const payload = {
+        name: req.body.name,
+        slug: req.body.name ? generateSlug(req.body.name) : item.slug,
+
+        displayOrder: req.body.displayOrder,
+        position,
+
+        programId: req.body.programId,
+        subjectId: JSON.stringify(subjectIds),
+
+        startDate: req.body.startDate,
+        endDate: req.body.endDate,
+        registrationStartDate: req.body.registrationStartDate,
+        registrationEndDate: req.body.registrationEndDate,
+
+        status: req.body.status,
+        shortDescription: req.body.shortDescription,
+        longDescription: req.body.longDescription,
+
+        medium: req.body.medium || "",
+        offerText: req.body.offerText,
+        fee_one_time: req.body.fee_one_time,
+        fee_inst: req.body.fee_inst,
+        note: req.body.note,
+
+        batchPrice: req.body.batchPrice,
+        batchDiscountPrice: req.body.batchDiscountPrice,
+        gst: req.body.gst,
+        offerValidityDays: req.body.offerValidityDays,
+
+        quizIds: Array.isArray(quizIds) ? quizIds : [],
+        testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
+
+        isEmi: Boolean(req.body.isEmi),
+        emiTotal: req.body.emiTotal || null,
+        emiSchedule: emiSchedule || null,
+
+        category: req.body.category,
+        imageUrl,
+      };
+
+      await item.update(payload);
+
+      await BatchController.clearBatchCache(batchId);
+
+      return res.json(item);
+
+    } catch (err) {
+
+      return res.status(500).json({
+        message: "Error updating batch",
+        error: err.message,
+      });
+
     }
-
-    /* ================= UPDATE PAYLOAD ================= */
-
-    const payload = {
-      name: req.body.name,
-      slug: req.body.name ? generateSlug(req.body.name) : item.slug,
-
-      displayOrder: req.body.displayOrder,
-      position,
-
-      programId: req.body.programId,
-      subjectId: JSON.stringify(subjectIds),
-
-      startDate: req.body.startDate,
-      endDate: req.body.endDate,
-      registrationStartDate: req.body.registrationStartDate,
-      registrationEndDate: req.body.registrationEndDate,
-
-      status: req.body.status,
-      shortDescription: req.body.shortDescription,
-      longDescription: req.body.longDescription,
-
-      medium: req.body.medium || "",
-      offerText: req.body.offerText,
-      fee_one_time: req.body.fee_one_time,
-      fee_inst: req.body.fee_inst,
-      note: req.body.note,
-
-      batchPrice: req.body.batchPrice,
-      batchDiscountPrice: req.body.batchDiscountPrice,
-      gst: req.body.gst,
-      offerValidityDays: req.body.offerValidityDays,
-
-      quizIds: Array.isArray(quizIds) ? quizIds : [],
-      testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
-
-      isEmi: Boolean(req.body.isEmi),
-      emiTotal: req.body.emiTotal || null,
-      emiSchedule: emiSchedule || null,
-
-      category: req.body.category,
-      imageUrl,
-    };
-
-    await item.update(payload);
-
-    await BatchController.clearBatchCache(batchId);
-
-    return res.json(item);
-
-  } catch (err) {
-
-    return res.status(500).json({
-      message: "Error updating batch",
-      error: err.message,
-    });
-
   }
-}
   // =========================
   // DELETE
   // =========================

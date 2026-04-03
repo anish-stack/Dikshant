@@ -51,12 +51,7 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
         videoCount: videoCountBySubject[sub.id] || 0,
     }));
 
-    const sortedSubjectList = [...subjectList].sort((a, b) => {
-        if (b.videoCount > 0 && a.videoCount === 0) return 1;   // b has video → b first
-        if (a.videoCount > 0 && b.videoCount === 0) return -1;  // a has video → a first
-
-        return a.name.localeCompare(b.name);
-    });
+    const sortedSubjectList = [...subjectList];
 
     const handleSubjectPress = (subjectId) => {
         navigation.navigate('view-all-videos', {
