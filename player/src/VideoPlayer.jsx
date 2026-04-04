@@ -243,6 +243,8 @@ export default function VideoPlayer({
 
     playerRef.current = new window.YT.Player("yt-player", {
       videoId,
+      width: "100%",   // ✅ yeh add karo
+      height: "100%",  // ✅ yeh add karo
       playerVars: {
         autoplay: 1, controls: 0, disablekb: 0, fs: 0,
         rel: 0, modestbranding: 1, playsinline: 1,
@@ -664,8 +666,7 @@ export default function VideoPlayer({
     >
       {/* ── YouTube iframe ─────────────────────────────────────────────────── */}
       <div className="relative w-full h-full">
-        <div id="yt-player" className="absolute inset-0 w-full h-full" />
-
+        <div id="yt-player" className="absolute inset-0 w-full h-full" style={{ aspectRatio: 'unset' }} />
         <VideoWatermark
           userId={`${user?.name}+${new Date().toLocaleTimeString()}+${user?.id}`}
         />
@@ -683,11 +684,12 @@ export default function VideoPlayer({
       <div
         className={`absolute inset-0 flex flex-col justify-end transition-opacity duration-300 pointer-events-none ${showControls ? "opacity-100" : "opacity-0"
           }`}
+        style={{ height: '100%', maxHeight: '100dvh' }}
       >
         {/* Gradient scrim */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-transparent pointer-events-none" />
 
-        <div className="relative z-50 space-y-1.5 sm:space-y-3 p-2 sm:p-5 pointer-events-auto">
+        <div className="relative z-50 space-y-1.5 sm:space-y-3 p-2 sm:p-5 pointer-events-auto pb-safe">
           {/* ── Progress bar ─────────────────────────────────────────────── */}
           <div className="px-1">
             <div className="relative group/bar">
@@ -864,7 +866,13 @@ export default function VideoPlayer({
 
       {/* ── Styles ─────────────────────────────────────────────────────────── */}
       <style>{`
-
+#yt-player iframe {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
       /* Lock video page to true fullscreen in landscape on mobile */
 @media screen and (max-width: 768px) and (orientation: landscape) {
   header,
@@ -880,16 +888,39 @@ export default function VideoPlayer({
   body {
     overflow: hidden !important;
   }
-
+#yt-player,
+  #yt-player iframe {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+  }
   /* Make the video wrapper fill entire screen */
   .vp-root {
-    position: fixed !important;
+       position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     width: 100vw !important;
-    height: 100dvh !important;
+    height: 100dvh !important;   /* <-- dvh important hai */
     z-index: 9999 !important;
   }
+
+
+  .vp-root > div:last-of-type {   /* controls overlay */
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+    ]
+   .vp-root .absolute.inset-0.flex.flex-col.justify-end {
+    justify-content: flex-end !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+
 }
         .vp-slider {
           background: linear-gradient(
