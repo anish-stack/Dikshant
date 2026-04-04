@@ -865,93 +865,69 @@ export default function VideoPlayer({
       )}
 
       {/* ── Styles ─────────────────────────────────────────────────────────── */}
-      <style>{`
-#yt-player iframe {
-  width: 100% !important;
-  height: 100% !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-}
-      /* Lock video page to true fullscreen in landscape on mobile */
-@media screen and (max-width: 768px) and (orientation: landscape) {
-  header,
-  nav,
-  .navbar,
-  [class*="header"],
-  [class*="Header"],
-  [class*="navbar"],
-  [class*="Navbar"] {
-    display: none !important;
-  }
-
-  body {
-    overflow: hidden !important;
-  }
-#yt-player,
+<style>{`
   #yt-player iframe {
     position: absolute !important;
     top: 50% !important;
     left: 50% !important;
+    width: 177.78vh !important;
+    height: 56.25vw !important;
+    min-width: 100% !important;
+    min-height: 100% !important;
     transform: translate(-50%, -50%) !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    max-width: 100vw !important;
-    max-height: 100dvh !important;
-  }
-  /* Make the video wrapper fill entire screen */
-  .vp-root {
-       position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important;   /* <-- dvh important hai */
-    z-index: 9999 !important;
   }
 
+  @media screen and (orientation: landscape) {
+    header, nav, .navbar,
+    [class*="header"], [class*="Header"],
+    [class*="navbar"], [class*="Navbar"] {
+      display: none !important;
+    }
 
-  .vp-root > div:last-of-type {   /* controls overlay */
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+    body {
+      overflow: hidden !important;
+    }
+
+    .vp-root {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+      z-index: 9999 !important;
+    }
   }
-    ]
-   .vp-root .absolute.inset-0.flex.flex-col.justify-end {
-    justify-content: flex-end !important;
-    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+
+  .vp-slider {
+    background: linear-gradient(
+      to right,
+      #3b82f6 0%,
+      #3b82f6 ${progress}%,
+      rgba(255,255,255,0.2) ${progress}%,
+      rgba(255,255,255,0.2) 100%
+    );
+    height: 4px;
+    cursor: pointer;
   }
-
-
-}
-        .vp-slider {
-          background: linear-gradient(
-            to right,
-            #3b82f6 0%,
-            #3b82f6 ${progress}%,
-            rgba(255,255,255,0.2) ${progress}%,
-            rgba(255,255,255,0.2) 100%
-          );
-          height: 4px;
-          cursor: pointer;
-        }
-        .vp-slider:hover { height: 6px; transition: height 0.15s; }
-        .vp-slider::-webkit-slider-thumb {
-          appearance: none;
-          width: 14px; height: 14px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
-        }
-        .vp-slider::-moz-range-thumb {
-          width: 14px; height: 14px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: none;
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
-        }
-        .hover\\:bg-white\\/8:hover { background-color: rgba(255,255,255,0.08); }
-      `}</style>
+  .vp-slider:hover { height: 6px; transition: height 0.15s; }
+  .vp-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+  }
+  .vp-slider::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+  }
+  .hover\\:bg-white\\/8:hover { background-color: rgba(255,255,255,0.08); }
+`}</style>
     </div>
   )
 }
