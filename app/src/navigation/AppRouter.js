@@ -63,6 +63,9 @@ import TestSeriesBundleView from "../../pages/TestSeries/Bundle/TestSeriesBundle
 import QuizBundleDetails from "../../pages/Quiz/Bundle/QuizBundleDetails";
 import AllPlayList from "../../pages/free_videos/AllPlayList";
 import VideoPlayerFreeScreen from "../../pages/free_videos/VideoPlayerFreeScreen";
+import AllStudyMaterialCats from "../../pages/study_material/AllStudyMaterialCats";
+import StudyMaterials from "../../pages/study_material/StudyMaterials";
+import StudyMaterialDetails from "../../pages/study_material/StudyMaterialDetails";
 
 const Stack = createNativeStackNavigator();
 
@@ -158,6 +161,12 @@ export default function AppRouter({ navigationRef }) {
         {/* Scholarship */}
         <Stack.Screen name="apply-sch" component={Scholarship} />
         <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
+
+        {/* Study Material  */}
+        <Stack.Screen name="study_material" component={AllStudyMaterialCats} />
+        <Stack.Screen name="StudyMaterials" component={StudyMaterials} />
+        <Stack.Screen name="StudyMaterials-details" component={StudyMaterialDetails} />
+
 
         {/* Share */}
         <Stack.Screen name="ShareApp" component={ShareAppScreen} />

@@ -28,10 +28,10 @@ const BUNDLE_ENDPOINT = `${API_URL_LOCAL_ENDPOINT}/testseries-bundles`;
 
 // ─── Tab Config ────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'all',       label: 'All',        icon: 'layers' },
-  { id: 'bundle',    label: 'Bundles',    icon: 'package' },
-  { id: 'objective', label: 'Objective',  icon: 'check-square' },
-  { id: 'my',        label: 'My Tests',   icon: 'star' },
+  { id: 'all',       label: 'All Tests',        icon: 'layers' },
+  { id: 'objective', label: 'Prelims',  icon: 'check-square' },
+  { id: 'subjective', label: 'Mains',  icon: 'check-square' },
+  { id: 'my', label: 'My Tests',   icon: 'star' },
 ];
 
 // ─── Animated Tab Bar ─────────────────────────────────────────────────────────

@@ -91,6 +91,7 @@ export default function CourseVideos() {
   const initialLimit = Number(searchParams.get("limit")) || 10;
   const initialSearch = searchParams.get("search") || "";
 
+  const [batch, setBatch] = useState(null)
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -154,7 +155,8 @@ export default function CourseVideos() {
         axios.get(`${API_URL}/batch/${batchId}`, { params }),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
-
+      console.log("subjectRes", subjectRes.data)
+      setBatch(subjectRes.data)
       setVideos(videoRes.data.data || []);
       setSubjects(subjectRes.data.subjects || []);
 
@@ -369,7 +371,7 @@ export default function CourseVideos() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Course Videos – Batch {batchId}
+              Course Videos – Batch {batch?.name || batchId} ({batch?.category || ""})
             </h1>
             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
               Manage videos with server-side pagination & search
@@ -843,18 +845,20 @@ export default function CourseVideos() {
                 />
               </div>
               {/* Position */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Position *
-                </label>
-                <input
-                  type="number"
-                  value={form.position}
-                  onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  required
-                />
-              </div>
+              {batch?.category === "recorded" && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Position *
+                  </label>
+                  <input
+                    type="number"
+                    value={form.position}
+                    onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) })}
+                    className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              )}
 
               {/* Source */}
               <div>

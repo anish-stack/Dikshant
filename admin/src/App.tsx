@@ -66,6 +66,10 @@ import EditQuizBundle from "./pages/Quiz/Bundle/EditQuizBundle";
 import Transactions from "./pages/Payments/transactions";
 import Coupons from "./pages/Payments/coupons";
 import AllPlayList from "./pages/free-videos/AllPlayList";
+import AllStudyMaterialsCategories from "./pages/StudyMaterial/AllStudyMaterialsCateories";
+import AllStudyMaterials from "./pages/StudyMaterial/AllStudyMaterials";
+import AllStudyMaterialPurchaseHistory from "./pages/StudyMaterial/AllStudyMaterialPurchaseHistory";
+import AssignStudyMaterial from "./pages/StudyMaterial/AssignStudyMaterial";
 export default function App() {
   return (
     <>
@@ -194,6 +198,11 @@ export default function App() {
 {/* Free v\videos */}
 
               <Route path="/free-videos" element={<AllPlayList />} />
+
+              <Route path="/all-study-material-categories" element={<AllStudyMaterialsCategories />} />
+              <Route path="/all-study-material" element={<AllStudyMaterials />} />
+              <Route path="/all-test-series-purchase" element={<AllStudyMaterialPurchaseHistory />} />
+              <Route path="/assign-material" element={<AssignStudyMaterial />} />
 
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />

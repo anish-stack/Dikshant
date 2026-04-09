@@ -237,12 +237,12 @@ export default function Notifications() {
 
                   <View style={styles.notificationContent}>
                     <View style={styles.notificationHeader}>
-                      <Text style={styles.notificationTitle} numberOfLines={2}>
+                      <Text style={styles.notificationTitle} numberOfLines={4}>
                         {notif.title}
                       </Text>
                       {!notif.isRead && <View style={styles.unreadDot} />}
                     </View>
-                    <Text style={styles.notificationMessage} numberOfLines={2}>
+                    <Text style={styles.notificationMessage} numberOfLines={4}>
                       {notif.message}
                     </Text>
                     <Text style={styles.notificationTime}>

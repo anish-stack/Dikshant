@@ -9,7 +9,7 @@ import {
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-import { Bell, CreditCard, FerrisWheelIcon, ImageDown, ProjectorIcon, School2, Speaker } from "lucide-react";
+import { Bell, BookDashed, CreditCard, FerrisWheelIcon, ImageDown, ProjectorIcon, School2, Speaker } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -51,6 +51,17 @@ const navItems: NavItem[] = [
       { name: "All Quizzes Bundle", path: "/all-quiz-bundles" },
       { name: "All Test Series", path: "/all-test-series" },
       { name: "All Test Series Bundle", path: "/all-test-series-bundle" },
+    ],
+  },
+      {
+    icon: <BookDashed />,
+    name: "Study Materials",
+    subItems: [
+      { name: "All Study Materials Categories", path: "/all-study-material-categories" },
+      { name: "All Study Materials", path: "/all-study-material" },
+      { name: "All Study material purchase", path: "/all-test-series-purchase" },
+      { name: "Assign Material", path: "/assign-material" }
+
     ],
   },
   {

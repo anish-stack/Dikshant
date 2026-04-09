@@ -146,7 +146,7 @@ export default function VideoPlayerFreeScreen() {
     }
 
     const isActuallyPlaying = playerState === 'playing'
-
+    console.log("Video",video)
     // ── Error state
     if (!video) {
         return (

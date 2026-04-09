@@ -219,21 +219,44 @@ class BatchController {
   // =========================
   static async findAll(req, res) {
     try {
-      let { page = 1, limit = 10, search = "" } = req.query;
-
+      let {
+        page = 1,
+        limit = 10,
+        search = "",
+        status = "",
+        category = "",
+        medium = ""
+      } = req.query;
+      console.log(req.query)
       page = parseInt(page);
       limit = parseInt(limit);
       const offset = (page - 1) * limit;
 
-
+      // Build dynamic where clause
       const where = {};
 
-      if (search.trim()) {
+      // Search filter (multi-field)
+      if (search && search.trim()) {
         where[Op.or] = [
-          { name: { [Op.like]: `%${search}%` } },
-          { shortDescription: { [Op.like]: `%${search}%` } },
-          { longDescription: { [Op.like]: `%${search}%` } },
+          { name: { [Op.like]: `%${search.trim()}%` } },
+          { shortDescription: { [Op.like]: `%${search.trim()}%` } },
+          { longDescription: { [Op.like]: `%${search.trim()}%` } },
         ];
+      }
+
+      // Status filter
+      if (status && status.trim()) {
+        where.status = status.trim();
+      }
+
+      // Category filter (online / offline / recorded)
+      if (category && category.trim()) {
+        where.category = category.trim();
+      }
+
+      // Medium filter
+      if (medium && medium.trim()) {
+        where.medium = medium.trim();
       }
 
       const result = await Batch.findAndCountAll({
@@ -250,13 +273,13 @@ class BatchController {
         ],
       });
 
+      // Enrich each batch with subjects
       const batchItems = await Promise.all(
         result.rows.map(async (batch) => {
           let subjectIds = [];
-
           try {
             subjectIds = JSON.parse(batch.subjectId || "[]");
-          } catch {
+          } catch (e) {
             subjectIds = [];
           }
 
@@ -280,6 +303,7 @@ class BatchController {
         items: batchItems,
       };
 
+      // Optional: Add Redis caching later
       // await redis.set(redisKey, JSON.stringify(response), "EX", 60);
 
       return res.json(response);
@@ -292,6 +316,126 @@ class BatchController {
     }
   }
 
+  static async ForHomeScreen(req, res) {
+    try {
+const batchAttributes = [
+  "id",
+  "name",
+  "slug",
+  "imageUrl",
+  "displayOrder",
+  "programId",
+  "medium",
+  "offerText",
+  "fee_one_time",
+  "fee_inst",
+  "note",
+  "batchPrice",
+  "batchDiscountPrice",
+  "position",
+  "category",
+  "c_status"
+];
+      // 7 batches per category
+      const onlineBatches = await Batch.findAll({
+        where: {
+          category: "online",
+          status: "active"
+        },
+          attributes: batchAttributes,
+        limit: 7,
+        order: [["position", "ASC"]],
+        include: [
+          {
+            model: Program,
+            as: "program",
+            attributes: ["id", "name", "slug"]
+          }
+        ]
+      });
+
+      const recordedBatches = await Batch.findAll({
+        where: {
+          category: "recorded",
+          status: "active"
+        },
+          attributes: batchAttributes,
+        limit: 7,
+        order: [["position", "ASC"]],
+        include: [
+          {
+            model: Program,
+            as: "program",
+            attributes: ["id", "name", "slug"]
+          }
+        ]
+      });
+
+      const offlineBatches = await Batch.findAll({
+        where: {
+          category: "offline",
+          status: "active"
+        },
+          attributes: batchAttributes,
+        limit: 7,
+        order: [["position", "ASC"]],
+        include: [
+          {
+            model: Program,
+            as: "program",
+            attributes: ["id", "name", "slug"]
+          }
+        ]
+      });
+
+      // Helper function to attach subjects
+      const attachSubjects = async (batches) => {
+        return Promise.all(
+          batches.map(async (batch) => {
+
+            let subjectIds = [];
+
+            try {
+              subjectIds = JSON.parse(batch.subjectId || "[]");
+            } catch {
+              subjectIds = [];
+            }
+
+            const subjects = await Subject.findAll({
+              where: { id: subjectIds },
+              attributes: ["id", "name", "slug"]
+            });
+
+            return {
+              ...batch.toJSON(),
+              subjects
+            };
+          })
+        );
+      };
+
+      const response = {
+        online: await attachSubjects(onlineBatches),
+        recorded: await attachSubjects(recordedBatches),
+        offline: await attachSubjects(offlineBatches)
+      };
+
+      return res.json({
+        success: true,
+        data: response
+      });
+
+    } catch (error) {
+
+      console.error("Home Screen Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching home data"
+      });
+
+    }
+  }
   // =========================
   // FIND ONE
   // =========================

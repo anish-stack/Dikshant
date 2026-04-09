@@ -15,7 +15,7 @@
     "database": "u905431022_dikshant",
     "host": "82.25.121.158",
     "port": 3306,
-    "dialect": "mysql",
+    "dialect": "mysql", 
     "timezone": "+05:30",
     "logging": false
   },

@@ -165,7 +165,7 @@ export default function App() {
   const handleNotificationData = (data) => {
     if (!data) return;
     setNotificationData(data);
-
+    console.log("Notification Type", data.type)
     if (!navigationRef.current?.isReady()) return;
 
     switch (data.type) {
@@ -200,7 +200,7 @@ export default function App() {
 
       default:
         if (data.screen) {
-          navigationRef.current.navigate(data.screen);
+          navigationRef.current.navigate("Notifications");
         } else {
           navigationRef.current.navigate("Notifications");
         }

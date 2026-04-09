@@ -14,132 +14,151 @@ class VideoCourseController {
   /* ======================
       CREATE
   ====================== */
-    static async create(req, res) {
-      try {
+  static async create(req, res) {
+    try {
 
-        const requiredFields = [
-          "title",
-          "videoSource",
-          "url",
-          "batchId",
-          "subjectId",
-        ];
+      const requiredFields = [
+        "title",
+        "videoSource",
+        "url",
+        "batchId",
+        "subjectId",
+      ];
 
-        for (const field of requiredFields) {
-          if (!req.body[field]) {
-            return res.status(400).json({
-              success: false,
-              message: `${field} is required`,
-            });
-          }
+      for (const field of requiredFields) {
+        if (!req.body[field]) {
+          return res.status(400).json({
+            success: false,
+            message: `${field} is required`,
+          });
         }
+      }
 
-        const batchId = Number(req.body.batchId);
+      const batchId = Number(req.body.batchId);
 
-        /* ================= POSITION HANDLING ================= */
+      /* ================= GET BATCH ================= */
 
-let position = await PositionService.insert(
-  VideoCourse,
-  "position",
-  req.body.position,
-  { batchId: batchId }   // ⭐ important
-) 
+      const batch = await Batch.findByPk(batchId);
 
-        /* ================= LIVE VALIDATION ================= */
-
-        const isLive = req.body.isLive === true || req.body.isLive === "true";
-
-        if (isLive) {
-          if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
-            return res.status(400).json({
-              success: false,
-              message:
-                "DateOfLive and TimeOfLIve are required when the video is live",
-            });
-          }
-        }
-
-        /* ================= IMAGE ================= */
-
-        let imageUrl = null;
-
-        if (req.file) {
-          imageUrl = await uploadToS3(req.file, "videocourses");
-        }
-
-        /* ================= PAYLOAD ================= */
-
-        const payload = {
-          title: req.body.title.trim(),
-          videoSource: req.body.videoSource,
-          url: req.body.url.trim(),
-
-          batchId,
-          subjectId: Number(req.body.subjectId),
-
-          position, // ⭐ added
-
-          isDownloadable:
-            req.body.isDownloadable === true ||
-            req.body.isDownloadable === "true",
-
-          isDemo:
-            req.body.isDemo === true ||
-            req.body.isDemo === "true",
-
-          isLive,
-          DateOfLive: isLive ? req.body.DateOfLive : null,
-          TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
-
-          dateOfClass: req.body.dateOfClass ?? null,
-          TimeOfClass: req.body.TimeOfClass ?? null,
-
-          status: "active",
-          imageUrl,
-        };
-
-        /* ================= CREATE VIDEO ================= */
-
-        const item = await VideoCourse.create(payload);
-
-        /* ================= TOKEN ================= */
-
-        const secureToken = encryptVideoPayload({
-          videoId: item.id,
-          batchId: item.batchId,
-          videoSource: item.videoSource,
-          exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-        });
-
-        await item.update({ secureToken });
-
-        /* ================= CACHE CLEAR ================= */
-
-        const redis = require("../config/redis");
-
-        await redis.del("videocourses");
-        await redis.del(`videocourses:batch:${batchId}`);
-
-        /* ================= RESPONSE ================= */
-
-        return res.status(201).json({
-          success: true,
-          message: "Video course created successfully",
-          data: {
-            ...item.toJSON(),
-            secureToken,
-          },
-        });
-
-      } catch (error) {
-        console.error("VideoCourse Create Error:", error);
-
-        return res.status(500).json({
+      if (!batch) {
+        return res.status(400).json({
           success: false,
-          message: "Server error",
+          message: "Batch not found",
         });
       }
+
+      /* ================= POSITION HANDLING ================= */
+
+      let position = null;
+
+      if (batch.category === "recorded") {
+
+        position = await PositionService.insert(
+          VideoCourse,
+          "position",
+          req.body.position,
+          { batchId: batchId }
+        );
+
+      }
+
+      /* ================= LIVE VALIDATION ================= */
+
+      const isLive = req.body.isLive === true || req.body.isLive === "true";
+
+      if (isLive) {
+        if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "DateOfLive and TimeOfLIve are required when the video is live",
+          });
+        }
+      }
+
+      /* ================= IMAGE ================= */
+
+      let imageUrl = null;
+
+      if (req.file) {
+        imageUrl = await uploadToS3(req.file, "videocourses");
+      }
+
+      /* ================= PAYLOAD ================= */
+
+      const payload = {
+        title: req.body.title.trim(),
+        videoSource: req.body.videoSource,
+        url: req.body.url.trim(),
+
+        batchId,
+        subjectId: Number(req.body.subjectId),
+
+        position, // ⭐ only for recorded
+
+        isDownloadable:
+          req.body.isDownloadable === true ||
+          req.body.isDownloadable === "true",
+
+        isDemo:
+          req.body.isDemo === true ||
+          req.body.isDemo === "true",
+
+        isLive,
+        DateOfLive: isLive ? req.body.DateOfLive : null,
+        TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
+
+        dateOfClass: req.body.dateOfClass ?? null,
+        TimeOfClass: req.body.TimeOfClass ?? null,
+
+        status: "active",
+        imageUrl,
+      };
+
+      /* ================= CREATE VIDEO ================= */
+
+      const item = await VideoCourse.create(payload);
+
+      /* ================= TOKEN ================= */
+
+      const secureToken = encryptVideoPayload({
+        videoId: item.id,
+        batchId: item.batchId,
+        videoSource: item.videoSource,
+        exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      });
+
+      await item.update({ secureToken });
+
+      /* ================= CACHE CLEAR ================= */
+
+      const redis = require("../config/redis");
+
+      await redis.del("videocourses");
+      await redis.del(`videocourses:batch:${batchId}`);
+
+      /* ================= RESPONSE ================= */
+
+      return res.status(201).json({
+        success: true,
+        message: "Video course created successfully",
+        data: {
+          ...item.toJSON(),
+          secureToken,
+        },
+      });
+
+    } catch (error) {
+
+      console.error("VideoCourse Create Error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
+      });
+
     }
+  }
   /* ======================
       GET ALL
   ====================== */
@@ -183,11 +202,33 @@ let position = await PositionService.insert(
       const offset = (page - 1) * limit;
 
       // -----------------------------
+      // Get batch type for ordering
+      // -----------------------------
+      const batch = await Batch.findByPk(id);
+
+      let orderCondition = [["position", "DESC"]];
+
+      if (batch) {
+        if (batch.category === "online") {
+          orderCondition = [
+            ["DateOfLive", "DESC"],
+            ["TimeOfLIve", "DESC"],
+          ];
+        } else if (batch.category === "offline") {
+          orderCondition = [
+            ["dateOfClass", "ASC"],
+            ["TimeOfClass", "ASC"],
+          ];
+        } else {
+          orderCondition = [["position", "ASC"]];
+        }
+      }
+
+      // -----------------------------
       // 1) Primary fetch: by batchId
       // -----------------------------
       let whereCondition = { batchId: id };
 
-      // ✅ Apply search only for admin
       if (isAdmin && search) {
         whereCondition.title = { [Op.like]: `%${search}%` };
       }
@@ -195,7 +236,7 @@ let position = await PositionService.insert(
       const buildQueryOptions = (where) => {
         const queryOptions = {
           where,
-          order: [["position", "DESC"]],
+          order: orderCondition,
         };
 
         if (isAdmin) {
@@ -207,16 +248,15 @@ let position = await PositionService.insert(
       };
 
       let result = await VideoCourse.findAndCountAll(buildQueryOptions(whereCondition));
+
       const normalizeSubjectIds = (raw) => {
         if (raw == null) return [];
 
         let val = raw;
 
-        // Step 1: Handle common string-wrapped cases
-        if (typeof val === 'string') {
+        if (typeof val === "string") {
           let s = val.trim();
 
-          // Case: '"[51]"' or "'[51]'" → remove outer quotes
           if (
             (s.startsWith('"') && s.endsWith('"')) ||
             (s.startsWith("'") && s.endsWith("'"))
@@ -224,16 +264,13 @@ let position = await PositionService.insert(
             s = s.slice(1, -1).trim();
           }
 
-          // Now try to parse as JSON
           try {
             val = JSON.parse(s);
           } catch (_) {
-            // If not JSON, keep as string (e.g. "51")
             val = s;
           }
         }
 
-        // Step 2: Flatten if nested arrays or weird structures
         const flatten = (arr) => {
           return arr.reduce((acc, item) => {
             if (Array.isArray(item)) {
@@ -251,28 +288,27 @@ let position = await PositionService.insert(
           val = [val];
         }
 
-        // Step 3: Clean to numbers only, dedupe
-        const numbers = [...new Set(
-          val
-            .map((x) => {
-              if (x == null) return null;
-              if (typeof x === 'string') x = x.trim();
-              const n = Number(x);
-              return Number.isFinite(n) ? n : null;
-            })
-            .filter((x) => x !== null)
-        )];
+        const numbers = [
+          ...new Set(
+            val
+              .map((x) => {
+                if (x == null) return null;
+                if (typeof x === "string") x = x.trim();
+                const n = Number(x);
+                return Number.isFinite(n) ? n : null;
+              })
+              .filter((x) => x !== null)
+          ),
+        ];
 
         return numbers;
       };
+
       // ---------------------------------------------------
       // 2) Fallback: if no videos in this batchId
-      //    fetch by subjectIds from Batch.subjectId (JSON)
       // ---------------------------------------------------
       if (result.rows.length === 0) {
-        const batch = await Batch.findByPk(id);
 
-        // If batch not found, return empty (or 404 if you want)
         if (!batch) {
           return res.json({
             success: true,
@@ -283,12 +319,8 @@ let position = await PositionService.insert(
           });
         }
 
-        // Batch.subjectId can be array or single value
         let subjectIds = normalizeSubjectIds(batch.subjectId);
 
-
-
-        // If no subject ids, return empty
         if (subjectIds.length === 0) {
           return res.json({
             success: true,
@@ -299,12 +331,10 @@ let position = await PositionService.insert(
           });
         }
 
-        // Build fallback where (any batch) by subjectId list
         const fallbackWhere = {
           subjectId: { [Op.in]: subjectIds },
         };
 
-        // ✅ Apply admin search on title in fallback as well
         if (isAdmin && search) {
           fallbackWhere.title = { [Op.like]: `%${search}%` };
         }
@@ -402,6 +432,9 @@ let position = await PositionService.insert(
       });
     }
   }
+
+
+
   static async decryptAndPassVideo(req, res) {
     try {
       const { token } = req.body;
@@ -590,8 +623,21 @@ let position = await PositionService.insert(
           : item.batchId;
 
       /* ================= POSITION VALIDATION ================= */
+      const batch = await Batch.findByPk(batchId);
 
-      let position = await PositionService.swap(VideoCourse, req.params.id, "position", req.body.position)
+      let position = item.position;
+
+      if (batch && batch.category === "recorded") {
+        position = await PositionService.swap(
+          VideoCourse,
+          req.params.id,
+          "position",
+          req.body.position,
+          { batchId }
+        );
+      } else {
+        position = null;
+      }
 
       /* ================= UPDATE PAYLOAD ================= */
 
@@ -717,7 +763,15 @@ let position = await PositionService.insert(
 
       /* ================= REORDER POSITIONS (BATCH-WISE) ================= */
 
-      await PositionService.reorder(VideoCourse, "position")
+      const batch = await Batch.findByPk(batchId);
+
+      if (batch && batch.category === "recorded") {
+        await PositionService.reorder(
+          VideoCourse,
+          "position",
+          { batchId }
+        );
+      }
 
 
       /* ================= CLEAR CACHE ================= */

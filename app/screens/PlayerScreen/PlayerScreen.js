@@ -17,7 +17,7 @@ import axios from "axios";
 import { useSettings } from "../../hooks/useSettings";
 import * as ScreenOrientation from "expo-screen-orientation";
 
-const API_BASE = "http://192.168.1.7:5001/api/chat";
+const API_BASE = "https://www.app.api.dikshantias.com/api/chat";
 const JOIN_API = `${API_BASE}/Student-join-api`;
 const LEAVE_API = `${API_BASE}/Student-Leave-api`;
 

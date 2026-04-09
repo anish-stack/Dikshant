@@ -22,201 +22,164 @@ const { width } = Dimensions.get("window");
 const CARD_MARGIN = 12;
 const CARD_WIDTH = width * 0.72;
 
-// === Horizontal Section Component ===
-const HorizontalSection = ({
-  title,
-  data,
-  renderItem,
-  keyExtractor,
-  cardWidth,
-  isLoading,
-  error,
-  onSeeAll
-}) => {
-  if (isLoading) {
-    return (
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text style={styles.loadingText}>Loading courses...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <Feather name="alert-circle" size={32} color="#ef4444" />
-          <Text style={styles.errorText}>Failed to load courses</Text>
-          <Text style={styles.errorSubtext}>Please try again later</Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <View style={styles.sectionContainer}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{title}</Text>
-        </View>
-        <View style={styles.emptyContainer}>
-          <Feather name="inbox" size={40} color="#cbd5e1" />
-          <Text style={styles.emptyText}>No courses available</Text>
-          <Text style={styles.emptySubtext}>Check back soon for updates</Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.sectionContainer}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {onSeeAll && data.length > 0 && (
-          <TouchableOpacity
-            style={styles.seeAllButton}
-            onPress={onSeeAll}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.seeAllText}>See all</Text>
-            <Feather name="chevron-right" size={16} color="#3b82f6" />
-          </TouchableOpacity>
-        )}
-      </View>
-      <FlatList
-        data={data}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        contentContainerStyle={styles.horizontalList}
-        snapToInterval={cardWidth + CARD_MARGIN}
-        snapToAlignment="start"
-        decelerationRate="fast"
-        initialNumToRender={3}
-        maxToRenderPerBatch={5}
-        windowSize={5}
-      />
-    </View>
-  );
+// ─── Category Config ──────────────────────────────────────────────────────────
+const CATEGORY_CONFIG = {
+  online: {
+    label: "Live Courses",
+    icon: "radio",
+    accent: "#ef4444",
+    light: "#fef2f2",
+    badge: "#ef4444",
+    type: "Online",
+  },
+  recorded: {
+    label: "Recorded Courses",
+    icon: "play-circle",
+    accent: "#8b5cf6",
+    light: "#f5f3ff",
+    badge: "#8b5cf6",
+    type: "Recorded",
+  },
+  offline: {
+    label: "Offline / Hybrid",
+    icon: "map-pin",
+    accent: "#f59e0b",
+    light: "#fffbeb",
+    badge: "#f59e0b",
+    type: "Offline",
+  },
 };
 
-const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
-  const imageUrl = batch.imageUrl;
-  const startDate = batch.startDate ? new Date(batch.startDate) : null;
+// ─── Pill Badge ───────────────────────────────────────────────────────────────
+const Pill = ({ label, color, bg, icon }) => (
+  <View style={[styles.pill, { backgroundColor: bg }]}>
+    {icon && <Feather name={icon} size={10} color={color} />}
+    <Text style={[styles.pillText, { color }]}>{label}</Text>
+  </View>
+);
 
-  // Check if this course is purchased
+// ─── Course Card ──────────────────────────────────────────────────────────────
+const CourseCard = ({ item: batch, navigation, token, purchasedCourses, categoryKey }) => {
+  const config = CATEGORY_CONFIG[categoryKey] || CATEGORY_CONFIG.online;
   const purchaseData = purchasedCourses[batch.id];
   const isPurchased = !!purchaseData;
 
-  // Calculate discount percentage
-  const discountPercent = batch.batchPrice && batch.batchDiscountPrice
-    ? Math.round(((batch.batchPrice - batch.batchDiscountPrice) / batch.batchPrice) * 100)
-    : 0;
-
-  // Format dates
-  const formatDate = (date) => {
-    if (!date) return null;
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
-  };
+  const discountPercent =
+    batch.batchPrice && batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice
+      ? Math.round(((batch.batchPrice - batch.batchDiscountPrice) / batch.batchPrice) * 100)
+      : 0;
 
   const handlePress = () => {
     if (isPurchased) {
-      const url =['online', 'offline'].includes(batch.category) ? "my-course" : "my-course-subjects";
-      navigation.navigate(url, {
-        unlocked: true,
-        courseId: batch.id,
-      });
+      const url = ["online", "offline"].includes(batch.category)
+        ? "my-course"
+        : "my-course-subjects";
+      navigation.navigate(url, { unlocked: true, courseId: batch.id });
     } else {
-      navigation.navigate("CourseDetail", {
-        courseId: batch.id,
-        batchData: batch,
-      });
+      navigation.navigate("CourseDetail", { courseId: batch.id, batchData: batch });
     }
   };
 
   return (
     <TouchableOpacity
-      style={[styles.courseCard, { width: CARD_WIDTH }]}
-      activeOpacity={0.9}
+      style={[styles.card, { width: CARD_WIDTH }]}
+      activeOpacity={0.92}
       onPress={handlePress}
     >
-      {/* Image Section */}
-      <View style={styles.imageContainer}>
+      {/* Thumbnail */}
+      <View style={styles.thumbWrap}>
         <Image
-          source={{ uri: imageUrl }}
-          style={styles.courseImage}
+          source={{ uri: batch.imageUrl }}
+          style={styles.thumb}
           resizeMode="cover"
         />
-       
-        {/* Subscribed Badge - Top Priority */}
-        {isPurchased ? (
-          <View style={styles.subscribedBadge}>
-            <Feather name="check-circle" size={12} color="#ffffff" />
-            <Text style={styles.subscribedText}>SUBSCRIBED</Text>
-          </View>
-        ) : null}
+        {/* Gradient overlay via opacity block */}
+        <View style={styles.thumbOverlay} />
+
+        {/* Top-left badges */}
+        <View style={styles.badgeRow}>
+          {isPurchased ? (
+            <View style={[styles.badge, { backgroundColor: "#22c55e" }]}>
+              <Feather name="check-circle" size={10} color="#fff" />
+              <Text style={styles.badgeText}>ENROLLED</Text>
+            </View>
+          ) : discountPercent > 0 ? (
+            <View style={[styles.badge, { backgroundColor: config.accent }]}>
+              <Text style={styles.badgeText}>{discountPercent}% OFF</Text>
+            </View>
+          ) : null}
+        </View>
+
       </View>
 
-      {/* Content Section */}
-      <View style={styles.cardContent}>
-        <Text style={styles.courseTitle} numberOfLines={2}>
+      {/* Body */}
+      <View style={styles.cardBody}>
+        {/* Program name */}
+        {batch.program?.name ? (
+          <Text style={[styles.programLabel, { color: config.accent }]} numberOfLines={1}>
+            {batch.program.name}
+          </Text>
+        ) : null}
+
+        {/* Course name */}
+        <Text style={styles.cardTitle} numberOfLines={2}>
           {batch.name}
         </Text>
 
-        {/* Program Name */}
-        {batch.program?.name && (
-          <Text style={styles.programName} numberOfLines={1}>
-            {batch.program.name}
-          </Text>
-        )}
+        {/* Meta chips */}
+        <View style={styles.metaRow}>
+          {batch.medium ? (
+            <Pill
+              label={batch.medium}
+              color="#64748b"
+              bg="#f1f5f9"
+              icon="globe"
+            />
+          ) : null}
+          {batch.subjects?.length > 0 ? (
+            <Pill
+              label={`${batch.subjects.length} subjects`}
+              color="#64748b"
+              bg="#f1f5f9"
+              icon="book-open"
+            />
+          ) : null}
 
-        {/* Meta Information */}
-        <View style={styles.metaContainer}>
-          {startDate && (
-            <View style={styles.metaItem}>
-              <Feather name="calendar" size={12} color="#64748b" />
-              <Text style={styles.metaText}>{formatDate(startDate)}</Text>
-            </View>
-          )}
-          {batch.subjects && batch.subjects.length > 0 && (
-            <View style={styles.metaItem}>
-              <Feather name="book-open" size={12} color="#64748b" />
-              <Text style={styles.metaText}>{batch.subjects.length} subjects</Text>
-            </View>
-          )}
         </View>
 
-        {/* Footer */}
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Footer: price or go-to-class */}
         <View style={styles.cardFooter}>
           {isPurchased ? (
-            <View style={styles.accessButton}>
-              <Feather name="play-circle" size={16} color="#22c55e" />
-              <Text style={styles.accessButtonText}>Go To ClassRoom</Text>
-            </View>
+            <TouchableOpacity style={[styles.goBtn, { backgroundColor: config.light }]} onPress={handlePress}>
+              <Feather name="play-circle" size={15} color={config.accent} />
+              <Text style={[styles.goBtnText, { color: config.accent }]}>Go to Classroom</Text>
+            </TouchableOpacity>
           ) : (
-            <View style={styles.priceContainer}>
+            <View style={styles.priceBlock}>
               {batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
                 <>
-                  <Text style={styles.originalPrice}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
-                  <Text style={styles.discountPrice}>₹{batch.batchDiscountPrice.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.strikePrice}>
+                    ₹{batch.batchPrice.toLocaleString("en-IN")}
+                  </Text>
+                  <Text style={styles.salePrice}>
+                    ₹{batch.batchDiscountPrice.toLocaleString("en-IN")}
+                  </Text>
                 </>
               ) : (
-                <Text style={styles.price}>₹{batch.batchPrice.toLocaleString('en-IN')}</Text>
+                <Text style={styles.regularPrice}>
+                  ₹{batch.batchPrice?.toLocaleString("en-IN")}
+                </Text>
               )}
+            </View>
+          )}
+
+          {!isPurchased && (
+            <View style={[styles.enrollBtn, { backgroundColor: config.accent }]}>
+              <Text style={styles.enrollBtnText}>Enroll</Text>
+              <Feather name="arrow-right" size={13} color="#fff" />
             </View>
           )}
         </View>
@@ -225,383 +188,286 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses }) => {
   );
 };
 
-export default function Course({ refreshing }) {
-  const navigation = useNavigation();
-  const [purchasedCourses, setPurchasedCourses] = useState({});
-  const [checkingPurchases, setCheckingPurchases] = useState(false);
-  const { token } = useAuthStore()
-  // Fetch courses from API
-  const { data: coursesResponse, error, isLoading, mutate } = useSWR(
-    "/batchs",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      dedupingInterval: 60000,
-    }
+// ─── Section ──────────────────────────────────────────────────────────────────
+const Section = ({ categoryKey, data, isLoading, error, navigation, token, purchasedCourses, onSeeAll }) => {
+  const config = CATEGORY_CONFIG[categoryKey];
+
+  const renderState = (icon, color, title, sub) => (
+    <View style={[styles.stateBox, { borderColor: color + "33" }]}>
+      <Feather name={icon} size={28} color={color} />
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateSub}>{sub}</Text>
+    </View>
   );
 
-  const courses = coursesResponse?.items || [];
+  return (
+    <View style={styles.section}>
+      {/* Section header */}
+      <View style={styles.sectionHead}>
+        <View style={styles.sectionHeadLeft}>
+          <View style={[styles.sectionIconWrap, { backgroundColor: config.light }]}>
+            <Feather name={config.icon} size={16} color={config.accent} />
+          </View>
+          <Text style={styles.sectionTitle}>{config.label}</Text>
+        </View>
+        {!isLoading && !error && data?.length > 0 && (
+          <TouchableOpacity style={styles.seeAllBtn} onPress={onSeeAll} activeOpacity={0.7}>
+            <Text style={[styles.seeAllText, { color: config.accent }]}>See all</Text>
+            <Feather name="chevron-right" size={14} color={config.accent} />
+          </TouchableOpacity>
+        )}
+      </View>
 
-  // Function to check if courses are purchased
+      {/* Content */}
+      {isLoading ? (
+        <View style={styles.stateBox}>
+          <ActivityIndicator size="small" color={config.accent} />
+          <Text style={styles.stateSub}>Loading…</Text>
+        </View>
+      ) : error ? (
+        renderState("alert-circle", "#ef4444", "Couldn't load", "Please try again later")
+      ) : !data || data.length === 0 ? (
+        renderState("inbox", "#94a3b8", "No courses yet", "Check back soon")
+      ) : (
+        <FlatList
+          data={data}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => `${categoryKey}-${item.id}`}
+          renderItem={({ item }) => (
+            <CourseCard
+              item={item}
+              navigation={navigation}
+              token={token}
+              purchasedCourses={purchasedCourses}
+              categoryKey={categoryKey}
+            />
+          )}
+          contentContainerStyle={styles.listPad}
+          snapToInterval={CARD_WIDTH + CARD_MARGIN}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          initialNumToRender={3}
+          maxToRenderPerBatch={5}
+        />
+      )}
+    </View>
+  );
+};
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
+export default function Course({ refreshing }) {
+  const navigation = useNavigation();
+  const { token } = useAuthStore();
+  const [purchasedCourses, setPurchasedCourses] = useState({});
+
+  // API now returns { success, data: { online: [...], recorded: [...], offline: [...] } }
+  const { data: apiResponse, error, isLoading, mutate } = useSWR(
+    "/batchs/for-home-screen",
+    fetcher,
+    { revalidateOnFocus: false, revalidateOnReconnect: false, dedupingInterval: 60000 }
+  );
+
+  const onlineCourses = (apiResponse?.data?.online || []).slice(0, 6);
+  const recordedCourses = (apiResponse?.data?.recorded || []).slice(0, 6);
+  const offlineCourses = (apiResponse?.data?.offline || []).slice(0, 6);
+
   const checkPurchaseStatus = async (batchIds) => {
     if (!token || batchIds.length === 0) return;
-
-    setCheckingPurchases(true);
     const purchaseMap = {};
-
     try {
-      // Check purchases in batches or individually
-      const checkPromises = batchIds.map(async (batchId) => {
-        try {
-          const response = await axios.get(
-            `${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`,
-            {
-              params: {
-                type: "batch",
-                itemId: batchId,
-              },
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (response.data?.purchased) {
-            console.log(response.data)
-            purchaseMap[batchId] = response.data;
+      await Promise.all(
+        batchIds.map(async (batchId) => {
+          try {
+            const res = await axios.get(`${API_URL_LOCAL_ENDPOINT}/orders/already-purchased`, {
+              params: { type: "batch", itemId: batchId },
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.data?.purchased) purchaseMap[batchId] = res.data;
+          } catch (e) {
+            console.error(`Purchase check failed for ${batchId}:`, e);
           }
-        } catch (error) {
-          console.error(`Error checking purchase for batch ${batchId}:`, error);
-        }
-      });
-
-      await Promise.all(checkPromises);
+        })
+      );
       setPurchasedCourses(purchaseMap);
-    } catch (error) {
-      console.error("Error checking purchase statuses:", error);
-    } finally {
-      setCheckingPurchases(false);
+    } catch (e) {
+      console.error("Bulk purchase check failed:", e);
     }
   };
 
-  // Check purchase status when courses load
   useEffect(() => {
-    if (courses.length > 0 && token) {
-      const batchIds = courses.map(course => course.id);
-      checkPurchaseStatus(batchIds);
-    }
-  }, [courses, token]);
+    const allIds = [...onlineCourses, ...recordedCourses, ...offlineCourses].map((c) => c.id);
+    if (allIds.length > 0 && token) checkPurchaseStatus(allIds);
+  }, [apiResponse, token]);
 
   useEffect(() => {
     if (refreshing) {
       mutate();
-      // Also refresh purchase status
-      if (courses.length > 0 && token) {
-        const batchIds = courses.map(course => course.id);
-        checkPurchaseStatus(batchIds);
-      }
+      const allIds = [...onlineCourses, ...recordedCourses, ...offlineCourses].map((c) => c.id);
+      if (allIds.length > 0 && token) checkPurchaseStatus(allIds);
     }
-  }, [refreshing, mutate]);
+  }, [refreshing]);
 
-  const sortedCourses = [...courses];
-
-  // Filter categories + take first 6
-  const liveCourses = sortedCourses.filter(c => c.category === "online").slice(0, 6);
-  const offlineCourses = sortedCourses.filter(c => c.category === "offline").slice(0, 6);
-  const recordedCourses = sortedCourses.filter(c => c.category === "recorded").slice(0, 6);
-
-  // Handle See All navigation
-  const handleSeeAll = (courseType) => {
-    navigation?.navigate?.("Courses", { type: courseType });
-  };
+  const sharedProps = { isLoading, error, navigation, token, purchasedCourses };
 
   return (
     <ScrollView
-      style={styles.container}
+      style={styles.root}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={styles.rootContent}
     >
-      {/* Live Courses Section */}
-      <HorizontalSection
-        title="Live Courses"
-        data={liveCourses}
-        renderItem={({ item }) => (
-          <CourseCard
-            item={item}
-            navigation={navigation}
-            token={token}
-            purchasedCourses={purchasedCourses}
-          />
-        )}
-        keyExtractor={(item) => `online-${item.id}`}
-        cardWidth={CARD_WIDTH}
-        isLoading={isLoading}
-        error={error}
-        onSeeAll={() => handleSeeAll("Online")}
+      <Section
+        categoryKey="online"
+        data={onlineCourses}
+        onSeeAll={() => navigation?.navigate?.("Courses", { filter: "online" })}
+        {...sharedProps}
       />
-
-      {/* Recorded Courses Section */}
-      <HorizontalSection
-        title="Recorded Courses"
+      <Section
+        categoryKey="recorded"
         data={recordedCourses}
-        renderItem={({ item }) => (
-          <CourseCard
-            item={item}
-            navigation={navigation}
-            token={token}
-            purchasedCourses={purchasedCourses}
-          />
-        )}
-        keyExtractor={(item) => `recorded-${item.id}`}
-        cardWidth={CARD_WIDTH}
-        isLoading={isLoading}
-        error={error}
-        onSeeAll={() => handleSeeAll("Recorded")}
+        onSeeAll={() => navigation?.navigate?.("Courses", { filter: "recorded" })}
+        {...sharedProps}
       />
-
-      {/* Offline Courses Section */}
-      <HorizontalSection
-        title="Offline Courses"
+      <Section
+        categoryKey="offline"
         data={offlineCourses}
-        renderItem={({ item }) => (
-          <CourseCard
-            item={item}
-            navigation={navigation}
-            token={token}
-            purchasedCourses={purchasedCourses}
-          />
-        )}
-        keyExtractor={(item) => `offline-${item.id}`}
-        cardWidth={CARD_WIDTH}
-        isLoading={isLoading}
-        error={error}
-        onSeeAll={() => handleSeeAll("Offline")}
+        onSeeAll={() => navigation?.navigate?.("Courses", { filter: "offline" })}
+        {...sharedProps}
       />
     </ScrollView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  root: { flex: 1, backgroundColor: "#f8fafc" },
+  rootContent: { paddingBottom: 32, paddingTop: 8 },
 
-  // Section Styles
-  sectionContainer: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
+  // ── Section
+  section: { marginBottom: 28 },
+  sectionHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 14,
+  },
+  sectionHeadLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "700",
-    color: "#a50309",
-    letterSpacing: -0.5,
+    color: "#0f172a",
+    letterSpacing: -0.4,
   },
-  seeAllButton: {
+  seeAllBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#eff6ff",
+    gap: 3,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: 20,
+    backgroundColor: "transparent",
   },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#3b82f6",
-  },
+  seeAllText: { fontSize: 13, fontWeight: "600" },
 
-  // List Styles
-  horizontalList: {
-    paddingLeft: 16,
-    paddingRight: 16,
-  },
+  // ── List
+  listPad: { paddingLeft: 16, paddingRight: 8 },
 
-  // Loading State
-  loadingContainer: {
-    height: 240,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
+  // ── State boxes
+  stateBox: {
     marginHorizontal: 16,
-    borderRadius: 12,
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#64748b",
-  },
-
-  // Error State
-  errorContainer: {
-    height: 240,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#ffffff",
-    marginHorizontal: 16,
-    borderRadius: 12,
-  },
-  errorText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ef4444",
-  },
-  errorSubtext: {
-    fontSize: 13,
-    color: "#64748b",
-  },
-
-  // Empty State
-  emptyContainer: {
-    height: 240,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#ffffff",
-    marginHorizontal: 16,
-    borderRadius: 12,
-  },
-  emptyText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  emptySubtext: {
-    fontSize: 13,
-    color: "#94a3b8",
-  },
-
-  // Course Card Styles
-  courseCard: {
-    marginBottom: 12,
-    marginRight: CARD_MARGIN,
+    height: 180,
     borderRadius: 16,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  stateTitle: { fontSize: 14, fontWeight: "600", color: "#334155" },
+  stateSub: { fontSize: 12, color: "#94a3b8" },
+
+  // ── Card
+  card: {
+    marginRight: CARD_MARGIN,
+    marginBottom: 4,
+    borderRadius: 18,
+    backgroundColor: "#fff",
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 4,
   },
 
-  // Image Section
-  imageContainer: {
-    position: "relative",
-    width: "100%",
-    height: 160,
-  },
-  courseImage: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#e2e8f0",
-  },
-  imageOverlay: {
+  // Thumbnail
+  thumbWrap: { width: "100%", height: 152, position: "relative" },
+  thumb: { width: "100%", height: "100%", backgroundColor: "#e2e8f0" },
+  thumbOverlay: {
     position: "absolute",
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  playButton: {
-    width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(59, 130, 246, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "rgba(15,23,42,0.18)",
   },
-
-  // Subscribed Badge (NEW)
-  subscribedBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
+  badgeRow: { position: "absolute", top: 10, left: 10, flexDirection: "row", gap: 6 },
+  badge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
     gap: 4,
-  },
-  subscribedText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#ffffff",
-    letterSpacing: 0.5,
-  },
-
-  // Discount Badge
-  discountBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
   },
-  discountText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#ffffff",
-    letterSpacing: 0.5,
+  badgeText: { fontSize: 10, fontWeight: "800", color: "#fff", letterSpacing: 0.4 },
+  catTag: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
+  catTagText: { fontSize: 9, fontWeight: "700", color: "#fff", letterSpacing: 0.5 },
 
-  // Content Section
-  cardContent: {
-    padding: 12,
-  },
-  courseTitle: {
-    fontSize: 15,
+  // Card body
+  cardBody: { padding: 12 },
+  programLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.3, marginBottom: 3, textTransform: "uppercase" },
+  cardTitle: {
+    fontSize: 14,
     fontWeight: "700",
     color: "#0f172a",
     lineHeight: 20,
-    marginBottom: 4,
+    marginBottom: 8,
     letterSpacing: -0.3,
   },
-  programName: {
-    fontSize: 12,
-    color: "#3b82f6",
-    fontWeight: "600",
-    marginBottom: 8,
-  },
 
-  // Meta Information
-  metaContainer: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-    flexWrap: "wrap",
-  },
-  metaItem: {
+  // Meta
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
+  pill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
   },
-  metaText: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: "500",
-  },
+  pillText: { fontSize: 10, fontWeight: "600" },
+
+  divider: { height: 1, backgroundColor: "#f1f5f9", marginBottom: 10 },
 
   // Footer
   cardFooter: {
@@ -609,76 +475,34 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
-  // Access Button (NEW)
-  accessButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#f0fdf4",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  accessButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#22c55e",
-    letterSpacing: -0.2,
-  },
-
-  // Price Container
-  priceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  price: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#0f172a",
-    letterSpacing: -0.3,
-  },
-  originalPrice: {
-    fontSize: 13,
-    fontWeight: "600",
+  priceBlock: { flexDirection: "row", alignItems: "baseline", gap: 5 },
+  strikePrice: {
+    fontSize: 12,
+    fontWeight: "500",
     color: "#94a3b8",
     textDecorationLine: "line-through",
   },
-  discountPrice: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#22c55e",
-    letterSpacing: -0.3,
-  },
+  salePrice: { fontSize: 17, fontWeight: "800", color: "#0f172a", letterSpacing: -0.3 },
+  regularPrice: { fontSize: 17, fontWeight: "800", color: "#0f172a", letterSpacing: -0.3 },
 
-  // Category Tags
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  enrollBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
   },
-  categoryTagOnline: {
-    backgroundColor: "#dbeafe",
+  enrollBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
+
+  goBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  categoryTagOffline: {
-    backgroundColor: "#fef3c7",
-  },
-  categoryTagRecorded: {
-    backgroundColor: "#f3e8ff",
-  },
-  categoryTagText: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-  },
-  categoryTagTextOnline: {
-    color: "#1e40af",
-  },
-  categoryTagTextOffline: {
-    color: "#92400e",
-  },
-  categoryTagTextRecorded: {
-    color: "#6b21a8",
-  },
+  goBtnText: { fontSize: 13, fontWeight: "700" },
 });

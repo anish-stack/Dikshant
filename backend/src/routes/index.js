@@ -34,6 +34,8 @@ router.use('/mcqresults', require('./mcqresults'));
 router.use('/app-ratings',require("./ratting"))
 router.use('/support',require("./support.routes"))
 router.use('/doubt',require("./doubt.routes"))
+router.use('/study-materials',require("./studyMaterialRoutes"))
+
 router.use('/assets',require('./appassets'))
 
 router.use('/free',require('./freeVideo'))

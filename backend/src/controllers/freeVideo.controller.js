@@ -10,6 +10,7 @@ class FreeVideoController {
      PLAYLIST CRUD
   ====================================================== */
 
+
   static async createPlaylist(req, res) {
     try {
 
@@ -109,8 +110,28 @@ class FreeVideoController {
   static async addVideo(req, res) {
     try {
 
-      const { playlistId } = req.body;
+      function extractYoutubeId(url) {
+        if (!url) return null;
 
+        const regExp =
+          /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([^&\n?#]+)/;
+
+        const match = url.match(regExp);
+
+        if (match && match[1]) {
+          return match[1];
+        }
+
+        // If already videoId
+        if (url.length === 11) {
+          return url;
+        }
+
+        return null;
+      }
+
+      const { playlistId } = req.body;
+      console.log(req.body)
       let position = Number(req.body.position);
 
       if (!position || position < 1) {
@@ -120,8 +141,8 @@ class FreeVideoController {
 
       const newPos = await PositionService.insert(FreeVideo, "position", req.body.position)
 
-      const videoId = req.body.youtubeUrl.split("v=")[1]?.split("&")[0];
-
+      const videoId = extractYoutubeId(req.body.youtubeUrl)
+      console.log(videoId)
       const item = await FreeVideo.create({
         playlistId,
         title: req.body.title,
@@ -157,25 +178,55 @@ class FreeVideoController {
   static async updateVideo(req, res) {
     try {
 
+      // Extract YouTube Video ID
+      const extractYoutubeId = (url) => {
+        if (!url) return null;
+
+        const regExp =
+          /(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([^&\n?#]+)/;
+
+        const match = url.match(regExp);
+
+        if (match && match[1]) return match[1];
+
+        // If already videoId
+        if (url.length === 11) return url;
+
+        return null;
+      };
+
       const item = await FreeVideo.findByPk(req.params.id);
 
-      if (!item) return res.status(404).json({ message: "Video not found" });
+      if (!item) {
+        return res.status(404).json({ message: "Video not found" });
+      }
 
-      let position = req.body.position ?? item.position;
+      // Handle position swap
+      const newPosition = await PositionService.swap(
+        FreeVideo,
+        req.params.id,
+        "position",
+        req.body.position
+      );
 
-      const newPosition = await PositionService.swap(FreeVideo, req.params.id, "position", req.body.position)
+      // Extract videoId from URL or ID
+      const youtubeVideoId = req.body.youtubeUrl
+        ? extractYoutubeId(req.body.youtubeUrl)
+        : item.youtubeVideoId;
 
       await item.update({
         title: req.body.title ?? item.title,
-        youtubeUrl: req.body.youtubeUrl ?? item.youtubeUrl,
+        youtubeVideoId: youtubeVideoId,
+        youtubeVideoId: youtubeVideoId ?? item.youtubeVideoId,
         duration: req.body.duration ?? item.duration,
         description: req.body.description ?? item.description,
-        position: newPosition
+        position: newPosition ?? item.position
       });
 
       return res.json(item);
 
     } catch (err) {
+      console.error(err);
       return res.status(500).json({ message: "Update failed", err });
     }
   }
