@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
 
     position: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     imageUrl: DataTypes.STRING,
     title: DataTypes.STRING,

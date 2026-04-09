@@ -20,10 +20,11 @@ import {
   Upload,
   ChevronsLeft,
   ChevronsRight,
+  Filter,
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-const API_URL = "https://www.app.api.dikshantias.com/api/videocourses"; // ← updated to your local
+const API_URL = "https://www.app.api.dikshantias.com/api/videocourses";
 const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
 
 interface Subject {
@@ -85,13 +86,15 @@ export default function CourseVideos() {
 
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [deleteLoading, setDeleteLoading] = useState(false)
-  // Read from URL or defaults
+
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // URL Params
   const initialPage = Number(searchParams.get("page")) || 1;
   const initialLimit = Number(searchParams.get("limit")) || 10;
   const initialSearch = searchParams.get("search") || "";
 
-  const [batch, setBatch] = useState(null)
+  const [batch, setBatch] = useState<any>(null);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -105,6 +108,12 @@ export default function CourseVideos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // New Filters
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [subjectFilter, setSubjectFilter] = useState<string>("");
+  const [dateFilter, setDateFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<"all" | "live" | "recorded" | "demo">("all");
+
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [deleteVideo, setDeleteVideo] = useState<VideoItem | null>(null);
@@ -116,10 +125,10 @@ export default function CourseVideos() {
     title: "",
     videoSource: "youtube",
     url: "",
-    position: 0,
     isLive: false,
     DateOfLive: getCurrentDate(),
     TimeOfLIve: getCurrentTime(),
+    position: 0,
     dateOfClass: "",
     TimeOfClass: "",
     subjectId: "",
@@ -128,7 +137,7 @@ export default function CourseVideos() {
     status: true,
   });
 
-  // Sync URL when page / limit / search changes
+  // Sync URL params
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("page", pagination.page.toString());
@@ -144,23 +153,25 @@ export default function CourseVideos() {
       setLoading(true);
       setError(false);
 
-      const params = {
+      const params: any = {
         admin: true,
         page: pagination.page,
         limit: pagination.limit,
         search: search.trim() || undefined,
+        status: statusFilter !== "all" ? statusFilter : undefined,
+        subjectId: subjectFilter || undefined,
+        date: dateFilter || undefined,
       };
 
-      const [videoRes, subjectRes] = await Promise.all([
+      const [videoRes, batchRes] = await Promise.all([
         axios.get(`${API_URL}/batch/${batchId}`, { params }),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
-      console.log("subjectRes", subjectRes.data)
-      setBatch(subjectRes.data)
-      setVideos(videoRes.data.data || []);
-      setSubjects(subjectRes.data.subjects || []);
 
-      // Update pagination from backend response
+      setBatch(batchRes.data);
+      setVideos(videoRes.data.data || []);
+      setSubjects(batchRes.data.subjects || []);
+
       if (videoRes.data.pagination) {
         setPagination((prev) => ({
           ...prev,
@@ -176,18 +187,17 @@ export default function CourseVideos() {
     } finally {
       setLoading(false);
     }
-  }, [batchId, pagination.page, pagination.limit, search]);
+  }, [batchId, pagination.page, pagination.limit, search, statusFilter, subjectFilter, dateFilter]);
 
   useEffect(() => {
     fetchVideos();
   }, [fetchVideos]);
 
-  // When search changes → reset to page 1
+  // Reset to page 1 when filters change
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
-  }, [search]);
+  }, [search, statusFilter, subjectFilter, dateFilter, typeFilter]);
 
-  // Modal handlers
   const openAdd = () => {
     setEditId(null);
     setForm({
@@ -237,9 +247,7 @@ export default function CourseVideos() {
     try {
       await axios.put(`${API_URL}/${v.id}`, { status: newStatus });
       setVideos((prev) =>
-        prev.map((item) =>
-          item.id === v.id ? { ...item, status: newStatus } : item
-        )
+        prev.map((item) => (item.id === v.id ? { ...item, status: newStatus } : item))
       );
     } catch (err) {
       console.error(err);
@@ -251,9 +259,7 @@ export default function CourseVideos() {
     try {
       await axios.put(`${API_URL}/${v.id}`, { isLiveEnded: true });
       setVideos((prev) =>
-        prev.map((item) =>
-          item.id === v.id ? { ...item, isLiveEnded: true } : item
-        )
+        prev.map((item) => (item.id === v.id ? { ...item, isLiveEnded: true } : item))
       );
     } catch (err) {
       console.error(err);
@@ -262,17 +268,16 @@ export default function CourseVideos() {
 
   const removeVideo = async () => {
     if (!deleteVideo) return;
-    setDeleteLoading(true)
+    setDeleteLoading(true);
     try {
       await axios.delete(`${API_URL}/${deleteVideo.id}`);
       setVideos((prev) => prev.filter((v) => v.id !== deleteVideo.id));
       setDeleteVideo(null);
-      fetchVideos(); // refresh list
+      fetchVideos();
     } catch (err) {
       console.error(err);
     } finally {
-      setDeleteLoading(false)
-
+      setDeleteLoading(false);
     }
   };
 
@@ -282,10 +287,7 @@ export default function CourseVideos() {
       alert("Please set date and time for live video");
       return;
     }
-    if (!batchId) {
-      alert("Invalid batch ID");
-      return;
-    }
+    if (!batchId) return;
 
     const data = new FormData();
     data.append("title", form.title);
@@ -293,7 +295,6 @@ export default function CourseVideos() {
     data.append("url", form.url);
     data.append("batchId", String(batchId));
     data.append("position", String(form.position));
-
     data.append("subjectId", form.subjectId);
     data.append("isDownloadable", String(form.isDownloadable));
     data.append("isDemo", String(form.isDemo));
@@ -321,9 +322,8 @@ export default function CourseVideos() {
       }
       setShowModal(false);
       fetchVideos();
-    } catch (err) {
-      console.error(err.response.data.message || err);
-      alert(err.response.data.message || "Failed to save video. Please try again.");
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to save video");
     }
   };
 
@@ -338,15 +338,12 @@ export default function CourseVideos() {
       return embed ? (
         <iframe src={embed} className="w-full h-full" allowFullScreen />
       ) : (
-        <div className="text-red-400 flex items-center justify-center h-full text-sm">
-          Invalid YouTube URL
-        </div>
+        <div className="text-red-400 flex items-center justify-center h-full text-sm">Invalid YouTube URL</div>
       );
     }
     return <video src={v.url} controls className="w-full h-full" />;
   };
 
-  // Jump to page
   const handleJumpToPage = (e: React.FormEvent) => {
     e.preventDefault();
     const input = (e.target as HTMLFormElement).jumpPage as HTMLInputElement;
@@ -356,12 +353,17 @@ export default function CourseVideos() {
     }
   };
 
+  // Filter videos by type (client-side for better UX)
+  const filteredVideos = videos.filter((v) => {
+    if (typeFilter === "all") return true;
+    if (typeFilter === "live") return v.isLive;
+    if (typeFilter === "demo") return v.isDemo;
+    if (typeFilter === "recorded") return !v.isLive && !v.isDemo;
+    return true;
+  });
+
   if (!batchId) {
-    return (
-      <div className="text-center py-12 text-red-600">
-        Invalid batch ID in URL
-      </div>
-    );
+    return <div className="text-center py-12 text-red-600">Invalid batch ID</div>;
   }
 
   return (
@@ -370,335 +372,199 @@ export default function CourseVideos() {
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Course Videos – Batch {batch?.name || batchId} ({batch?.category || ""})
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Course Videos – {batch?.name || `Batch ${batchId}`}
             </h1>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              Manage videos with server-side pagination & search
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {batch?.category?.toUpperCase()} • Manage with advanced filters
             </p>
           </div>
           <button
             onClick={openAdd}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg font-medium transition shadow-lg"
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition shadow-lg"
           >
-            <Plus className="w-4 h-4" />
-            Add Video
+            <Plus className="w-5 h-5" />
+            Add New Video
           </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto">
-        {/* Controls: Search + Limit */}
-        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-5">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search videos..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
+        {/* Filters Bar */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow border border-gray-200 dark:border-gray-700 p-4 mb-6">
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* Search */}
+            <div className="flex-1 min-w-[240px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by title..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                />
+              </div>
+            </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-              Show:
-            </label>
-            <select
-              value={pagination.limit}
-              onChange={(e) =>
-                setPagination((prev) => ({
-                  ...prev,
-                  limit: Number(e.target.value),
-                  page: 1,
-                }))
-              }
-              className="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
+            {/* Status Filter */}
+            <div className="min-w-[140px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Status</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            {/* Subject Filter */}
+            <div className="min-w-[180px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Subject</label>
+              <select
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+              >
+                <option value="">All Subjects</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Filter */}
+            <div className="min-w-[160px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Class Date</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="min-w-[140px]">
+              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Type</label>
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as any)}
+                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+              >
+                <option value="all">All Types</option>
+                <option value="live">Live</option>
+                <option value="recorded">Recorded</option>
+                <option value="demo">Demo</option>
+              </select>
+            </div>
+
+            {/* Reset Filters */}
+            <button
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setSubjectFilter("");
+                setDateFilter("");
+                setTypeFilter("all");
+              }}
+              className="px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800 flex items-center gap-2"
             >
-              {LIMIT_OPTIONS.map((lim) => (
-                <option key={lim} value={lim}>
-                  {lim}
-                </option>
-              ))}
-            </select>
+              <X className="w-4 h-4" />
+              Reset
+            </button>
           </div>
         </div>
 
-        {/* Loading / Error */}
-        {loading && (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full"></div>
-            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-              Loading videos...
-            </p>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="text-center py-12 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-            <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              Failed to load videos. Please try again.
-            </p>
-          </div>
-        )}
-
-        {/* Table */}
+        {/* Table Section */}
         {!loading && !error && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      #
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Title
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Subject
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Comments
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Type
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Schedule
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Preview Class
-                    </th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">
-                      Status
-                    </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
-                      Upload Pdf
-                    </th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">
-                      Actions
-                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">#</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Title</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Subject</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Type</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Schedule</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300">Status</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {videos.length === 0 ? (
+                  {filteredVideos.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={10}
-                        className="px-3 py-8 text-center text-gray-500 dark:text-gray-400"
-                      >
-                        {search ? "No matching videos found" : "No videos yet"}
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        No videos found matching your filters
                       </td>
                     </tr>
                   ) : (
-                    videos.map((v) => (
-                      <tr
-                        key={v.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition"
-                      >
-                        <td className="px-3 py-2">
-                          <span>#{v.position || 0}</span>
-
-                        </td>
-                        <td className="px-3 py-2">
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white line-clamp-1">
-                              {v.title}
-                            </p>
-                            <div className="flex gap-1 mt-0.5 flex-wrap">
-                              {v.isDemo && (
-                                <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-                                  Demo
-                                </span>
-                              )}
-                              {v.isDownloadable && (
-                                <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                                  DL
-                                </span>
-                              )}
-                              {v.isLive && (
-                                <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 rounded flex items-center gap-0.5">
-                                  <span className="w-1 h-1 bg-purple-600 rounded-full animate-pulse"></span>
-                                  Live
-                                </span>
-                              )}
-                              {v.isLiveEnded && (
-                                <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded flex items-center gap-0.5">
-                                  <span className="w-1 h-1 bg-red-600 rounded-full"></span>
-                                  Live Ended
-                                </span>
-                              )}
-                              {!v.isLive && !v.isLiveEnded && !v.isDemo && (
-                                <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
-                                  Recorded
-                                </span>
-                              )}
-                            </div>
+                    filteredVideos.map((v, index) => (
+                      <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                        <td className="px-4 py-3 font-medium">#{v.position}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-gray-900 dark:text-white">{v.title}</div>
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {v.isDemo && <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded">Demo</span>}
+                            {v.isDownloadable && <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded">DL</span>}
+                            {v.isLive && (
+                              <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse" /> LIVE
+                              </span>
+                            )}
                           </div>
                         </td>
-
-                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                           {subjects.find((s) => s.id === v.subjectId)?.name || "—"}
                         </td>
-
-                        <td className="px-3 py-2">
-                          <button
-                            onClick={() => navigate(`/view-comments-joined/${v.id}`)}
-                            className="px-3 py-1.5 text-xs bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 dark:hover:bg-cyan-900/50 rounded transition"
-                          >
-                            View Comments
-                          </button>
-                        </td>
-
-                        <td className="px-3 py-2">
-                          <span className="text-xs px-2 py-1 bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 rounded font-medium">
+                        <td className="px-4 py-3">
+                          <span className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 rounded-full font-medium">
                             {v.videoSource.toUpperCase()}
                           </span>
                         </td>
-
-                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
-                          {v.isLive && v.DateOfLive && v.TimeOfLIve ? (
-                            <div className="text-xs">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {v.DateOfLive.replace(/-/g, "/")}
-                              </div>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <Clock className="w-3 h-3" />
-                                {v.TimeOfLIve.slice(0, 5)}
-                              </div>
-                            </div>
-                          ) : v.dateOfClass && v.TimeOfClass ? (
-                            <div className="text-xs">
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {v.dateOfClass.replace(/-/g, "/")}
-                              </div>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <Clock className="w-3 h-3" />
-                                {v.TimeOfClass.slice(0, 5)}
-                              </div>
-                            </div>
+                        <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
+                          {v.isLive && v.DateOfLive ? (
+                            <>
+                              {v.DateOfLive} • {v.TimeOfLIve}
+                            </>
+                          ) : v.dateOfClass ? (
+                            <>
+                              {v.dateOfClass} • {v.TimeOfClass}
+                            </>
                           ) : (
                             "—"
                           )}
                         </td>
-
-                        <td className="px-3 py-2 flex gap-2 flex-wrap">
-                          <a
-                            target="_blank"
-                            rel="noreferrer"
-                            href={`/stats-of-class/${v.id}`}
-                            className="px-3 py-1.5 text-xs bg-indigo-600 text-white rounded-full hover:bg-indigo-700"
-                          >
-                            Admin Check Live
-                          </a>
-                          <a
-                            target="_blank"
-                            rel="noreferrer"
-                            href={`/live-class-monitor/${v.id}`}
-                            className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-full hover:bg-emerald-700"
-                          >
-                            Share Live Monitor
-                          </a>
-                        </td>
-
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3 text-center">
                           <span
-                            className={`text-xs px-2 py-1 rounded font-semibold ${v.status === "active"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                              }`}
+                            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
+                              v.status === "active"
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                            }`}
                           >
-                            {v.status.charAt(0).toUpperCase() + v.status.slice(1)}
+                            {v.status.toUpperCase()}
                           </span>
                         </td>
-
-                        <td className="px-3 py-2 text-center">
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/upload-pdf?batch=${batchId}&video=${v.id}&title=${encodeURIComponent(
-                                  v.title.trim().toLowerCase().replace(/\s+/g, "-")
-                                )}`
-                              )
-                            }
-                            className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 rounded"
-                            title="Upload PDF"
-                          >
-                            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                          </button>
-                        </td>
-
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-3">
                           <div className="flex justify-center gap-1 flex-wrap">
-                            <button
-                              onClick={() => setPlaying(v)}
-                              className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 hover:bg-indigo-200 rounded"
-                              title="Play"
-                            >
-                              <Play className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <button onClick={() => setPlaying(v)} className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg" title="Play">
+                              <Play className="w-4 h-4 text-indigo-600" />
                             </button>
-
-                            {v.isLive && (
-                              <>
-                                <button
-                                  onClick={() => !v.isLiveEnded && endLiveSession(v)}
-                                  disabled={v.isLiveEnded}
-                                  className={`p-1.5 rounded text-xs font-medium ${v.isLiveEnded
-                                    ? "bg-gray-300 dark:bg-gray-600 cursor-not-allowed"
-                                    : "bg-yellow-100 dark:bg-yellow-900/40 hover:bg-yellow-200"
-                                    }`}
-                                >
-                                  {v.isLiveEnded ? "Ended" : "End Live"}
-                                </button>
-
-                                <button
-                                  onClick={() => navigate(`/view-chat/${v.id}`)}
-                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 rounded"
-                                  title="View Chats"
-                                >
-                                  <MessageSquare className="w-4 h-4 text-cyan-600" />
-                                </button>
-
-                                <button
-                                  onClick={() => navigate(`/view-studnets-joined/${v.id}`)}
-                                  className="p-1.5 bg-cyan-100 dark:bg-cyan-900/30 hover:bg-cyan-200 rounded"
-                                  title="View Joined Students"
-                                >
-                                  <Eye className="w-4 h-4 text-cyan-600" />
-                                </button>
-                              </>
-                            )}
-
-                            <button
-                              onClick={() => openEdit(v)}
-                              className="p-1.5 bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 rounded"
-                              title="Edit"
-                            >
+                            <button onClick={() => openEdit(v)} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg" title="Edit">
                               <Edit2 className="w-4 h-4 text-blue-600" />
                             </button>
-
-                            <button
-                              onClick={() => toggleStatus(v)}
-                              className="p-1.5 bg-orange-100 dark:bg-orange-900/30 hover:bg-orange-200 rounded"
-                              title={v.status === "active" ? "Hide" : "Show"}
-                            >
-                              {v.status === "active" ? (
-                                <Eye className="w-4 h-4 text-orange-600" />
-                              ) : (
-                                <EyeOff className="w-4 h-4 text-orange-600" />
-                              )}
+                            <button onClick={() => toggleStatus(v)} className="p-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg" title="Toggle Status">
+                              {v.status === "active" ? <Eye className="w-4 h-4 text-orange-600" /> : <EyeOff className="w-4 h-4 text-orange-600" />}
                             </button>
-
-                            <button
-                              onClick={() => setDeleteVideo(v)}
-                              className="p-1.5 bg-red-100 dark:bg-red-900/30 hover:bg-red-200 rounded"
-                              title="Delete"
-                            >
+                            <button onClick={() => setDeleteVideo(v)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg" title="Delete">
                               <Trash2 className="w-4 h-4 text-red-600" />
                             </button>
                           </div>
@@ -710,31 +576,19 @@ export default function CourseVideos() {
               </table>
             </div>
 
-            {/* Pagination Controls */}
+            {/* Pagination */}
             {pagination.total > 0 && (
-              <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
-                <div className="text-gray-600 dark:text-gray-400">
+              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
+                <div>
                   Showing {(pagination.page - 1) * pagination.limit + 1} –{" "}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                  {pagination.total}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap justify-center">
-                  <button
-                    onClick={() => setPagination((p) => ({ ...p, page: 1 }))}
-                    disabled={pagination.page === 1}
-                    className="p-2 rounded border disabled:opacity-40"
-                  >
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setPagination((p) => ({ ...p, page: 1 }))} disabled={pagination.page === 1} className="p-2 disabled:opacity-50">
                     <ChevronsLeft className="w-5 h-5" />
                   </button>
-
-                  <button
-                    onClick={() =>
-                      setPagination((p) => ({ ...p, page: p.page - 1 }))
-                    }
-                    disabled={pagination.page === 1}
-                    className="p-2 rounded border disabled:opacity-40"
-                  >
+                  <button onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))} disabled={pagination.page === 1} className="p-2 disabled:opacity-50">
                     <ChevronLeft className="w-5 h-5" />
                   </button>
 
@@ -746,34 +600,18 @@ export default function CourseVideos() {
                       min={1}
                       max={pagination.totalPages}
                       defaultValue={pagination.page}
-                      className="w-16 px-2 py-1 text-center border rounded dark:bg-gray-800 dark:border-gray-600"
+                      className="w-14 px-2 py-1 text-center border rounded dark:bg-gray-800"
                     />
                     <span>of {pagination.totalPages}</span>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
-                    >
+                    <button type="submit" className="px-4 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
                       Go
                     </button>
                   </form>
 
-                  <button
-                    onClick={() =>
-                      setPagination((p) => ({ ...p, page: p.page + 1 }))
-                    }
-                    disabled={pagination.page === pagination.totalPages}
-                    className="p-2 rounded border disabled:opacity-40"
-                  >
+                  <button onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))} disabled={pagination.page === pagination.totalPages} className="p-2 disabled:opacity-50">
                     <ChevronRight className="w-5 h-5" />
                   </button>
-
-                  <button
-                    onClick={() =>
-                      setPagination((p) => ({ ...p, page: p.totalPages }))
-                    }
-                    disabled={pagination.page === pagination.totalPages}
-                    className="p-2 rounded border disabled:opacity-40"
-                  >
+                  <button onClick={() => setPagination((p) => ({ ...p, page: p.totalPages }))} disabled={pagination.page === pagination.totalPages} className="p-2 disabled:opacity-50">
                     <ChevronsRight className="w-5 h-5" />
                   </button>
                 </div>
@@ -781,31 +619,33 @@ export default function CourseVideos() {
             )}
           </div>
         )}
+
+        {/* Loading & Error States */}
+        {loading && (
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full" />
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading videos...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="text-center py-20 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+            <p>Failed to load videos. Please try again.</p>
+          </div>
+        )}
       </div>
 
       {/* Video Player Modal */}
       {playing && (
-        <div
-          className="fixed inset-0 bg-black/95 z-[999999999] flex items-center justify-center p-4"
-          onClick={() => setPlaying(null)}
-        >
-          <div
-            className="relative w-full max-w-4xl bg-black rounded-lg overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setPlaying(null)}
-              className="absolute top-2 right-2 z-10 w-8 h-8 bg-white/20 hover:bg-white/40 rounded-full flex items-center justify-center"
-            >
-              <X className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 bg-black/95 z-[999999] flex items-center justify-center p-4" onClick={() => setPlaying(null)}>
+          <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setPlaying(null)} className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center">
+              <X className="w-6 h-6 text-white" />
             </button>
             <div className="aspect-video">{renderPlayer(playing)}</div>
-            <div className="p-3 bg-gradient-to-t from-black to-transparent text-white">
-              <h3 className="font-semibold text-sm">{playing.title}</h3>
-              <p className="text-xs opacity-70 mt-1">
-                {subjects.find((s) => s.id === playing.subjectId)?.name} •{" "}
-                {playing.videoSource.toUpperCase()}
-              </p>
+            <div className="p-4 bg-gradient-to-t from-black text-white">
+              <h3 className="font-semibold">{playing.title}</h3>
             </div>
           </div>
         </div>
