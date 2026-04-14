@@ -39,6 +39,8 @@ import {
   AlertCircle,
   Calculator,
   ChevronDown,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import JoditEditor from "jodit-react";
 
@@ -59,6 +61,15 @@ interface SortableSubjectProps {
   id: number;
   name: string;
 }
+interface SeparatePurchaseSubject {
+  subjectId: number;
+  price: number;
+  discountPrice: number;
+  expiryDays: number;
+  position: number;
+  status: "active" | "inactive";
+  tag?: string;
+}
 interface EditBatchFormData {
   name: string;
   displayOrder: number;
@@ -74,6 +85,7 @@ interface EditBatchFormData {
   fee_one_time: string;
   fee_inst: string;
   note: string;
+  separatePurchaseSubjectIds: SeparatePurchaseSubject[];
 
   shortDescription: string;
   longDescription: string;
@@ -92,6 +104,7 @@ interface Batch {
   imageUrl: string;
   displayOrder: number;
   position: number;
+  separatePurchaseSubjectIds: SeparatePurchaseSubject[];
 
   programId: number;
   subjectId: string;
@@ -206,6 +219,7 @@ const EditBatch = () => {
   const [emiSchedule, setEmiSchedule] = useState<
     Array<{ month: number; amount: number }>
   >([]);
+  const [separatePurchaseSubjects, setSeparatePurchaseSubjects] = useState<SeparatePurchaseSubject[]>([]);
 
   const [formData, setFormData] = useState<EditBatchFormData>({
     name: "",
@@ -220,6 +234,7 @@ const EditBatch = () => {
     status: "active",
     shortDescription: "",
     longDescription: "",
+    separatePurchaseSubjectIds: [],
     quizIds: [],
     medium: "",
     offerText: "",
@@ -364,7 +379,7 @@ const EditBatch = () => {
         ]);
 
         const data = batchRes.data;
-
+        console.log("batchRes", batchRes.data)
         setBatch(data);
         setAllSubjects(subjectsRes.data);
         setImagePreview(data.imageUrl || "");
@@ -404,16 +419,29 @@ const EditBatch = () => {
           registrationEndDate: data.registrationEndDate
             ? data.registrationEndDate.split("T")[0]
             : "",
+
           medium: data?.medium || "",
           offerText: data?.offerText || "",
           fee_one_time: data?.fee_one_time || "",
           fee_inst: data?.fee_inst || "",
           note: data?.note || "",
+
           status: data.status || "inactive",
           position: data.position || 1,
+
           quizIds: Array.isArray(data.quizIds) ? data.quizIds : [],
-          testSeriesIds: Array.isArray(data.testSeriesIds)
-            ? data.testSeriesIds
+          testSeriesIds: Array.isArray(data.testSeriesIds) ? data.testSeriesIds : [],
+
+          separatePurchaseSubjectIds: Array.isArray(data.separatePurchaseSubjects)
+            ? data.separatePurchaseSubjects.map((item: any) => ({
+              subjectId: Number(item.subjectId),
+              price: Number(item.price) || 0,
+              discountPrice: Number(item.discountPrice) || 0,
+              expiryDays: Number(item.expiryDays) || 365,
+              position: Number(item.position) || 1,
+              status: item.status || "active",
+              tag: item.tag || "",
+            }))
             : [],
 
           shortDescription: data.shortDescription || "",
@@ -426,14 +454,25 @@ const EditBatch = () => {
 
           category:
             typeof data.category === "string"
-              ? (data.category.toLowerCase() as
-                | ""
-                | "online"
-                | "offline"
-                | "recorded")
+              ? (data.category.toLowerCase() as "" | "online" | "offline" | "recorded")
               : "",
         });
 
+        /* ================= SEPARATE PURCHASE SUBJECTS STATE ================= */
+        if (Array.isArray(data.separatePurchaseSubjects) && data.separatePurchaseSubjects.length > 0) {
+          const normalized = data.separatePurchaseSubjects.map((item: any) => ({
+            subjectId: Number(item.subjectId),
+            price: Number(item.price) || 0,
+            discountPrice: Number(item.discountPrice) || 0,
+            expiryDays: Number(item.expiryDays) || 365,
+            position: Number(item.position) || 1,
+            status: (item.status === "inactive" ? "inactive" : "active") as "active" | "inactive",
+            tag: item.tag || "",
+          }));
+          setSeparatePurchaseSubjects(normalized);
+        } else {
+          setSeparatePurchaseSubjects([]);
+        }
         /* ================= SEPARATE STATES ================= */
         // setSele(Array.isArray(data.subjects) ? data.subjects : [])
         // setSelectedQuizIds(Array.isArray(data.quizIds) ? data.quizIds : []);
@@ -591,7 +630,7 @@ const EditBatch = () => {
       data.append("name", formData.name);
       data.append("displayOrder", formData.displayOrder.toString());
       data.append("position", formData.position.toString());
-
+      data.append("separatePurchaseSubjectIds", JSON.stringify(separatePurchaseSubjects));
       data.append("programId", formData.programId);
       data.append("category", formData.category);
       data.append("subjectId", JSON.stringify(selectedSubjectIds));
@@ -1470,25 +1509,175 @@ const EditBatch = () => {
               </p>
             </div>
 
-            {/* Submit Buttons */}
-            <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {submitting ? "Updating..." : "Update Batch"}
-              </button>
-              <Link to="/all-courses">
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-sm font-semibold">
+                  Separate Purchase Subjects (Individual Selling)
+                </Label>
                 <button
                   type="button"
-                  className="px-6 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                  onClick={() => {
+                    if (selectedSubjectIds.length === 0) {
+                      toast.error("Please select subjects first from above");
+                      return;
+                    }
+                    // Add all selected subjects as separate purchase by default
+                    const newItems = selectedSubjectIds
+                      .filter(id => !separatePurchaseSubjects.some(s => s.subjectId === id))
+                      .map(id => ({
+                        subjectId: id,
+                        price: 0,
+                        discountPrice: 0,
+                        expiryDays: 365,
+                        position: separatePurchaseSubjects.length + 1,
+                        status: "active" as const,
+                        tag: "",
+                      }));
+                    setSeparatePurchaseSubjects(prev => [...prev, ...newItems]);
+                  }}
+                  className="flex items-center gap-2 text-sm bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-lg hover:bg-indigo-200 transition"
                 >
-                  Cancel
+                  <Plus className="w-4 h-4" />
+                  Add Selected Subjects
                 </button>
-              </Link>
+              </div>
+
+              {separatePurchaseSubjects.length > 0 ? (
+                <div className="space-y-4">
+                  {separatePurchaseSubjects.map((item, index) => {
+                    const subject = allSubjects.find(s => s.id === item.subjectId);
+                    return (
+                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-medium">{subject?.name}</p>
+                            <p className="text-xs text-gray-500">Subject ID: {item.subjectId}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSeparatePurchaseSubjects(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div>
+                            <Label className="text-xs">Price (₹)</Label>
+                            <Input
+                              type="number"
+                              value={item.price}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].price = parseFloat(e.target.value) || 0;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Discount Price (₹)</Label>
+                            <Input
+                              type="number"
+                              value={item.discountPrice}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].discountPrice = parseFloat(e.target.value) || 0;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Expiry Days</Label>
+                            <Input
+                              type="number"
+                              value={item.expiryDays}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].expiryDays = parseInt(e.target.value) || 365;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-4 mt-4">
+                          <div>
+                            <Label className="text-xs">Position</Label>
+                            <Input
+                              type="number"
+                              value={item.position}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].position = parseInt(e.target.value) || 1;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Status</Label>
+                            <select
+                              value={item.status}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].status = e.target.value as "active" | "inactive";
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                            >
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Tag (Optional)</Label>
+                            <Input
+                              value={item.tag || ""}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].tag = e.target.value;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                              placeholder="e.g. Popular, New"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No separate purchase subjects added yet.</p>
+              )}
             </div>
+
+            {/* Submit Buttons */}
+          <div className="sticky bottom-0 bg-white dark:bg-gray-900 pt-4 pb-4 border-t border-gray-200 dark:border-gray-800 flex gap-3 justify-end">
+  <button
+    type="submit"
+    disabled={submitting}
+    className="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition"
+  >
+    {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+    {submitting ? "Updating..." : "Update Batch"}
+  </button>
+
+  <Link to="/all-courses">
+    <button
+      type="button"
+      className="px-6 py-2.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+    >
+      Cancel
+    </button>
+  </Link>
+</div>
           </Form>
         </div>
       </div>

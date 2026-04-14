@@ -19,6 +19,8 @@ import {
   Search,
   AlertCircle,
   ChevronDown,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 const BATCH_API = "https://www.app.api.dikshantias.com/api/batchs";
@@ -39,7 +41,15 @@ interface Program {
 }
 
 type BatchStatus = "active" | "inactive" | "upcoming";
-
+interface SeparatePurchaseSubject {
+  subjectId: number;
+  price: number;
+  discountPrice: number;
+  expiryDays: number;
+  position: number;
+  status: "active" | "inactive";
+  tag?: string;
+}
 interface CreateBatchFormData {
   name: string;
   displayOrder: number;
@@ -65,6 +75,7 @@ interface CreateBatchFormData {
   gst: number;
   offerValidityDays: number;
   category: string;
+  separatePurchaseSubjectIds: SeparatePurchaseSubject[];
 }
 
 interface Quiz {
@@ -104,7 +115,7 @@ const CreateBatch = () => {
 
   const [quizzesDropdownOpen, setQuizzesDropdownOpen] = useState(false);
   const [testSeriesDropdownOpen, setTestSeriesDropdownOpen] = useState(false);
-
+  const [separatePurchaseSubjects, setSeparatePurchaseSubjects] = useState<SeparatePurchaseSubject[]>([]);
   const [isEmi, setIsEmi] = useState(false);
   const [emiMonths, setEmiMonths] = useState(2);
   const [emiSchedule, setEmiSchedule] = useState<
@@ -128,6 +139,7 @@ const CreateBatch = () => {
     startDate: "",
     endDate: "",
     registrationStartDate: "",
+    separatePurchaseSubjectIds: [],
     quizIds: [],
     testSeriesIds: [],
     registrationEndDate: "",
@@ -353,7 +365,7 @@ const CreateBatch = () => {
       data.append("fee_one_time", formData.fee_one_time);
       data.append("fee_inst", formData.fee_inst);
       data.append("note", formData.note);
-
+      data.append("separatePurchaseSubjectIds", JSON.stringify(separatePurchaseSubjects));
 
       data.append("batchPrice", formData.batchPrice.toString());
 
@@ -1205,9 +1217,157 @@ const CreateBatch = () => {
                 />
               </div>
             </div>
+            {/* Separate Purchase Subjects */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-sm font-semibold">
+                  Separate Purchase Subjects (Individual Selling)
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedSubjectIds.length === 0) {
+                      toast.error("Please select subjects first from above");
+                      return;
+                    }
+                    // Add all selected subjects as separate purchase by default
+                    const newItems = selectedSubjectIds
+                      .filter(id => !separatePurchaseSubjects.some(s => s.subjectId === id))
+                      .map(id => ({
+                        subjectId: id,
+                        price: 0,
+                        discountPrice: 0,
+                        expiryDays: 365,
+                        position: separatePurchaseSubjects.length + 1,
+                        status: "active" as const,
+                        tag: "",
+                      }));
+                    setSeparatePurchaseSubjects(prev => [...prev, ...newItems]);
+                  }}
+                  className="flex items-center gap-2 text-sm bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-4 py-2 rounded-lg hover:bg-indigo-200 transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Selected Subjects
+                </button>
+              </div>
 
+              {separatePurchaseSubjects.length > 0 ? (
+                <div className="space-y-4">
+                  {separatePurchaseSubjects.map((item, index) => {
+                    const subject = allSubjects.find(s => s.id === item.subjectId);
+                    return (
+                      <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <p className="font-medium">{subject?.name}</p>
+                            <p className="text-xs text-gray-500">Subject ID: {item.subjectId}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSeparatePurchaseSubjects(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div>
+                            <Label className="text-xs">Price (₹)</Label>
+                            <Input
+                              type="number"
+                              value={item.price}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].price = parseFloat(e.target.value) || 0;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Discount Price (₹)</Label>
+                            <Input
+                              type="number"
+                              value={item.discountPrice}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].discountPrice = parseFloat(e.target.value) || 0;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Expiry Days</Label>
+                            <Input
+                              type="number"
+                              value={item.expiryDays}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].expiryDays = parseInt(e.target.value) || 365;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-4 mt-4">
+                          <div>
+                            <Label className="text-xs">Position</Label>
+                            <Input
+                              type="number"
+                              value={item.position}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].position = parseInt(e.target.value) || 1;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Status</Label>
+                            <select
+                              value={item.status}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].status = e.target.value as "active" | "inactive";
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
+                            >
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Tag (Optional)</Label>
+                            <Input
+                              value={item.tag || ""}
+                              onChange={(e) => {
+                                const updated = [...separatePurchaseSubjects];
+                                updated[index].tag = e.target.value;
+                                setSeparatePurchaseSubjects(updated);
+                              }}
+                              className="text-sm"
+                              placeholder="e.g. Popular, New"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic">No separate purchase subjects added yet.</p>
+              )}
+            </div>
             {/* Submit Buttons */}
-            <div className="flex gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
+            <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 flex gap-3 justify-end z-50">
               <button
                 type="submit"
                 disabled={submitting || loadingSubjects}
@@ -1216,6 +1376,7 @@ const CreateBatch = () => {
                 {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {submitting ? "Creating..." : "Create Batch"}
               </button>
+
               <Link to="/all-courses">
                 <button
                   type="button"

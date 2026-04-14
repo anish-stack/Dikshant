@@ -66,6 +66,9 @@ import VideoPlayerFreeScreen from "../../pages/free_videos/VideoPlayerFreeScreen
 import AllStudyMaterialCats from "../../pages/study_material/AllStudyMaterialCats";
 import StudyMaterials from "../../pages/study_material/StudyMaterials";
 import StudyMaterialDetails from "../../pages/study_material/StudyMaterialDetails";
+import DeliveryTimeLine from "../../pages/study_material/DeliveryTimeLine";
+import AllStudyMaterialsOrders from "../../pages/Profile/AllStudyMaterialsOrders";
+import EnrollSubject from "../../screens/courses/EnrollSubject";
 
 const Stack = createNativeStackNavigator();
 
@@ -166,6 +169,13 @@ export default function AppRouter({ navigationRef }) {
         <Stack.Screen name="study_material" component={AllStudyMaterialCats} />
         <Stack.Screen name="StudyMaterials" component={StudyMaterials} />
         <Stack.Screen name="StudyMaterials-details" component={StudyMaterialDetails} />
+
+        <Stack.Screen name="check-status" component={DeliveryTimeLine} />
+        <Stack.Screen name="study-materials-orders" component={AllStudyMaterialsOrders} />
+        <Stack.Screen name="subject-enroll" component={EnrollSubject} />
+
+{/*  */}
+
 
 
         {/* Share */}

@@ -215,8 +215,8 @@ class QuizResultController {
           is_correct: Boolean(userAnswer?.isCorrect),
           marks_awarded: Number(userAnswer?.marksObtained || 0),
           marks_total: question?.marks || 0,
-          explanation: quiz.show_explanations ? question?.explanation : null,
-          hint: quiz.show_hints ? question?.hint : null,
+          explanation: question?.explanation ,
+          hint: question?.hint ,
           options: questionOptions,
         };
       });

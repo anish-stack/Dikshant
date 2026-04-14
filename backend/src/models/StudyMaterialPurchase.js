@@ -26,6 +26,24 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false
         },
 
+        studentName: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+
+        contactNumber: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+
+        address: {
+            type: DataTypes.TEXT
+        },
+
+        pincode: {
+            type: DataTypes.STRING
+        },
+
         materialId: {
             type: DataTypes.INTEGER,
             allowNull: false
@@ -40,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
         },
 
         paymentStatus: {
-            type: DataTypes.ENUM('pending','paid','failed','refunded','admin-assigned'),
+            type: DataTypes.ENUM('pending', 'paid', 'failed', 'refunded', 'admin-assigned'),
             defaultValue: 'pending'
         },
 
@@ -55,7 +73,7 @@ module.exports = (sequelize, DataTypes) => {
         },
 
         accessType: {
-            type: DataTypes.ENUM('lifetime','limited'),
+            type: DataTypes.ENUM('lifetime', 'limited'),
             defaultValue: 'lifetime'
         },
 
@@ -75,6 +93,29 @@ module.exports = (sequelize, DataTypes) => {
 
         notes: {
             type: DataTypes.TEXT
+        },
+
+        // 📦 Delivery fields for hard copy
+
+        deliveryStatus: {
+            type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled'),
+            defaultValue: 'pending'
+        },
+
+        courierName: {
+            type: DataTypes.STRING
+        },
+
+        trackingNumber: {
+            type: DataTypes.STRING
+        },
+
+        dispatchedAt: {
+            type: DataTypes.DATE
+        },
+
+        deliveredAt: {
+            type: DataTypes.DATE
         }
 
     }, {

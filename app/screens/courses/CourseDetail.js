@@ -12,6 +12,7 @@ import {
   Pressable,
   Animated,
   LayoutAnimation,
+  FlatList,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -26,6 +27,7 @@ import { API_URL_LOCAL_ENDPOINT } from "../../constant/api";
 import { useAuthStore } from "../../stores/auth.store";
 import QuizCards from "./QuizCards";
 import TestSeries from "./TestSeries";
+import SubjectBatchCard from "./SubjectBatchCard";
 const { width } = Dimensions.get("window");
 
 // Updated color scheme
@@ -167,7 +169,6 @@ export default function CourseDetail() {
     expiryMessage: passedExpiryMessage,
   } = route.params || {};
   const insets = useSafeAreaInsets();
-  const [webHeight, setWebHeight] = useState(0);
   const isGestureNavigation = insets.bottom >= BOTTOM_GESTURE_THRESHOLD;
   const TAB_BAR_HEIGHT = isGestureNavigation ? 72 : 56;
   const { token, userId } = useAuthStore()
@@ -181,11 +182,11 @@ export default function CourseDetail() {
 
   const [purchaseStatus, setPurchaseStatus] = useState({
     purchased: passedPurchased ?? false,
-    canAccess: passedExpired !== true, // invert: if passedExpired=true → canAccess=false
+    canAccess: passedExpired !== true,
     message: passedExpiryMessage || null,
   });
 
-  const [loadingStatus, setLoadingStatus] = useState(true);
+
 
   // Fetch batch details
   const {
@@ -196,6 +197,7 @@ export default function CourseDetail() {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
   });
+
 
   // Fetch videos for this batch
   const {
@@ -402,7 +404,17 @@ export default function CourseDetail() {
     }
   }, []);
 
-  // Loading state
+  // ✅ Correct & Clean Version
+  const filteredSubjects = useMemo(() => {
+    if (!Array.isArray(batchData?.separatePurchaseSubjects)) {
+      return [];
+    }
+
+    return batchData.separatePurchaseSubjects
+      .filter(s => s.price > 0 && s.status === "active")
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
+  }, [batchData?.separatePurchaseSubjects]);
+
   if (batchLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -458,7 +470,7 @@ export default function CourseDetail() {
   </html>
 `;
 
- const htmlContentShort = `
+  const htmlContentShort = `
 <!DOCTYPE html>
 <html>
   <head>
@@ -551,14 +563,14 @@ export default function CourseDetail() {
 
           {batchData?.shortDescription && (
             <WebView
-                originWhitelist={['*']}
-                androidLayerType="hardware"
-                nestedScrollEnabled={true}
-                source={{ html: htmlContentShort }}
-                style={{ height: 100 }}
-                scrollEnabled={true}
-                showsVerticalScrollIndicator={true}
-              />
+              originWhitelist={['*']}
+              androidLayerType="hardware"
+              nestedScrollEnabled={true}
+              source={{ html: htmlContentShort }}
+              style={{ height: 100 }}
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            />
           )}
 
           <View style={styles.statsRow}>
@@ -661,7 +673,7 @@ export default function CourseDetail() {
                           <Feather name="video" size={20} color={colors.white} />
                         </View>
                       )}
-                    
+
                     </View>
 
                     <View style={styles.videoDetails}>
@@ -695,6 +707,45 @@ export default function CourseDetail() {
             <Text style={styles.videosLoadingText}>Loading videos...</Text>
           </View>
         )}
+
+        <View style={styles.section}>
+
+          <AccordionItem
+            title={`Buy Individual Subjects (${filteredSubjects.length} Available)`}
+            icon="play-circle"
+            initiallyOpen={true}
+          >
+            <FlatList
+              data={filteredSubjects}
+              keyExtractor={(item) => item.subjectId.toString()}
+              renderItem={({ item }) => {
+
+                const subject = batchData.subjects.find(
+                  s => s.id === item.subjectId
+                );
+
+                return (
+                  <SubjectBatchCard
+                    subject={subject}
+                    subjectInfo={item}
+                    isBatchPurchased={batchData.isBatchPurchased}
+                    purchasedSubjectIds={batchData.purchasedSubjectIds}
+                    loading={batchLoading}
+                    onPurchase={(subjectId) => navigation.navigate("subject-enroll", {
+                      batchId,
+                      userId: userId,
+                      subjectId,
+                    })}
+                  />
+                );
+              }}
+            />
+
+          </AccordionItem>
+
+        </View>
+
+
 
         {/* Pricing Section */}
         <View style={styles.section}>

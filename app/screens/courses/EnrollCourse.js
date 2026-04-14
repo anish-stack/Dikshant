@@ -48,7 +48,6 @@ export default function EnrollCourse() {
   const navigation = useNavigation();
   const { batchId } = route.params || {};
   const { user, token } = useAuthStore();
-  console.log(token)
 
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);

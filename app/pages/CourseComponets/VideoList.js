@@ -22,6 +22,11 @@ const { width } = Dimensions.get("window");
 export default function VideoList({
   videos,
   currentVideo,
+  // New add for single subject buy
+  type,
+  purchasedItem,
+  batchIdOfSubject,
+  // ==============
   courseId,
   subjectId,
   startDate,
@@ -210,7 +215,7 @@ export default function VideoList({
         batchId: video?.batchId ?? "",
         userId: String(userId),
         token,
-        videoId:video?.id,
+        videoId: video?.id,
         courseId: String(courseId),
       })
 
@@ -491,7 +496,13 @@ export default function VideoList({
         <Text style={styles.mainTitle}>📚 All Lectures</Text>
 
         <TouchableOpacity onPress={() => navigation.navigate('my-course-subjects',
-          { courseId: courseId, unlocked: true })}>
+          {
+            courseId: courseId,
+            type,
+            purchasedItem,
+            batchIdOfSubject,
+            unlocked: true
+          })}>
           <Text style={styles.viewAllText}>All Content </Text>
         </TouchableOpacity>
       </View>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../stores/auth.store';
-import { getStatusColor, formatDate } from '../../utils/getStatusColorCourse';
+import { formatDate } from '../../utils/getStatusColorCourse';
 import Layout from '../../components/layout';
 import api from '../../constant/fetcher';
 
@@ -24,10 +24,9 @@ const colors = {
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',
-  disabled: '#9CA3AF',
 };
 
-// Date helpers
+// Date Helpers
 const addDays = (dateStr, days) => {
   if (!days || days <= 0) return null;
   const date = new Date(dateStr);
@@ -41,75 +40,74 @@ const getExpiryText = (order, expiryDate, expired) => {
   if (expired && expiryDate) {
     return `Expired on ${formatDate(expiryDate.toISOString())}`;
   }
-  if (order.reason === 'BATCH_INCLUDED') {
-    return 'Validity follows batch schedule';
+  if (order.accessValidityDays && order.accessValidityDays > 0) {
+    return `Expires on ${formatDate(expiryDate?.toISOString())}`;
   }
-  if (order.accessValidityDays != null && order.accessValidityDays > 0) {
-    if (expiryDate) {
-      return `Assigned validity: Expires on ${formatDate(expiryDate.toISOString())}`;
-    }
-  }
-  // Fallback for normal courses
   if (order.batch?.endDate) {
     return `Valid until ${formatDate(order.batch.endDate)}`;
   }
-  return 'Validity: Unlimited / Follows batch';
+  return 'Validity: Follows batch schedule';
 };
 
 export default function MyCourses() {
   const { user } = useAuthStore();
-  const [selectedTab, setSelectedTab] = useState('all');
   const navigation = useNavigation();
+
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTab, setSelectedTab] = useState('all');
 
   const fetchCourses = async () => {
     try {
       const res = await api.get(`/Orders/user/${user.id}`);
-      if (res.data) {
-        const batchOrders = res.data.filter((i) => i.type === 'batch');
-        setCourses(batchOrders || []);
+      if (res.data?.success) {
+        // Filter only batch and subject purchases
+        const filtered = res.data.data.filter((item) =>
+          ["batch", "subject"].includes(item.type)
+        );
+        setCourses(filtered);
       }
     } catch (err) {
-      console.log('Error fetching courses:', err);
+      console.error('Error fetching courses:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!user?.id) return;
-    fetchCourses();
+    if (user?.id) fetchCourses();
   }, [user?.id]);
 
-  // Process each order
-  const processedCourses = courses.map((order) => {
-    const batch = order.batch || {};
-    let expiryDate = null;
+  // Process orders with extra info
+  const processedCourses = useMemo(() => {
+    return courses.map((order) => {
+      const batch = order.batch || {};
+      let expiryDate = null;
 
-    const isBatchIncluded = order.reason === 'BATCH_INCLUDED';
+      if (order.accessValidityDays && order.accessValidityDays > 0) {
+        expiryDate = addDays(order.createdAt, order.accessValidityDays);
+      }
 
-    if (!isBatchIncluded && typeof order.accessValidityDays === 'number' && order.accessValidityDays > 0) {
-      expiryDate = addDays(order.createdAt, order.accessValidityDays);
-    }
+      const expired = isExpired(expiryDate);
 
-    const expired = isExpired(expiryDate);
+      return {
+        ...order,
+        batch,
+        expiryDate,
+        expired,
+        isSubjectPurchase: order.type === "subject",
+      };
+    });
+  }, [courses]);
 
-    return {
-      ...order,
-      batch,
-      expiryDate,
-      expired,
-      isBatchIncluded,
-    };
-  });
-
-  // Sort: active → expired last
-  const sortedCourses = [...processedCourses].sort((a, b) => {
-    if (a.expired && !b.expired) return 1;
-    if (!a.expired && b.expired) return -1;
-    return 0;
-  });
+  // Sort: Active first, then expired
+  const sortedCourses = useMemo(() => {
+    return [...processedCourses].sort((a, b) => {
+      if (a.expired && !b.expired) return 1;
+      if (!a.expired && b.expired) return -1;
+      return 0;
+    });
+  }, [processedCourses]);
 
   const filteredCourses = sortedCourses.filter((order) => {
     if (selectedTab === 'all') return true;
@@ -121,9 +119,27 @@ export default function MyCourses() {
   const handleCoursePress = (order) => {
     if (order.expired) return;
 
-    const batch = order.batch || {};
-    const url = ['online', 'offline'].includes(batch.category) ? 'my-course' : 'my-course-subjects';
-    navigation.navigate(url, { unlocked: true, courseId: batch.id });
+    const isSubject = order.type === "subject";
+
+    const params = isSubject
+      ? {
+        unlocked: true,
+        type: "subject",
+        orderId: order.id,
+        batchIdOfSubject: order.batchIdOfSubject,
+        purchasedItem: order.itemId,
+        courseId: order.batch?.id,
+      }
+      : {
+        unlocked: true,
+        type: "batch",
+        orderId: order.id,
+        courseId: order.batch?.id,
+      };
+
+    const screen = isSubject ? 'my-course-subjects' : 'my-course';
+
+    navigation.navigate(screen, params);
   };
 
   if (loading) {
@@ -145,6 +161,7 @@ export default function MyCourses() {
           <Text style={styles.count}>{processedCourses.length} courses</Text>
         </View>
 
+        {/* Tabs */}
         <View style={styles.tabs}>
           {['all', 'in-progress', 'completed'].map((key) => (
             <TouchableOpacity
@@ -155,7 +172,6 @@ export default function MyCourses() {
               <Text style={[styles.tabText, selectedTab === key && styles.tabTextActive]}>
                 {key === 'all' ? 'All' : key === 'in-progress' ? 'In Progress' : 'Completed'}
               </Text>
-              {selectedTab === key && <View style={styles.tabUnderline} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -168,38 +184,48 @@ export default function MyCourses() {
         ) : (
           <View style={styles.coursesList}>
             {filteredCourses.map((order) => {
-              const { batch, expired, expiryDate } = order;
-              const statusStyle = getStatusColor(batch.c_status || 'Active');
-              const expiryText = getExpiryText(order, expiryDate, expired);
+              const { batch, expired, expiryDate, isSubjectPurchase, subjects } = order;
+
+              // For subject purchase - get subject name
+              const subjectName = isSubjectPurchase && subjects?.[0]?.name
+                ? subjects[0].name
+                : null;
+
+              const displayTitle = isSubjectPurchase && subjectName
+                ? subjectName
+                : (batch?.name || 'Untitled Course');
 
               return (
                 <TouchableOpacity
                   key={order.id}
                   style={[styles.courseCard, expired && styles.courseCardExpired]}
-                  activeOpacity={expired ? 1 : 0.8}
+                  activeOpacity={expired ? 1 : 0.85}
                   disabled={expired}
                   onPress={() => handleCoursePress(order)}
                 >
-                  <View style={styles.cardHeader}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: `${statusStyle.bg}20`, borderColor: statusStyle.bg },
-                      ]}
-                    >
-                      <Text style={[styles.statusText, { color: statusStyle.text }]}>
-                        {batch.c_status || 'Active'}
-                      </Text>
+                  {/* Subject Badge */}
+                  {isSubjectPurchase && (
+                    <View style={styles.subjectBadge}>
+                      <Text style={styles.subjectBadgeText}>Subject Only</Text>
                     </View>
-                  </View>
+                  )}
 
-                  <Text style={[styles.courseTitle, expired && styles.expiredText]} numberOfLines={2}>
-                    {batch.name || 'Untitled Course'}
+                  {/* Main Title */}
+                  <Text
+                    style={[styles.courseTitle, expired && styles.expiredText]}
+                    numberOfLines={2}
+                  >
+                    {displayTitle}
                   </Text>
 
-                  {batch.program?.name && (
-                    <Text style={styles.programText}>{batch.program.name}</Text>
+                  {/* Batch Name (shown below for subject purchases) */}
+                  {isSubjectPurchase && batch?.name && (
+                    <Text style={styles.batchNameText}>
+                      From Batch: {batch.name}
+                    </Text>
                   )}
+
+
 
                   <View style={styles.metaContainer}>
                     <View style={styles.metaRow}>
@@ -207,60 +233,23 @@ export default function MyCourses() {
                         Paid: ₹{order.totalAmount?.toLocaleString('en-IN') || '0'}
                       </Text>
                       <Text style={styles.dateText}>
-                        Enrolled: {formatDate(order.createdAt)}
+                        {formatDate(order.createdAt)}
                       </Text>
                     </View>
 
                     <Text
-                      style={[
-                        styles.expiryText,
-                        expired ? styles.expiredExpiryText : null,
-                      ]}
+                      style={[styles.expiryText, expired && styles.expiredExpiryText]}
                     >
-                      {expiryText}
+                      {getExpiryText(order, expiryDate, expired)}
                     </Text>
                   </View>
 
-                  <View style={styles.progressContainer}>
-                    <View style={styles.progressBar}>
-                      <View style={styles.progressBackground}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            {
-                              width: expired
-                                ? '0%'
-                                : batch.c_status === 'Completed'
-                                  ? '100%'
-                                  : batch.c_status === 'In Progress'
-                                    ? '60%'
-                                    : batch.c_status === 'Partially Complete'
-                                      ? '85%'
-                                      : '0%',
-                              backgroundColor: expired ? colors.disabled : statusStyle.bg,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.progressLabel,
-                        expired && { color: colors.disabled },
-                      ]}
-                    >
-                      {expired
-                        ? 'Expired'
-                        : batch.c_status === 'Completed'
-                          ? 'Completed'
-                          : batch.c_status === 'In Progress'
-                            ? 'In Progress'
-                            : batch.c_status === 'Start Soon'
-                              ? 'Not Started'
-                              : 'Ongoing'}
+                  {/* Extra note for subject purchase */}
+                  {isSubjectPurchase && (
+                    <Text style={styles.subjectNote}>
+                      You purchased this subject individually from "{batch?.name}"
                     </Text>
-                  </View>
+                  )}
                 </TouchableOpacity>
               );
             })}
@@ -271,10 +260,12 @@ export default function MyCourses() {
   );
 }
 
+// ==================== STYLES ====================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 15, color: colors.textLight },
+  loadingText: { marginTop: 12, fontSize: 15, color: '#6B7280' },
+
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -282,110 +273,97 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E5E7EB',
   },
-  title: { fontSize: 22, fontWeight: '700', color: colors.text },
-  count: { fontSize: 14, color: colors.textLight },
+  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  count: { fontSize: 14, color: '#6B7280' },
+
   tabs: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E5E7EB',
   },
-  tab: { paddingHorizontal: 16, paddingVertical: 8, marginRight: 24, position: 'relative' },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, marginRight: 24 },
   tabActive: {},
-  tabText: { fontSize: 15, color: colors.textLight, fontWeight: '600' },
-  tabTextActive: { color: colors.primary, fontWeight: '700' },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: -13,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: colors.primary,
-    borderRadius: 2,
-  },
+  tabText: { fontSize: 15, color: '#6B7280', fontWeight: '600' },
+  tabTextActive: { color: '#DC2626', fontWeight: '700' },
+
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
-  emptyText: { marginTop: 16, fontSize: 16, color: colors.textLight },
+  emptyText: { marginTop: 16, fontSize: 16, color: '#6B7280' },
+
   coursesList: { padding: 20, paddingTop: 8 },
+
   courseCard: {
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#E5E7EB',
   },
   courseCardExpired: {
-    opacity: 0.55,
-    backgroundColor: '#f8f8f8',
-    borderColor: '#e5e7eb',
+    opacity: 0.6,
+    backgroundColor: '#f9fafb',
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+
+  subjectBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
+  subjectBadgeText: {
+    color: '#d97706',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  statusText: { fontSize: 12, fontWeight: '600' },
+
   courseTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: colors.text,
+    color: '#111827',
     marginBottom: 6,
+    paddingRight: 80, // space for badge
   },
-  expiredText: { color: colors.textLight },
+  expiredText: { color: '#9CA3AF' },
+
   programText: {
     fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 10,
-  },
-  metaContainer: {
+    color: '#4B5563',
     marginBottom: 12,
   },
+
+  metaContainer: { marginTop: 8 },
   metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   priceText: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.primary,
+    color: '#DC2626',
   },
-  dateText: { fontSize: 13, color: colors.textLight },
+  dateText: { fontSize: 13, color: '#6B7280' },
+
   expiryText: {
-    fontSize: 13,
-    color: colors.warning,
+    fontSize: 13.5,
+    color: '#F59E0B',
     fontWeight: '500',
   },
   expiredExpiryText: {
-    color: colors.danger,
-    fontWeight: '600',
+    color: '#EF4444',
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  progressBar: { flex: 1, marginRight: 12 },
-  progressBackground: {
-    height: 6,
-    backgroundColor: colors.surface,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressLabel: {
+
+  subjectNote: {
+    marginTop: 12,
     fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: '500',
+    color: '#6B7280',
+    fontStyle: 'italic',
   },
 });

@@ -35,17 +35,17 @@ const CATEGORY_CONFIG = {
   recorded: {
     label: "Recorded Courses",
     icon: "play-circle",
-    accent: "#8b5cf6",
+    accent: "#ef4444",
     light: "#f5f3ff",
-    badge: "#8b5cf6",
+    badge: "#ef4444",
     type: "Recorded",
   },
   offline: {
     label: "Offline / Hybrid",
     icon: "map-pin",
-    accent: "#f59e0b",
+    accent: "#ef4444",
     light: "#fffbeb",
-    badge: "#f59e0b",
+    badge: "#ef4444",
     type: "Offline",
   },
 };
@@ -71,7 +71,8 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses, category
 
   const handlePress = () => {
     if (isPurchased) {
-      const url = ["online", "offline"].includes(batch.category)
+      console.log(batch.category)
+      const url = ["online"].includes(batch.category)
         ? "my-course"
         : "my-course-subjects";
       navigation.navigate(url, { unlocked: true, courseId: batch.id });
@@ -102,10 +103,6 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses, category
             <View style={[styles.badge, { backgroundColor: "#22c55e" }]}>
               <Feather name="check-circle" size={10} color="#fff" />
               <Text style={styles.badgeText}>ENROLLED</Text>
-            </View>
-          ) : discountPercent > 0 ? (
-            <View style={[styles.badge, { backgroundColor: config.accent }]}>
-              <Text style={styles.badgeText}>{discountPercent}% OFF</Text>
             </View>
           ) : null}
         </View>

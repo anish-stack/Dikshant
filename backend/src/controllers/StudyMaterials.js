@@ -4,7 +4,9 @@ const {
   StudyMaterialCategory,
   StudyMaterial,
   StudyMaterialPurchase,
+  StudyMaterialDeliveryHistory,
   User
+
 } = require('../models');
 
 const redis = require('../config/redis');
@@ -444,67 +446,67 @@ class StudyMaterialController {
       });
     }
   }
-static async getMaterialByCatId(req, res) {
-  try {
+  static async getMaterialByCatId(req, res) {
+    try {
 
-    const { id } = req.params;
-    const userId = req.user?.id;
+      const { id } = req.params;
+      const userId = req.user?.id;
 
-    const materials = await StudyMaterial.findAll({
-      where: { categoryId: id },
-      include: [{
-        model: StudyMaterialCategory,
-        as: "category",
-        attributes: ["id", "name", "slug"]
-      }]
-    });
+      const materials = await StudyMaterial.findAll({
+        where: { categoryId: id },
+        include: [{
+          model: StudyMaterialCategory,
+          as: "category",
+          attributes: ["id", "name", "slug"]
+        }]
+      });
 
-    if (!materials || materials.length === 0) {
-      return res.status(404).json({
+      if (!materials || materials.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Study material not found"
+        });
+      }
+
+      let purchasedMaterialIds = [];
+
+      if (userId) {
+
+        const purchases = await StudyMaterialPurchase.findAll({
+          where: { userId },
+          attributes: ["materialId"]
+        });
+
+        purchasedMaterialIds = purchases.map(p => p.materialId);
+
+      }
+
+      const materialsWithStatus = materials.map(material => {
+
+        const item = material.toJSON();
+
+        item.alreadyPurchased = purchasedMaterialIds.includes(material.id);
+
+        return item;
+
+      });
+
+      return res.json({
+        success: true,
+        data: materialsWithStatus
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
         success: false,
-        message: "Study material not found"
-      });
-    }
-
-    let purchasedMaterialIds = [];
-
-    if (userId) {
-
-      const purchases = await StudyMaterialPurchase.findAll({
-        where: { userId },
-        attributes: ["materialId"]
+        message: error.message
       });
 
-      purchasedMaterialIds = purchases.map(p => p.materialId);
-
     }
-
-    const materialsWithStatus = materials.map(material => {
-
-      const item = material.toJSON();
-
-      item.alreadyPurchased = purchasedMaterialIds.includes(material.id);
-
-      return item;
-
-    });
-
-    return res.json({
-      success: true,
-      data: materialsWithStatus
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-
   }
-}
 
   /* =======================================================
       ASSIGN FREE MATERIAL BY ADMIN
@@ -592,51 +594,82 @@ static async getMaterialByCatId(req, res) {
   static async createOrder(req, res) {
     try {
 
-      const { materialId } = req.body;
+      const { materialId, studentName, contactNumber, address, pincode } = req.body;
 
       const material = await StudyMaterial.findByPk(materialId);
 
       if (!material) {
         return res.status(404).json({
           success: false,
-          message: "Material not found"
+          message: "We couldn't find the requested study material. Please try again."
         });
       }
 
       if (!material.isPaid) {
         return res.status(400).json({
           success: false,
-          message: "This material is free"
+          message: "Good news! This study material is available for free."
         });
+      }
+
+      // Hard copy validation
+      if (material.isHardCopy) {
+        if (!studentName || !contactNumber || !address || !pincode) {
+          return res.status(400).json({
+            success: false,
+            message: "Please provide your name, contact number, address, and pincode so we can deliver the printed material to you."
+          });
+        }
       }
 
       const existingPurchase = await StudyMaterialPurchase.findOne({
         where: {
           userId: req.user.id,
-          materialId
+          materialId,
+          paymentStatus: "paid"
         }
       });
 
       if (existingPurchase) {
-        return res.status(400).json({
-          success: false,
-          message: "Material already purchased"
-        });
+
+        const purchaseTime = new Date(existingPurchase.purchaseDate);
+        const now = new Date();
+        const diffHours = (now - purchaseTime) / (1000 * 60 * 60);
+
+        if (diffHours < 24) {
+          const remainingHours = Math.ceil(24 - diffHours);
+
+          return res.status(400).json({
+            success: false,
+            message: `You have already purchased this material recently. You can place a new order after ${remainingHours} hour(s).`
+          });
+        }
       }
 
+      // Create Razorpay Order
       const order = await razorpay.orders.create({
         amount: material.price * 100,
         currency: "INR",
-        receipt: `material_${material.id}_${Date.now()}`,
-        notes: {
-          userId: req.user.id,
-          materialId: material.id
-        }
+        receipt: `material_${material.id}_${Date.now()}`
+      });
+
+      // Save initial purchase record
+      await StudyMaterialPurchase.create({
+        userId: req.user.id,
+        materialId: material.id,
+        studentName: studentName || "",
+        contactNumber: contactNumber || "",
+        address: address || "",
+        pincode: pincode || "",
+        orderId: order.id,
+        paymentStatus: "pending",
+        purchasePrice: material.price,
+        currency: "INR"
       });
 
       return res.json({
         success: true,
-        message: "Order created successfully",
+        message: "Your order has been created successfully. Please complete the payment to access the study material.",
         data: {
           orderId: order.id,
           key: process.env.RAZORPAY_KEY,
@@ -653,7 +686,7 @@ static async getMaterialByCatId(req, res) {
 
       return res.status(500).json({
         success: false,
-        message: error.message
+        message: "Something went wrong while creating your order. Please try again later."
       });
 
     }
@@ -665,10 +698,10 @@ static async getMaterialByCatId(req, res) {
       const {
         razorpay_order_id,
         razorpay_payment_id,
-        razorpay_signature,
-        materialId
+        razorpay_signature
       } = req.body;
 
+      // Verify Razorpay signature
       const body = razorpay_order_id + "|" + razorpay_payment_id;
 
       const expectedSignature = crypto
@@ -683,59 +716,37 @@ static async getMaterialByCatId(req, res) {
         });
       }
 
-      const material = await StudyMaterial.findByPk(materialId);
-
-      if (!material) {
-        return res.status(404).json({
-          success: false,
-          message: "Material not found"
-        });
-      }
-
-      const existingPurchase = await StudyMaterialPurchase.findOne({
+      // Find pending purchase
+      const purchase = await StudyMaterialPurchase.findOne({
         where: {
-          userId: req.user.id,
-          materialId
+          orderId: razorpay_order_id
         }
       });
 
-      if (existingPurchase) {
-        return res.status(400).json({
+      if (!purchase) {
+        return res.status(404).json({
           success: false,
-          message: "Material already purchased"
+          message: "Purchase record not found"
         });
       }
 
-      const purchase = await StudyMaterialPurchase.create({
+      // Update purchase record
+      purchase.paymentId = razorpay_payment_id;
+      purchase.paymentStatus = "paid";
+      purchase.purchaseDate = new Date();
+      purchase.isActive = true;
 
-        userId: req.user.id,
-        materialId,
+      await purchase.save();
 
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id,
+      const material = await StudyMaterial.findByPk(purchase.materialId);
 
-        paymentStatus: "paid",
-        purchasePrice: material.price,
-        currency: "INR",
-
-        purchaseDate: new Date(),
-
-        accessType: "lifetime",
-        expiryDate: null,
-
-        isActive: true,
-        deviceLimit: 1,
-
-        notes: "Purchased via Razorpay"
-
-      });
-
+      // Create notification
       await NotificationController.createNotification({
-        userId: req.user.id,
+        userId: purchase.userId,
         title: "Study Material Purchased",
         message: `You purchased ${material.title}`,
         type: "study_material",
-        relatedId: materialId
+        relatedId: purchase.materialId
       });
 
       return res.json({
@@ -756,6 +767,54 @@ static async getMaterialByCatId(req, res) {
     }
   }
 
+
+
+  static async updateDeliveryStatus(req, res) {
+    try {
+
+      const { purchaseId } = req.params;
+      const { status, remarks, courierName, trackingNumber } = req.body;
+
+      const purchase = await StudyMaterialPurchase.findByPk(purchaseId);
+
+      if (!purchase) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found"
+        });
+      }
+
+      // update current delivery status
+      purchase.deliveryStatus = status;
+
+      if (courierName) purchase.courierName = courierName;
+      if (trackingNumber) purchase.trackingNumber = trackingNumber;
+
+      await purchase.save();
+
+      // create delivery history record
+      await StudyMaterialDeliveryHistory.create({
+        purchaseId,
+        status,
+        remarks
+      });
+
+      return res.json({
+        success: true,
+        message: "Delivery status updated successfully"
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Something went wrong while updating delivery status"
+      });
+
+    }
+  }
   /* =======================================================
       USER MATERIAL ACCESS
   ======================================================= */
@@ -792,13 +851,78 @@ static async getMaterialByCatId(req, res) {
     }
   }
 
+
+
+  static async checkMaterialIsAlreadyBuyViaCustomer(req, res) {
+    try {
+
+      const purchase = await StudyMaterialPurchase.findOne({
+        where: {
+          materialId: req.params.id,
+          userId: req.user.id,
+          paymentStatus: "paid"
+        }
+      });
+
+      if (!purchase) {
+        return res.json({
+          success: true,
+          purchased: false,
+          message: "Material not purchased"
+        });
+      }
+
+      return res.json({
+        success: true,
+        purchased: true,
+        data: purchase
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+
+    }
+  }
+
+  static async getDeliveryTimeline(req, res) {
+    try {
+
+      const { purchaseId } = req.params;
+
+      const history = await StudyMaterialDeliveryHistory.findAll({
+        where: { purchaseId },
+        order: [["createdAt", "ASC"]]
+      });
+
+      return res.json({
+        success: true,
+        data: history
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Unable to fetch delivery tracking information"
+      });
+
+    }
+  }
+
   static async getAllPurchase(req, res) {
     try {
 
       const purchases = await StudyMaterialPurchase.findAll({
 
         include: [
-
           {
             model: User,
             as: "user",

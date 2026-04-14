@@ -9,7 +9,7 @@ router.get('/for-home-screen', ctrl.ForHomeScreen)
 router.post('/', upload.single('imageUrl'), ctrl.create);
 router.get('/:id', ctrl.findOne);
 router.get('/slug/:slug', ctrl.findOneBySlug);
-router.get('/student/:id', ctrl.findOneForStudent);
+router.get('/student/:id',auth, ctrl.findOneForStudent);
 
 router.put('/:id', upload.single('imageUrl'), ctrl.update);
 router.delete('/:id', ctrl.delete);

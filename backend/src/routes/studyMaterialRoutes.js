@@ -25,7 +25,7 @@ router.delete('/categories/:id', StudyMaterialController.deleteCategory);
 // Public Routes
 router.get('/materials', StudyMaterialController.getAllMaterials);
 router.get('/materials/:id', StudyMaterialController.getMaterialById);
-router.get('/materials-cat/:id',auth, StudyMaterialController.getMaterialByCatId);
+router.get('/materials-cat/:id', auth, StudyMaterialController.getMaterialByCatId);
 
 
 // Admin Only Routes (CRUD)
@@ -61,9 +61,18 @@ router.post('/materials/verify-payment', auth, StudyMaterialController.verifyPay
 
 // Get User's Purchased/Assigned Materials
 router.get('/my-materials', auth, StudyMaterialController.getUserMaterials);
-router.get('/purchases',  StudyMaterialController.getAllPurchase);
+router.post('/update-delivery-status/:purchaseId', StudyMaterialController.updateDeliveryStatus);
 
-router.get('/stats-for-user',  StudyMaterialController.getStatsForAppUser);
+
+
+
+router.get('/purchases', StudyMaterialController.getAllPurchase);
+router.get('/check-purchase/:id', auth, StudyMaterialController.checkMaterialIsAlreadyBuyViaCustomer)
+router.get('/delivery-status/:purchaseId', StudyMaterialController.getDeliveryTimeline)
+
+
+
+router.get('/stats-for-user', StudyMaterialController.getStatsForAppUser);
 
 
 

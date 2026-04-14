@@ -70,6 +70,9 @@ import AllStudyMaterialsCategories from "./pages/StudyMaterial/AllStudyMaterials
 import AllStudyMaterials from "./pages/StudyMaterial/AllStudyMaterials";
 import AllStudyMaterialPurchaseHistory from "./pages/StudyMaterial/AllStudyMaterialPurchaseHistory";
 import AssignStudyMaterial from "./pages/StudyMaterial/AssignStudyMaterial";
+import BatchSubjectAssign from "./pages/Assigns/BatchSubjectAssign";
+import AssignQuiz from "./pages/Assigns/AssignQuiz";
+import AssignTestSeries from "./pages/Assigns/AssignTestSeries";
 export default function App() {
   return (
     <>
@@ -192,10 +195,10 @@ export default function App() {
                 path="/view-comments-joined/:id"
                 element={<ViewComments />}
               />
-              
+
               <Route path="/payments/transactions" element={<Transactions />} />
               <Route path="/payments/coupons" element={<Coupons />} />
-{/* Free v\videos */}
+              {/* Free v\videos */}
 
               <Route path="/free-videos" element={<AllPlayList />} />
 
@@ -207,6 +210,15 @@ export default function App() {
               {/* Charts */}
               <Route path="/line-chart" element={<LineChart />} />
               <Route path="/bar-chart" element={<BarChart />} />
+
+
+              {/* Admin Assigns */}
+              <Route path="/admin/users/:id/assign-subject" element={<BatchSubjectAssign />} />
+              <Route path="/admin/users/:id/assign-quiz" element={<AssignQuiz />} />
+              <Route path="/admin/users/:id/assign-testseries" element={<AssignTestSeries />} />
+
+
+
             </Route>
           </Route>
 

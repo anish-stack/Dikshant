@@ -11,6 +11,7 @@ module.exports = (sequelize, DataTypes) => {
         "batch",
         "test",
         "quiz",
+        "subject",
         "quiz_bundle",
         "test_series_bundle",
       ),
@@ -20,7 +21,7 @@ module.exports = (sequelize, DataTypes) => {
       discount: DataTypes.FLOAT,
       gst: DataTypes.FLOAT,
       totalAmount: DataTypes.FLOAT,
-
+      batchIdOfSubject: DataTypes.INTEGER,
       razorpayOrderId: DataTypes.STRING,
       razorpayPaymentId: DataTypes.STRING,
       razorpaySignature: DataTypes.STRING,

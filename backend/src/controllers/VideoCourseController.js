@@ -194,16 +194,21 @@ class VideoCourseController {
 
   static async FindByBatchId(req, res) {
     try {
+
+      console.log(req.query);
+
       const isAdmin = req.query.admin === "true";
       const { id } = req.params;
+
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const search = req.query.search ? req.query.search.trim() : null;
+
+      const subjectId = req.query.subjectId;
+      const batchIdOfSubject = req.query.batchIdOfSubject;
+
       const offset = (page - 1) * limit;
 
-      // -----------------------------
-      // Get batch type for ordering
-      // -----------------------------
       const batch = await Batch.findByPk(id);
 
       let orderCondition = [["position", "DESC"]];
@@ -224,10 +229,19 @@ class VideoCourseController {
         }
       }
 
-      // -----------------------------
-      // 1) Primary fetch: by batchId
-      // -----------------------------
+      /* ===============================
+         Primary WHERE condition
+      =============================== */
+
       let whereCondition = { batchId: id };
+
+      // If student purchased only one subject
+      if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
+        whereCondition = {
+          batchId: id,
+          subjectId: Number(subjectId),
+        };
+      }
 
       if (isAdmin && search) {
         whereCondition.title = { [Op.like]: `%${search}%` };
@@ -247,9 +261,16 @@ class VideoCourseController {
         return queryOptions;
       };
 
-      let result = await VideoCourse.findAndCountAll(buildQueryOptions(whereCondition));
+      let result = await VideoCourse.findAndCountAll(
+        buildQueryOptions(whereCondition)
+      );
+
+      /* ===============================
+         Normalize Subject IDs
+      =============================== */
 
       const normalizeSubjectIds = (raw) => {
+
         if (raw == null) return [];
 
         let val = raw;
@@ -266,27 +287,20 @@ class VideoCourseController {
 
           try {
             val = JSON.parse(s);
-          } catch (_) {
+          } catch {
             val = s;
           }
         }
 
-        const flatten = (arr) => {
-          return arr.reduce((acc, item) => {
-            if (Array.isArray(item)) {
-              acc.push(...flatten(item));
-            } else {
-              acc.push(item);
-            }
+        const flatten = (arr) =>
+          arr.reduce((acc, item) => {
+            if (Array.isArray(item)) acc.push(...flatten(item));
+            else acc.push(item);
             return acc;
           }, []);
-        };
 
-        if (Array.isArray(val)) {
-          val = flatten(val);
-        } else {
-          val = [val];
-        }
+        if (Array.isArray(val)) val = flatten(val);
+        else val = [val];
 
         const numbers = [
           ...new Set(
@@ -304,9 +318,10 @@ class VideoCourseController {
         return numbers;
       };
 
-      // ---------------------------------------------------
-      // 2) Fallback: if no videos in this batchId
-      // ---------------------------------------------------
+      /* ===============================
+         Fallback if no videos
+      =============================== */
+
       if (result.rows.length === 0) {
 
         if (!batch) {
@@ -331,15 +346,24 @@ class VideoCourseController {
           });
         }
 
-        const fallbackWhere = {
+        let fallbackWhere = {
           subjectId: { [Op.in]: subjectIds },
         };
+
+        // If subject purchased only
+        if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
+          fallbackWhere = {
+            subjectId: Number(subjectId),
+          };
+        }
 
         if (isAdmin && search) {
           fallbackWhere.title = { [Op.like]: `%${search}%` };
         }
 
-        result = await VideoCourse.findAndCountAll(buildQueryOptions(fallbackWhere));
+        result = await VideoCourse.findAndCountAll(
+          buildQueryOptions(fallbackWhere)
+        );
       }
 
       const { rows: items, count } = result;
@@ -359,11 +383,13 @@ class VideoCourseController {
         });
       }
 
-      // -----------------------------
-      // 3) Map response + secureToken
-      // -----------------------------
+      /* ===============================
+         Secure Token + Response Map
+      =============================== */
+
       const response = await Promise.all(
         items.map(async (video) => {
+
           let secureToken = video.secureToken;
 
           if (!secureToken) {
@@ -390,12 +416,14 @@ class VideoCourseController {
             batchId: video.batchId,
             subjectId: video.subjectId,
             position: video.position,
+
             isDownloadable: video.isDownloadable,
             isDemo: video.isDemo,
             status: video.status,
 
             isLive: video.isLive,
             isLiveEnded: video.isLiveEnded,
+
             LiveEndAt: video.LiveEndAt,
             DateOfLive: video.DateOfLive,
             TimeOfLIve: video.TimeOfLIve,
@@ -404,6 +432,7 @@ class VideoCourseController {
             TimeOfClass: video.TimeOfClass,
 
             createdAt: video.createdAt,
+
             secureToken,
 
             ...(isAdmin ? { url: video.url } : {}),
@@ -425,11 +454,14 @@ class VideoCourseController {
       });
 
     } catch (error) {
+
       console.error("FindByBatchId error:", error);
+
       return res.status(500).json({
         success: false,
         message: "Server error",
       });
+
     }
   }
 

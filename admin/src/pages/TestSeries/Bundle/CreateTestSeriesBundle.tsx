@@ -3,7 +3,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 import { Loader2 } from "lucide-react";
 
-const API_URL = "https://www.app.api.dikshantias.com//api";
+const API_URL = "https://www.app.api.dikshantias.com/api";
 
 const CreateTestSeriesBundle = () => {
   const [title, setTitle] = useState("");

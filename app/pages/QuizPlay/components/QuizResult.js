@@ -34,7 +34,6 @@ export default function QuizResult() {
 
   const routeParams = route.params || {};
   const attemptIdFromRoute = routeParams.attemptId;
-  console.log("Route Params:", routeParams);
 
   const [resultData, setResultData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -54,14 +53,12 @@ export default function QuizResult() {
         setError(null);
 
         const response = await api.get(`/quiz/results/${attemptIdFromRoute}`);
-        console.log("Fetched result data:", response.data);
         if (response.data.success) {
           setResultData(response.data.data);
         } else {
           setError("Failed to load result");
         }
       } catch (err) {
-        console.log("Result fetch error:", err);
         setError("Network error. Using cached data.");
       } finally {
         setLoading(false);
@@ -73,7 +70,7 @@ export default function QuizResult() {
 
   // Fallback to route params if API fails or no attemptId
   const data = resultData || routeParams;
-
+    
   const {
     percentage = 0,
     passed = false,
@@ -89,6 +86,9 @@ export default function QuizResult() {
   const correctCount = questions.filter(q => q.is_correct).length;
   const incorrectCount = questions.filter(q => !q.is_correct && q.user_selected_option_id !== null).length;
   const notAttemptedCount = questions.filter(q => q.user_selected_option_id === null).length;
+
+
+
 
   const toggleQuestion = (questionId) => {
     setExpandedQuestions(prev => ({

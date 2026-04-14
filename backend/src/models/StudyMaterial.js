@@ -32,11 +32,19 @@ module.exports = (sequelize, DataTypes) => {
       unique: true
     },
 
+    shortDescription: {
+      type: DataTypes.TEXT
+    },
+
     description: {
       type: DataTypes.TEXT
     },
 
     fileUrl: {
+      type: DataTypes.TEXT
+    },
+
+    samplePdf: {
       type: DataTypes.TEXT
     },
 
@@ -49,14 +57,6 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
 
-    subjectId: {
-      type: DataTypes.INTEGER
-    },
-
-    batchId: {
-      type: DataTypes.INTEGER
-    },
-
     isPaid: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
@@ -66,15 +66,20 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0
     },
-
+    isHardCopy: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
     isDownloadable: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
     },
+
     featured: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
     },
+
     position: {
       type: DataTypes.INTEGER,
       defaultValue: 0
@@ -82,15 +87,14 @@ module.exports = (sequelize, DataTypes) => {
 
     status: {
       type: DataTypes.ENUM('active', 'inactive'),
-      defaultValue: "active"
+      defaultValue: 'active'
     }
 
   }, {
     sequelize,
-
     modelName: 'StudyMaterial',
     tableName: 'study_materials',
-    timestamps: false
+    timestamps: true
   });
 
   return StudyMaterial;

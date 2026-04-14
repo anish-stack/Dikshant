@@ -19,25 +19,35 @@ import { useAuthStore } from '../../stores/auth.store';
 const { width } = Dimensions.get('window');
 
 export default function CourseSubjectEnrolled({ route, navigation }) {
-    const { unlocked, courseId } = route.params || {};
+    const { unlocked, courseId, type,
+        purchasedItem,
+        batchIdOfSubject, } = route.params || {};
     const { token, userId } = useAuthStore()
     const { data: batchData, isLoading: batchLoading } = useSWR(
         courseId ? `/batchs/${courseId}` : null,
         fetcher,
         { revalidateOnFocus: false }
     );
+    const apiUrl =
+        unlocked && courseId
+            ? type === "subject"
+                ? `/videocourses/batch/${courseId}?subjectId=${purchasedItem}&batchIdOfSubject=${batchIdOfSubject}`
+                : `/videocourses/batch/${courseId}`
+            : null;
 
-    const { data: videosData, isLoading: videosLoading } = useSWR(
-        unlocked && courseId ? `/videocourses/batch/${courseId}` : null,
-        fetcher,
-        { revalidateOnFocus: false }
-    );
+    const {
+        data: videosData,
+        isLoading: videosLoading,
+        mutate: mutateVideos
+    } = useSWR(apiUrl, fetcher, {
+        revalidateOnFocus: false
+    });
 
     const isLoading = batchLoading || videosLoading;
 
     const batch = batchData || {};
     const videos = videosData?.data || [];
-    const subjects = batch.subjects || [];
+    const subjects = type === "subject" ? batch.subjects.filter((i) => i.id === purchasedItem) : batch.subjects || [];
 
     // Count videos per subject
     const videoCountBySubject = videos.reduce((acc, video) => {
@@ -46,11 +56,12 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
         return acc;
     }, {});
 
+
+
     const subjectList = subjects.map(sub => ({
         ...sub,
         videoCount: videoCountBySubject[sub.id] || 0,
     }));
-
     const sortedSubjectList = [...subjectList];
 
     const handleSubjectPress = (subjectId) => {
@@ -104,22 +115,25 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
                         </Text>
 
                         {/* "Show All Videos" button - more prominent */}
-                        <TouchableOpacity
-                            style={[
-                                styles.showAllButton,
-
-                            ]}
-                            onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId })}
-                        >
-                            <Text
+                        {type !== "subject" && (
+                            <TouchableOpacity
                                 style={[
-                                    styles.showAllText,
+                                    styles.showAllButton,
 
                                 ]}
+                                onPress={() => navigation.navigate('view-all-videos', { id: courseId, token, userId })}
                             >
-                                View All Videos
-                            </Text>
-                        </TouchableOpacity>
+                                <Text
+                                    style={[
+                                        styles.showAllText,
+
+                                    ]}
+                                >
+                                    View All Videos
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
                     </View>
                     <FlatList
                         data={sortedSubjectList}

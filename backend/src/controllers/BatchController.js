@@ -1,6 +1,6 @@
 "use strict";
 
-const { Batch, Program, Subject, Sequelize, Quizzes, TestSeries, sequelize } = require("../models");
+const { Batch, Program, Subject, Sequelize, Quizzes, TestSeries, sequelize, Order } = require("../models");
 const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
@@ -36,17 +36,13 @@ class BatchController {
     const t = await sequelize.transaction();
 
     try {
-
       /* ================= IMAGE ================= */
-
       let imageUrl = null;
-
       if (req.file) {
         imageUrl = await uploadToS3(req.file, "batchs");
       }
 
       /* ================= JSON NORMALIZE ================= */
-
       const quizIds =
         typeof req.body.quizIds === "string"
           ? JSON.parse(req.body.quizIds)
@@ -57,15 +53,40 @@ class BatchController {
           ? JSON.parse(req.body.testSeriesIds)
           : req.body.testSeriesIds || [];
 
+      /* ================= SEPARATE PURCHASE SUBJECTS (NEW) ================= */
+      let separatePurchaseSubjectIds = [];
+      if (req.body.separatePurchaseSubjectIds) {
+        try {
+          separatePurchaseSubjectIds =
+            typeof req.body.separatePurchaseSubjectIds === "string"
+              ? JSON.parse(req.body.separatePurchaseSubjectIds)
+              : req.body.separatePurchaseSubjectIds;
+
+          if (Array.isArray(separatePurchaseSubjectIds)) {
+            separatePurchaseSubjectIds = separatePurchaseSubjectIds.map((sub) => ({
+              subjectId: Number(sub.subjectId),
+              price: Number(sub.price) || 0,
+              discountPrice: Number(sub.discountPrice) || 0,
+              expiryDays: Number(sub.expiryDays) || 365,
+              position: Number(sub.position) || 1,
+              status: sub.status === "inactive" ? "inactive" : "active",
+              tag: sub.tag || null,
+            }));
+          } else {
+            separatePurchaseSubjectIds = [];
+          }
+        } catch (e) {
+          console.error("Error parsing separatePurchaseSubjectIds:", e);
+          separatePurchaseSubjectIds = [];
+        }
+      }
+
       const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
       /* ================= DATE PARSING ================= */
-
       const parseDate = (value) => {
         if (!value || value === "" || value === "Invalid date") return null;
-
         const date = new Date(value);
-
         return isNaN(date.getTime()) ? null : date;
       };
 
@@ -76,141 +97,104 @@ class BatchController {
 
       if (registrationStart && registrationEnd && registrationEnd < registrationStart) {
         await t.rollback();
-
         return res.status(400).json({
-          message: "Registration end date cannot be before start date"
+          message: "Registration end date cannot be before start date",
         });
       }
 
       /* ================= POSITION HANDLING ================= */
-
       let position = Number(req.body.position);
 
       if (!position || position < 1) {
-
         const maxPosition = await Batch.max("position");
         position = (maxPosition || 0) + 1;
-
       } else {
-
-        // shift existing batches
+        // Shift existing batches
         await Batch.increment(
           { position: 1 },
           {
-            where: {
-              position: { [Op.gte]: position }
-            },
-            transaction: t
+            where: { position: { [Op.gte]: position } },
+            transaction: t,
           }
         );
-
       }
 
       /* ================= PAYLOAD ================= */
-
       const payload = {
-
         name: req.body.name,
-
         slug: generateSlug(req.body.name),
-
         imageUrl,
 
         displayOrder: req.body.displayOrder,
-
         position,
 
         programId: req.body.programId,
-
         subjectId: req.body.subjectId,
 
+        // ✅ New Field: Separate Purchase Subjects
+        separatePurchaseSubjectIds: separatePurchaseSubjectIds,
+
         medium: req.body.medium || "",
-
         offerText: req.body.offerText,
-
         fee_one_time: req.body.fee_one_time,
-
         fee_inst: req.body.fee_inst,
-
         note: req.body.note,
 
         startDate: start,
-
         endDate: end,
-
         registrationStartDate: registrationStart,
-
         registrationEndDate: registrationEnd,
 
         status: req.body.status,
-
         shortDescription: req.body.shortDescription,
-
         longDescription: req.body.longDescription,
 
         batchPrice: req.body.batchPrice,
-
         batchDiscountPrice: req.body.batchDiscountPrice,
-
         gst: req.body.gst,
-
         offerValidityDays: req.body.offerValidityDays,
 
         quizIds: Array.isArray(quizIds) ? quizIds : [],
-
         testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
 
         isEmi: Boolean(req.body.isEmi),
-
         emiTotal: req.body.emiTotal || null,
-
         emiSchedule,
 
-        category: req.body.category
+        category: req.body.category,
       };
 
       const item = await Batch.create(payload, { transaction: t });
 
       await t.commit();
-
       await BatchController.clearBatchCache();
 
       return res.status(201).json({
         success: true,
         message: "Batch created successfully",
-        data: item
+        data: item,
       });
 
     } catch (err) {
-
       await t.rollback();
-
       console.error("Batch Create Error:", err);
 
       let userMessage = "Failed to create batch. Please try again.";
       let status = 500;
 
       if (err.name === "SequelizeDatabaseError") {
-
         if (err.parent?.sqlMessage?.includes("Incorrect datetime value")) {
-
-          userMessage =
-            "Invalid date format for start/end or registration dates.";
-
+          userMessage = "Invalid date format for start/end or registration dates.";
           status = 400;
         }
-
       } else if (err.name === "SequelizeValidationError") {
-
-        userMessage =
-          "Validation failed: " + err.errors.map((e) => e.message).join(", ");
-
+        userMessage = "Validation failed: " + err.errors.map((e) => e.message).join(", ");
         status = 400;
       }
 
       return res.status(status).json({
         message: userMessage,
-        error: err.message
+        error: err.message,
       });
     }
   }
@@ -227,7 +211,7 @@ class BatchController {
         category = "",
         medium = ""
       } = req.query;
-      console.log(req.query)
+
       page = parseInt(page);
       limit = parseInt(limit);
       const offset = (page - 1) * limit;
@@ -263,6 +247,9 @@ class BatchController {
         where,
         limit,
         offset,
+        attributes: {
+          exclude: ["longDescription"]
+        },
         order: [["position", "ASC"]],
         include: [
           {
@@ -272,25 +259,61 @@ class BatchController {
           },
         ],
       });
+      const parseSubjectIds = (raw) => {
+        if (!raw) return [];
 
+        let parsed = raw;
+
+        try {
+          if (typeof parsed === "string") {
+            parsed = JSON.parse(parsed);
+          }
+
+          if (typeof parsed === "string") {
+            parsed = JSON.parse(parsed);
+          }
+
+        } catch (e) {
+          console.error("SubjectId parse error:", e);
+          return [];
+        }
+
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed.map((id) => Number(id)).filter((n) => Number.isInteger(n));
+      };
       // Enrich each batch with subjects
       const batchItems = await Promise.all(
         result.rows.map(async (batch) => {
-          let subjectIds = [];
-          try {
-            subjectIds = JSON.parse(batch.subjectId || "[]");
-          } catch (e) {
-            subjectIds = [];
-          }
+
+          const subjectIds = parseSubjectIds(batch.subjectId);
+
 
           const subjectsList = await Subject.findAll({
             where: { id: subjectIds },
             attributes: ["id", "name", "slug", "description"],
           });
+       
+          /* ---------- Map for quick lookup ---------- */
+
+          const subjectMap = {};
+          subjectsList.forEach((s) => {
+            subjectMap[s.id] = s.name;
+          });
+
+          /* ---------- Add subject name to separatePurchaseSubjectIds ---------- */
+
+          const separateSubjects = (batch.separatePurchaseSubjectIds || []).map(
+            (s) => ({
+              ...s,
+              subjectName: subjectMap[s.subjectId] || null,
+            })
+          );
 
           return {
             ...batch.toJSON(),
             subjects: subjectsList,
+            separatePurchaseSubjectIds: separateSubjects,
           };
         })
       );
@@ -318,31 +341,31 @@ class BatchController {
 
   static async ForHomeScreen(req, res) {
     try {
-const batchAttributes = [
-  "id",
-  "name",
-  "slug",
-  "imageUrl",
-  "displayOrder",
-  "programId",
-  "medium",
-  "offerText",
-  "fee_one_time",
-  "fee_inst",
-  "note",
-  "batchPrice",
-  "batchDiscountPrice",
-  "position",
-  "category",
-  "c_status"
-];
+      const batchAttributes = [
+        "id",
+        "name",
+        "slug",
+        "imageUrl",
+        "displayOrder",
+        "programId",
+        "medium",
+        "offerText",
+        "fee_one_time",
+        "fee_inst",
+        "note",
+        "batchPrice",
+        "batchDiscountPrice",
+        "position",
+        "category",
+        "c_status"
+      ];
       // 7 batches per category
       const onlineBatches = await Batch.findAll({
         where: {
           category: "online",
           status: "active"
         },
-          attributes: batchAttributes,
+        attributes: batchAttributes,
         limit: 7,
         order: [["position", "ASC"]],
         include: [
@@ -359,7 +382,7 @@ const batchAttributes = [
           category: "recorded",
           status: "active"
         },
-          attributes: batchAttributes,
+        attributes: batchAttributes,
         limit: 7,
         order: [["position", "ASC"]],
         include: [
@@ -376,7 +399,7 @@ const batchAttributes = [
           category: "offline",
           status: "active"
         },
-          attributes: batchAttributes,
+        attributes: batchAttributes,
         limit: 7,
         order: [["position", "ASC"]],
         include: [
@@ -500,11 +523,37 @@ const batchAttributes = [
         }));
       }
 
+      /* ================= Parse Separate Purchase Subjects ================= */
+      let separatePurchaseSubjects = [];
+      try {
+        let rawSeparate = item.separatePurchaseSubjectIds;
+
+        if (typeof rawSeparate === "string") {
+          rawSeparate = JSON.parse(rawSeparate);
+        }
+
+        if (Array.isArray(rawSeparate)) {
+          separatePurchaseSubjects = rawSeparate.map((sub) => ({
+            subjectId: Number(sub.subjectId),
+            price: Number(sub.price) || 0,
+            discountPrice: Number(sub.discountPrice) || 0,
+            expiryDays: Number(sub.expiryDays) || 365,
+            position: Number(sub.position) || 1,
+            status: sub.status || "active",
+            tag: sub.tag || null,
+          }));
+        }
+      } catch (e) {
+        console.error("Error parsing separatePurchaseSubjectIds:", e);
+        separatePurchaseSubjects = [];
+      }
       const response = {
         ...item.toJSON(),
         subjects: subjectsList,
+        separatePurchaseSubjects,
       };
-
+      delete response.subjectId;
+      delete response.separatePurchaseSubjectIds;
       return res.json(response);
     } catch (err) {
       return res.status(500).json({
@@ -590,10 +639,16 @@ const batchAttributes = [
 
   static async findOneForStudent(req, res) {
     try {
+      const userId = req.user?.id;
       const { id } = req.params;
-      if (!id) return res.status(400).json({ message: "Batch ID is required" });
+
+      if (!id) {
+        return res.status(400).json({ message: "Batch ID is required" });
+      }
 
       const { Op } = Sequelize;
+
+      /* ================= Fetch Batch ================= */
 
       const batch = await Batch.findByPk(id, {
         include: [
@@ -603,54 +658,45 @@ const batchAttributes = [
             attributes: ["id", "name"],
           },
         ],
-        raw: false,
       });
 
-      if (!batch) return res.status(404).json({ message: "Batch not found" });
+      if (!batch) {
+        return res.status(404).json({ message: "Batch not found" });
+      }
 
-      // ---------------------------
-      // Helper: safely parse ID array
-      // ---------------------------
+      /* ================= Helper: Safe JSON Array Parse ================= */
+
       const parseIdArray = (raw) => {
         if (!raw) return [];
 
         let parsed = raw;
 
-        // string -> parse
-        if (typeof parsed === "string") {
-          try {
+        try {
+          if (typeof parsed === "string") {
             parsed = JSON.parse(parsed);
-          } catch {
-            return [];
           }
-        }
 
-        // double-stringified
-        if (typeof parsed === "string") {
-          try {
+          if (typeof parsed === "string") {
             parsed = JSON.parse(parsed);
-          } catch {
-            return [];
           }
+        } catch {
+          return [];
         }
 
         if (!Array.isArray(parsed)) return [];
 
         return parsed
-          .map((x) => Number(x))
+          .map((v) => Number(v))
           .filter((n) => Number.isInteger(n));
       };
 
-      // ✅ IDs parse (IMPORTANT: your batch has QuizzesIds not quizIds)
+      /* ================= Parse IDs ================= */
+
       const subjectIds = parseIdArray(batch.subjectId);
-
-      // If your field is quizIds (recommended):
       const quizIds = parseIdArray(batch.quizIds);
-
-      // If your field is QuizzesIds (current in your model), use this instead:
-      // const quizIds = parseIdArray(batch.QuizzesIds);
-
       const testSeriesIds = parseIdArray(batch.testSeriesIds);
+
+      /* ================= Fetch Related Data ================= */
 
       const [subjects, quizzes, testSeries] = await Promise.all([
         subjectIds.length
@@ -659,7 +705,7 @@ const batchAttributes = [
             attributes: ["id", "name"],
             raw: true,
           })
-          : Promise.resolve([]),
+          : [],
 
         quizIds.length
           ? Quizzes.findAll({
@@ -667,7 +713,7 @@ const batchAttributes = [
             attributes: ["id", "title", "image", "price", "description"],
             raw: true,
           })
-          : Promise.resolve([]),
+          : [],
 
         testSeriesIds.length
           ? TestSeries.findAll({
@@ -675,14 +721,73 @@ const batchAttributes = [
             attributes: ["id", "title", "imageUrl", "price", "description"],
             raw: true,
           })
-          : Promise.resolve([]),
+          : [],
       ]);
+
+      /* ================= Parse Separate Purchase Subjects ================= */
+
+      let separatePurchaseSubjects = [];
+
+      try {
+        let rawSeparate = batch.separatePurchaseSubjectIds;
+
+        if (typeof rawSeparate === "string") {
+          rawSeparate = JSON.parse(rawSeparate);
+        }
+
+        if (Array.isArray(rawSeparate)) {
+          separatePurchaseSubjects = rawSeparate.map((sub) => ({
+            subjectId: Number(sub.subjectId),
+            price: Number(sub.price) || 0,
+            discountPrice: Number(sub.discountPrice) || 0,
+            expiryDays: Number(sub.expiryDays) || 365,
+            position: Number(sub.position) || 1,
+            status: sub.status || "active",
+            tag: sub.tag || null,
+          }));
+        }
+      } catch (error) {
+        console.error("Error parsing separatePurchaseSubjectIds:", error);
+        separatePurchaseSubjects = [];
+      }
+
+      /* ================= Check User Purchases ================= */
+
+      let isBatchPurchased = false;
+      let purchasedSubjectIds = [];
+
+      if (userId) {
+        const userOrders = await Order.findAll({
+          where: {
+            userId,
+            status: "success",
+            type: {
+              [Op.in]: ["batch", "subject"],
+            },
+          },
+          attributes: ["type", "itemId"],
+          raw: true,
+        });
+
+        isBatchPurchased = userOrders.some(
+          (order) => order.type === "batch" && order.itemId === Number(id)
+        );
+
+        purchasedSubjectIds = userOrders
+          .filter((order) => order.type === "subject")
+          .map((order) => order.itemId);
+      }
+
+      /* ================= Build Response ================= */
 
       const response = {
         ...batch.toJSON(),
 
         program: batch.program
-          ? { id: batch.program.id, name: batch.program.name }
+          ? {
+            id: batch.program.id,
+            name: batch.program.name,
+          }
           : null,
 
         subjects: subjects.map((s) => ({
@@ -706,16 +811,22 @@ const batchAttributes = [
           description: ts.description || null,
         })),
 
-        // hide raw id arrays (optional)
-        subjectId: undefined,
-        quizIds: undefined,        // remove if you used QuizzesIds
-        QuizzesIds: undefined,     // remove if you used quizIds
-        testSeriesIds: undefined,
+        separatePurchaseSubjects,
+
+        /* ⭐ Purchase Info */
+        isBatchPurchased,
+        purchasedSubjectIds,
       };
+
+      /* ================= Remove Raw Fields ================= */
+
+
+      delete response.separatePurchaseSubjectIds;
 
       return res.status(200).json(response);
     } catch (err) {
       console.error("Batch Fetch Error:", err);
+
       return res.status(500).json({
         message: "Error fetching batch details",
         error: err.message,
@@ -729,8 +840,8 @@ const batchAttributes = [
   static async update(req, res) {
     try {
       const batchId = req.params.id;
-
       const item = await Batch.findByPk(batchId);
+      console.log(req.body)
       if (!item) {
         return res.status(404).json({ message: "Batch not found" });
       }
@@ -738,123 +849,132 @@ const batchAttributes = [
       const { Op } = require("sequelize");
 
       /* ================= IMAGE ================= */
-
       let imageUrl = item.imageUrl;
-
       if (req.file) {
         if (item.imageUrl) {
           await deleteFromS3(item.imageUrl);
         }
-
         imageUrl = await uploadToS3(req.file, "batchs");
       }
 
       /* ================= NORMALIZE ARRAYS ================= */
-
       const quizIds =
         typeof req.body.quizIds === "string"
           ? JSON.parse(req.body.quizIds)
-          : req.body.quizIds;
+          : req.body.quizIds || [];
 
       const testSeriesIds =
         typeof req.body.testSeriesIds === "string"
           ? JSON.parse(req.body.testSeriesIds)
-          : req.body.testSeriesIds;
+          : req.body.testSeriesIds || [];
 
-      /* ================= SUBJECT ORDER ================= */
-
+      /* ================= SUBJECTS ================= */
       let subjectIds =
         typeof req.body.subjectId === "string"
           ? JSON.parse(req.body.subjectId)
-          : req.body.subjectId;
-
+          : req.body.subjectId || [];
       subjectIds = Array.isArray(subjectIds) ? subjectIds.map(Number) : [];
 
-      /* ================= EMI ================= */
+      /* ================= SEPARATE PURCHASE SUBJECTS (NEW) ================= */
+      let separatePurchaseSubjectIds = [];
+      if (req.body.separatePurchaseSubjectIds) {
+        try {
+          separatePurchaseSubjectIds =
+            typeof req.body.separatePurchaseSubjectIds === "string"
+              ? JSON.parse(req.body.separatePurchaseSubjectIds)
+              : req.body.separatePurchaseSubjectIds;
 
+          // Ensure it's an array and each item has required fields
+          if (Array.isArray(separatePurchaseSubjectIds)) {
+            separatePurchaseSubjectIds = separatePurchaseSubjectIds.map((sub) => ({
+              subjectId: Number(sub.subjectId),
+              price: Number(sub.price) || 0,
+              discountPrice: Number(sub.discountPrice) || 0,
+              expiryDays: Number(sub.expiryDays) || 365,
+              position: Number(sub.position) || 1,
+              status: sub.status || "active",
+              tag: sub.tag || null,
+            }));
+          } else {
+            separatePurchaseSubjectIds = [];
+          }
+        } catch (e) {
+          console.error("Error parsing separatePurchaseSubjectIds:", e);
+          separatePurchaseSubjectIds = [];
+        }
+      }
+
+      /* ================= EMI ================= */
       const emiSchedule = normalizeEmiSchedule(req.body.emiSchedule);
 
       /* ================= POSITION VALIDATION ================= */
-
       let position = Number(req.body.position);
-
       if (position) {
-
         const existingBatch = await Batch.findOne({
           where: {
             position,
-            id: { [Op.ne]: batchId }
-          }
+            id: { [Op.ne]: batchId },
+          },
         });
-
         if (existingBatch) {
-
           await existingBatch.update({
-            position: item.position
+            position: item.position,
           });
-
         }
-
       } else {
         position = item.position;
       }
 
       /* ================= UPDATE PAYLOAD ================= */
-
       const payload = {
         name: req.body.name,
         slug: req.body.name ? generateSlug(req.body.name) : item.slug,
-
         displayOrder: req.body.displayOrder,
         position,
-
         programId: req.body.programId,
         subjectId: JSON.stringify(subjectIds),
+
+        // ✅ New Field - Separate Purchase Subjects
+        separatePurchaseSubjectIds: JSON.stringify(separatePurchaseSubjectIds),
 
         startDate: req.body.startDate,
         endDate: req.body.endDate,
         registrationStartDate: req.body.registrationStartDate,
         registrationEndDate: req.body.registrationEndDate,
-
         status: req.body.status,
         shortDescription: req.body.shortDescription,
         longDescription: req.body.longDescription,
-
         medium: req.body.medium || "",
         offerText: req.body.offerText,
         fee_one_time: req.body.fee_one_time,
         fee_inst: req.body.fee_inst,
         note: req.body.note,
-
         batchPrice: req.body.batchPrice,
         batchDiscountPrice: req.body.batchDiscountPrice,
         gst: req.body.gst,
         offerValidityDays: req.body.offerValidityDays,
-
         quizIds: Array.isArray(quizIds) ? quizIds : [],
         testSeriesIds: Array.isArray(testSeriesIds) ? testSeriesIds : [],
-
         isEmi: Boolean(req.body.isEmi),
         emiTotal: req.body.emiTotal || null,
         emiSchedule: emiSchedule || null,
-
         category: req.body.category,
         imageUrl,
       };
 
       await item.update(payload);
-
       await BatchController.clearBatchCache(batchId);
 
-      return res.json(item);
-
+      return res.json({
+        message: "Batch updated successfully",
+        data: item,
+      });
     } catch (err) {
-
+      console.error("Batch Update Error:", err);
       return res.status(500).json({
         message: "Error updating batch",
         error: err.message,
       });
-
     }
   }
   // =========================

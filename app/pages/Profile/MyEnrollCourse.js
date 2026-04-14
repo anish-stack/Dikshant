@@ -27,9 +27,17 @@ export default function CourseScreen() {
   const route = useRoute();
   const navigation = useNavigation();
 
-  const { courseId, unlocked = false, subjectId } = route.params || {};
-  const { user } = useAuthStore();
+  const {
+    courseId,
+    unlocked = false,
+    subjectId,
+    type,
+    orderId,
+    batchIdOfSubject,
+    purchasedItem
+  } = route.params || {}; const { user } = useAuthStore();
 
+  console.log("Route Params:", route.params);
   // UI / Player states
   const [currentVideo, setCurrentVideo] = useState(null);
   const [showComments, setShowComments] = useState(false);
@@ -43,12 +51,20 @@ export default function CourseScreen() {
     fetcher,
     { revalidateOnFocus: false }
   );
+  const apiUrl =
+    unlocked && courseId
+      ? type === "subject"
+        ? `/videocourses/batch/${courseId}?subjectId=${purchasedItem}&batchIdOfSubject=${batchIdOfSubject}`
+        : `/videocourses/batch/${courseId}`
+      : null;
 
-  const { data: videosData, isLoading: videosLoading, mutate: mutateVideos } = useSWR(
-    unlocked && courseId ? `/videocourses/batch/${courseId}` : null,
-    fetcher,
-    { revalidateOnFocus: false }
-  );
+  const {
+    data: videosData,
+    isLoading: videosLoading,
+    mutate: mutateVideos
+  } = useSWR(apiUrl, fetcher, {
+    revalidateOnFocus: false
+  });
 
   const allVideos = videosData?.data || [];
 
@@ -159,9 +175,14 @@ export default function CourseScreen() {
                 ) : (
                   <VideoList
                     videos={displayedVideos}
+                    // new
+                    type={type}
+                    purchasedItem={purchasedItem}
+                    batchIdOfSubject={batchIdOfSubject}
+                      // new
                     startDate={batchData?.startDate}
                     endDate={batchData?.endDate}
-                    subjectId={subjectId ? subjectId :""}
+                    subjectId={subjectId ? subjectId : ""}
                     currentVideo={currentVideo}
                     courseId={courseId}
                     onVideoSelect={handleVideoSelect}

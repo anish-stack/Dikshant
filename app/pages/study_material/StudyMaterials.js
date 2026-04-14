@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react"
 import {
   View,
   Text,
@@ -12,599 +13,518 @@ import {
   Modal,
   Platform,
   Alert,
-} from "react-native";
-import React, { useEffect, useState } from "react";
-import { useRoute, useNavigation } from "@react-navigation/native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import * as FileSystem from "expo-file-system/legacy";
-import * as IntentLauncher from "expo-intent-launcher";
-import * as Sharing from "expo-sharing";
-import api from "../../constant/fetcher";
+  Dimensions,
+} from "react-native"
+import { useRoute, useNavigation } from "@react-navigation/native"
+import { SafeAreaView } from "react-native-safe-area-context"
+import Icon from "react-native-vector-icons/MaterialCommunityIcons"
+import * as FileSystem from "expo-file-system/legacy"
+import * as IntentLauncher from "expo-intent-launcher"
+import * as Sharing from "expo-sharing"
+import api from "../../constant/fetcher"
 
+const { width } = Dimensions.get("window")
+const CARD_WIDTH = (width - 40) / 2
+
+// ─── Fallback placeholder when coverImage is missing ───────────────────────
+const PlaceholderCover = ({ categoryName }) => (
+  <View style={styles.placeholderCover}>
+    <Icon name="file-document-outline" size={36} color="#A5B4FC" />
+    <Text style={styles.placeholderText} numberOfLines={1}>
+      {categoryName || "Study Material"}
+    </Text>
+  </View>
+)
+
+// ─── Single material card ───────────────────────────────────────────────────
+const MaterialCard = ({ item, onPreview, onDownload }) => {
+  const isAlreadyPurchasedByUser = item.alreadyPurchased || false
+  const isPaid = item.isPaid && parseFloat(item.price || 0) > 0
+  const isDownloadable = item.isDownloadable !== false
+  const hasImage = !!item.coverImage
+
+  return (
+    <TouchableOpacity activeOpacity={0.9} onPress={() => onPreview(isAlreadyPurchasedByUser)} style={styles.card}>
+
+
+      {/* Cover / Fallback */}
+      {hasImage ? (
+        <Image
+          source={{ uri: item.coverImage }}
+          style={styles.coverImage}
+          resizeMode="cover"
+          onError={() => { }}
+        />
+      ) : (
+        <PlaceholderCover categoryName={item.category?.name} />
+      )}
+
+      {/* Body */}
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <Text style={styles.categoryText} numberOfLines={3}>
+          {item.category?.name || "Material"}
+        </Text>
+        {!!item.shortDescription && (
+          <Text style={styles.cardDesc} numberOfLines={2}>
+            {item.shortDescription}
+          </Text>
+        )}
+
+        {/* Info chips */}
+        <View style={styles.chipRow}>
+          {item.isHardCopy ? (
+            <View style={styles.chip}>
+              <Text style={styles.chipLabel}>Type</Text>
+              <Text style={styles.chipValue}>Printed Copy</Text>
+            </View>
+          ) : (
+            <View style={styles.chip}>
+              <Text style={styles.chipLabel}>Type</Text>
+              <Text style={styles.chipValue}>PDF</Text>
+            </View>
+          )}
+
+          <View style={styles.chip}>
+            <Text style={styles.chipLabel}>Price</Text>
+            <Text style={[styles.chipValue, isPaid ? styles.paidText : styles.freeText]}>
+              {isPaid ? `₹${item.price}` : "Free"}
+            </Text>
+          </View>
+
+        </View>
+
+        {/* Action buttons */}
+        <View style={styles.btnRow}>
+
+          <TouchableOpacity style={styles.previewBtn} onPress={() => onPreview(isAlreadyPurchasedByUser)}>
+            <Text style={styles.previewBtnText}>Preview</Text>
+          </TouchableOpacity>
+
+          {isDownloadable && (
+            <TouchableOpacity
+              style={styles.downloadBtn}
+              onPress={() => onDownload(item.fileUrl, item.title)}
+            >
+              <Text style={styles.downloadBtnText}>Download</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+// ─── Main screen ────────────────────────────────────────────────────────────
 export default function StudyMaterials() {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { slug } = route.params || {};
+  const route = useRoute()
+  const navigation = useNavigation()
+  const { slug } = route.params || {}
 
-  const [materials, setMaterials] = useState([]);
-  const [filteredMaterials, setFilteredMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [categoryName, setCategoryName] = useState("Study Materials");
+  const [materials, setMaterials] = useState([])
+  const [filteredMaterials, setFilteredMaterials] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [categoryName, setCategoryName] = useState("Study Materials")
 
-  // Download modal
-  const [downloadModalVisible, setDownloadModalVisible] = useState(false);
-  const [downloadingTitle, setDownloadingTitle] = useState("");
-  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadModalVisible, setDownloadModalVisible] = useState(false)
+  const [downloadingTitle, setDownloadingTitle] = useState("")
+  const [downloadProgress, setDownloadProgress] = useState(0)
 
   useEffect(() => {
-    if (slug) fetchMaterials();
-  }, [slug]);
+    if (slug) fetchMaterials()
+  }, [slug])
 
   const fetchMaterials = async () => {
     try {
-      const res = await api.get(`/study-materials/materials-cat/${slug}`);
-      const data = res.data.data || [];
-      setMaterials(data);
-      setFilteredMaterials(data);
+      const res = await api.get(`/study-materials/materials-cat/${slug}`)
+      const data = res.data.data || []
+      setMaterials(data)
+      setFilteredMaterials(data)
       if (data.length > 0 && data[0].category?.name) {
-        setCategoryName(data[0].category.name);
+        setCategoryName(data[0].category.name)
       }
-    } catch (error) {
-      console.log("Error fetching materials:", error);
+    } catch (err) {
+      console.log("Fetch error:", err)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
-  // Search filter
   useEffect(() => {
-    const filtered = materials.filter((item) =>
-      item.title.toLowerCase().includes(search.toLowerCase())
-    );
-    setFilteredMaterials(filtered);
-  }, [search, materials]);
+    const q = search.toLowerCase()
+    setFilteredMaterials(
+      materials.filter(
+        (m) =>
+          m.title.toLowerCase().includes(q) ||
+          (m.shortDescription && m.shortDescription.toLowerCase().includes(q))
+      )
+    )
+  }, [search, materials])
 
   const openPdf = (url) => {
     Linking.openURL(url).catch(() =>
-      Alert.alert("Cannot Open", "Please try downloading the file instead.")
-    );
-  };
+      Alert.alert("Cannot Open", "Try downloading the file instead.")
+    )
+  }
 
   const downloadPdf = async (url, title) => {
     try {
-      const fileName = title.replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".pdf";
-      const fileUri = FileSystem.documentDirectory + fileName;
+      const fileName = title.replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".pdf"
+      const fileUri = FileSystem.documentDirectory + fileName
+      const info = await FileSystem.getInfoAsync(fileUri)
 
-      const fileInfo = await FileSystem.getInfoAsync(fileUri);
-      if (fileInfo.exists) {
-        await openDownloadedPdf(fileUri);
-        return;
+      if (info.exists) {
+        await openDownloadedFile(fileUri)
+        return
       }
 
-      setDownloadingTitle(title);
-      setDownloadProgress(0);
-      setDownloadModalVisible(true);
+      setDownloadingTitle(title)
+      setDownloadProgress(0)
+      setDownloadModalVisible(true)
 
-      const callback = (progress) => {
-        const percent = Math.round(
-          (progress.totalBytesWritten / progress.totalBytesExpectedToWrite) * 100
-        );
-        setDownloadProgress(percent);
-      };
+      const dl = FileSystem.createDownloadResumable(url, fileUri, {}, (p) => {
+        const pct = Math.round(
+          (p.totalBytesWritten / p.totalBytesExpectedToWrite) * 100
+        )
+        setDownloadProgress(isNaN(pct) ? 0 : pct)
+      })
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        url,
-        fileUri,
-        {},
-        callback
-      );
-
-      const { uri } = await downloadResumable.downloadAsync();
-      setDownloadModalVisible(false);
-
-      if (!uri) throw new Error("Download failed");
-
-      Alert.alert("Success", "Downloaded successfully!");
-      await openDownloadedPdf(uri);
-    } catch (error) {
-      setDownloadModalVisible(false);
-      console.error(error);
-      Alert.alert("Download Failed", "Please check your connection and try again.");
+      const { uri } = await dl.downloadAsync()
+      setDownloadModalVisible(false)
+      if (!uri) throw new Error("No URI")
+      Alert.alert("Downloaded", "File saved successfully!")
+      await openDownloadedFile(uri)
+    } catch {
+      setDownloadModalVisible(false)
+      Alert.alert("Failed", "Download failed. Check your connection.")
     }
-  };
+  }
 
-  const openDownloadedPdf = async (fileUri) => {
+  const openDownloadedFile = async (fileUri) => {
     try {
-      let contentUri = fileUri;
       if (Platform.OS === "android") {
-        contentUri = await FileSystem.getContentUriAsync(fileUri);
+        const contentUri = await FileSystem.getContentUriAsync(fileUri)
+        await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+          data: contentUri,
+          type: "application/pdf",
+          flags: 1,
+        })
+      } else {
+        await Sharing.shareAsync(fileUri)
       }
-
-      await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
-        data: contentUri,
-        type: "application/pdf",
-        flags: 1,
-      });
-    } catch (error) {
+    } catch {
       try {
-        await Sharing.shareAsync(fileUri);
+        await Sharing.shareAsync(fileUri)
       } catch {
-        Alert.alert("PDF Saved", `Saved at: ${fileUri}`);
+        Alert.alert("Saved", `File path: ${fileUri}`)
       }
     }
-  };
-
-  const renderMaterial = ({ item }) => {
-    const isAlreadyPurchased = item?.alreadyPurchased || false;
-    const isPaid = item.isPaid && parseFloat(item.price || 0) > 0;
-    const hasCover = item.coverImage;
-
-    return (
-      <View style={styles.materialCard}>
-        {/* Cover */}
-        <View style={styles.coverContainer}>
-          {hasCover ? (
-            <Image
-              source={{ uri: item.coverImage }}
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.coverPlaceholder}>
-              <Icon name="file-document-outline" size={52} color="#6366F1" />
-            </View>
-          )}
-
-          {/* Badge */}
-          {isPaid ? (
-            <View style={styles.paidBadge}>
-              <Icon name="lock" size={12} color="#fff" />
-              <Text style={styles.badgeText}>₹{item.price}</Text>
-            </View>
-          ) : (
-            <View style={[styles.paidBadge, styles.freeBadge]}>
-              <Text style={styles.badgeText}>Free</Text>
-            </View>
-          )}
-        </View>
-        {isAlreadyPurchased && (
-          <View style={styles.SubscribedBadge}>
-            <Icon name="lock" size={12} color="#fff" />
-            <Text style={styles.badgeText}>Subscribed</Text>
-          </View>
-        )}
-
-        {/* Content */}
-        <View style={styles.cardContent}>
-          <Text style={styles.title} numberOfLines={2}>
-            {item.title}
-          </Text>
-
-          {item.description && (
-            <Text style={styles.description} numberOfLines={2}>
-              {item.description}
-            </Text>
-          )}
-
-          <View style={styles.actions}>
-            {/* Free OR Purchased */}
-            {!isPaid || isAlreadyPurchased ? (
-              <>
-                <TouchableOpacity
-                  style={styles.viewBtn}
-                  onPress={() => openPdf(item.fileUrl)}
-                >
-                  <Icon name="eye-outline" size={18} color="#fff" />
-                  <Text style={styles.viewBtnText}>View Online</Text>
-                </TouchableOpacity>
-
-                {item.isDownloadable && (
-                  <TouchableOpacity
-                    style={styles.downloadBtn}
-                    onPress={() => downloadPdf(item.fileUrl, item.title)}
-                  >
-                    <Icon name="download-outline" size={18} color="#6366F1" />
-                    <Text style={styles.downloadBtnText}>Download</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            ) : (
-              /* Paid but not purchased */
-              <TouchableOpacity
-                style={styles.buyNowBtn}
-                onPress={() =>
-                  navigation.navigate("StudyMaterials-details", {
-                    slug: item.id,
-                  })
-                }
-              >
-                <Icon name="cart-outline" size={20} color="#fff" />
-                <Text style={styles.buyNowText}>Buy Now - ₹{item.price}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-    );
-  };
+  }
 
   const ListHeader = () => (
     <View style={styles.listHeader}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Icon name="arrow-left" size={24} color="#0F172A" />
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Icon name="arrow-left" size={20} color="#1E293B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{categoryName}</Text>
+        <Text style={styles.topTitle} numberOfLines={1}>{categoryName}</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Search */}
-      <View style={styles.searchContainer}>
-        <Icon name="magnify" size={20} color="#94A3B8" />
+      <View style={styles.searchBox}>
+        <Icon name="magnify" size={18} color="#94A3B8" />
         <TextInput
           style={styles.searchInput}
           placeholder="Search materials..."
+          placeholderTextColor="#94A3B8"
           value={search}
           onChangeText={setSearch}
-          placeholderTextColor="#94A3B8"
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch("")}>
-            <Icon name="close-circle" size={20} color="#94A3B8" />
+            <Icon name="close-circle" size={18} color="#94A3B8" />
           </TouchableOpacity>
         )}
       </View>
 
-      <Text style={styles.countText}>
-        {filteredMaterials.length} materials found
+      {/* Count */}
+      <Text style={styles.countLabel}>
+        {filteredMaterials.length} {filteredMaterials.length === 1 ? "result" : "results"}
       </Text>
     </View>
-  );
+  )
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loaderContainer}>
+      <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color="#6366F1" />
-        <Text style={styles.loadingText}>Loading materials...</Text>
+        <Text style={styles.loadingText}>Loading materials…</Text>
       </SafeAreaView>
-    );
+    )
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <SafeAreaView style={styles.screen} edges={["top"]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F1F5F9" />
 
       <FlatList
         data={filteredMaterials}
-        renderItem={renderMaterial}
         keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrapper}
         ListHeaderComponent={ListHeader}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <MaterialCard
+            item={item}
+            onPreview={(isAlreadyPurchasedByUser) => navigation.navigate("StudyMaterials-details", {
+              slug: item.id,
+              isAlreadyPurchasedByUser 
+            })}
+            onDownload={downloadPdf}
+          />
+        )}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Icon name="file-document-outline" size={70} color="#E2E8F0" />
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <Icon name="file-search-outline" size={40} color="#A5B4FC" />
+            </View>
             <Text style={styles.emptyTitle}>No materials found</Text>
-            <Text style={styles.emptySubtitle}>
-              Try changing your search term
-            </Text>
+            <Text style={styles.emptySub}>Try a different search term</Text>
           </View>
         }
       />
 
-      {/* Download Progress Modal */}
+      {/* Download progress modal */}
       <Modal visible={downloadModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Downloading</Text>
-            <Text style={styles.modalFilename} numberOfLines={2}>
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconWrap}>
+              <Icon name="download-circle-outline" size={36} color="#6366F1" />
+            </View>
+            <Text style={styles.modalTitle}>Downloading…</Text>
+            <Text style={styles.modalFileName} numberOfLines={2}>
               {downloadingTitle}
             </Text>
 
-            <View style={styles.progressContainer}>
-              <View
-                style={[styles.progressBar, { width: `${downloadProgress}%` }]}
-              />
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${downloadProgress}%` }]} />
             </View>
 
-            <Text style={styles.progressText}>{downloadProgress}%</Text>
-
-            <Text style={styles.modalNote}>
-              Please keep the app open during download
-            </Text>
+            <Text style={styles.progressPct}>{downloadProgress}%</Text>
+            <Text style={styles.modalNote}>Keep the app open during download</Text>
           </View>
         </View>
       </Modal>
     </SafeAreaView>
-  );
+  )
 }
 
+// ─── Styles ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
+  screen: { flex: 1, backgroundColor: "#F1F5F9" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F1F5F9" },
 
-  /* Header & Search */
-  listHeader: {
-    backgroundColor: "#F8FAFC",
-    paddingBottom: 12,
-  },
-  header: {
+  // List
+  listContent: { paddingBottom: 32 },
+  columnWrapper: { justifyContent: "space-between", paddingHorizontal: 16 },
+
+  // Header
+  listHeader: { backgroundColor: "#F1F5F9", paddingBottom: 4 },
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    marginRight: 12,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#0F172A",
-  },
+  topTitle: { fontSize: 17, fontWeight: "700", color: "#0F172A", flex: 1, textAlign: "center" },
 
-  searchContainer: {
+  // Search
+  searchBox: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#fff",
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 10,
     borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    height: 48,
+    height: 44,
   },
   searchInput: {
     flex: 1,
-    marginHorizontal: 10,
-    fontSize: 15,
+    marginHorizontal: 8,
+    fontSize: 14,
     color: "#0F172A",
   },
+  countLabel: { fontSize: 12, color: "#94A3B8", paddingHorizontal: 16, marginBottom: 10 },
 
-  countText: {
-    fontSize: 14,
-    color: "#64748B",
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-
-  /* Material Card */
-  materialCard: {
+  // Card
+  card: {
+    width: CARD_WIDTH,
     backgroundColor: "#fff",
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
+    borderRadius: 14,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    marginBottom: 14,
+
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 6,
   },
 
-  coverContainer: {
-    height: 160,
-    backgroundColor: "#f1f5f9",
-    position: "relative",
-  },
-  coverImage: {
+  categoryText: { color: "#4338CA", fontSize: 10, fontWeight: "600" },
+  priceBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  freeBadge: { backgroundColor: "#D1FAE5" },
+  paidBadge: { backgroundColor: "#EEF2FF" },
+  priceText: { fontSize: 10, fontWeight: "700", color: "#065F46" },
+  paidText: { color: "#4338CA" },
+
+  // Cover image / placeholder
+  coverImage: { width: "100%", height: 110 },
+  placeholderCover: {
     width: "100%",
-    height: "100%",
-  },
-  coverPlaceholder: {
-    flex: 1,
+    height: 110,
+    backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+  },
+  placeholderText: {
+    fontSize: 11,
+    color: "#818CF8",
+    fontWeight: "500",
+    paddingHorizontal: 8,
+    textAlign: "center",
   },
 
-  paidBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    backgroundColor: "#6366F1",
-    paddingHorizontal: 12,
+  // Body
+  cardBody: { padding: 10 },
+  cardTitle: { fontSize: 12.5, fontWeight: "700", color: "#0F172A", lineHeight: 17, marginBottom: 4 },
+  cardDesc: { fontSize: 11, color: "#64748B", lineHeight: 15, marginBottom: 10 },
+
+  // Chips
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
+  chip: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 7,
+    paddingHorizontal: 7,
     paddingVertical: 5,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    minWidth: "30%",
+    flex: 1,
   },
-  SubscribedBadge: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    backgroundColor: "#29a836",
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  freeBadge: {
-    backgroundColor: "#10B981",
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
+  chipLabel: { fontSize: 9.5, color: "#94A3B8", marginBottom: 1 },
+  chipValue: { fontSize: 11, fontWeight: "600", color: "#1E293B" },
+  freeText: { color: "#059669" },
+  noText: { color: "#EF4444" },
 
-  cardContent: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 16.5,
-    fontWeight: "700",
-    color: "#0F172A",
-    lineHeight: 22,
-    marginBottom: 6,
-  },
-  description: {
-    fontSize: 13.5,
-    color: "#64748B",
-    lineHeight: 19,
-    marginBottom: 16,
-  },
-
-  actions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  viewBtn: {
+  // Buttons
+  btnRow: { flexDirection: "row", gap: 6 },
+  previewBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#6366F1",
-    paddingVertical: 13,
-    borderRadius: 12,
-    gap: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#6366F1",
+    borderRadius: 8,
+    paddingVertical: 8,
+    backgroundColor: "#fff",
   },
-  viewBtnText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14.5,
-  },
+  previewBtnText: { color: "#6366F1", fontSize: 11, fontWeight: "600" },
   downloadBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
-    paddingVertical: 13,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#6366F1",
-    gap: 8,
+    gap: 4,
+    backgroundColor: "#6366F1",
+    borderRadius: 8,
+    paddingVertical: 8,
   },
-  downloadBtnText: {
-    color: "#6366F1",
-    fontWeight: "600",
-    fontSize: 14.5,
-  },
+  downloadBtnText: { color: "#fff", fontSize: 11, fontWeight: "600" },
 
-  /* Loader */
-  loaderContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8FAFC",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#64748B",
-  },
+  // Loading
+  loadingText: { marginTop: 12, fontSize: 14, color: "#64748B" },
 
-  /* Empty State */
-  emptyContainer: {
-    alignItems: "center",
-    paddingVertical: 80,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#0F172A",
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-    marginTop: 6,
-  },
-  /* Buy Now Button */
-  buyNowBtn: {
-    flex: 1,
-    flexDirection: "row",
+  // Empty state
+  emptyWrap: { alignItems: "center", paddingVertical: 64, width: "100%" },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#EEF2FF",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#10B981",   // Green color for purchase (ya #6366F1 bhi rakh sakte ho)
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    elevation: 2,
-    shadowColor: "#10B981",
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    marginBottom: 16,
   },
-  buyNowText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 15.5,
-  },
-  /* List */
-  listContent: {
-    paddingBottom: 30,
-  },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: "#1E293B", marginBottom: 4 },
+  emptySub: { fontSize: 13, color: "#94A3B8" },
 
-  /* Modal */
-  modalOverlay: {
+  // Modal
+  modalBg: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(15,23,42,0.55)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
-  modalContent: {
+  modalCard: {
     backgroundColor: "#fff",
     borderRadius: 20,
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 320,
     padding: 24,
     alignItems: "center",
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  modalTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 6 },
+  modalFileName: { fontSize: 12.5, color: "#64748B", textAlign: "center", marginBottom: 20, lineHeight: 18 },
+  progressTrack: {
+    width: "100%",
+    height: 6,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 3,
+    overflow: "hidden",
     marginBottom: 8,
   },
-  modalFilename: {
-    fontSize: 14,
-    color: "#475569",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  progressContainer: {
-    width: "100%",
-    height: 8,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#6366F1",
-  },
-  progressText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#6366F1",
-    marginBottom: 16,
-  },
-  modalNote: {
-    fontSize: 12.5,
-    color: "#64748B",
-    textAlign: "center",
-  },
-});
+  progressFill: { height: "100%", backgroundColor: "#6366F1", borderRadius: 3 },
+  progressPct: { fontSize: 14, fontWeight: "700", color: "#6366F1", marginBottom: 12 },
+  modalNote: { fontSize: 11.5, color: "#94A3B8", textAlign: "center" },
+})

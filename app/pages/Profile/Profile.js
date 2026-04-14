@@ -47,13 +47,26 @@ const quickActions = [
     screen: "TestSeries" // tera test series screen name daal dena
   },
   {
+    label: "Study Materials",
+    icon: "book",
+    bg: "#f1f3f6",
+    color: "#f5651d",
+    screen: "study-materials-orders"
+  },
+  {
     label: "Settings",
     icon: "settings",
     bg: "#DBEAFE",
     color: "#3B82F6",
     screen: "Settings"
   },
-
+  {
+    label: "Notifications",
+    icon: "bell",
+    bg: "#ffffff",
+    color: "#002aff",
+    screen: "Notifications"
+  },
   {
     label: "Rate Us",
     icon: "star",
@@ -80,7 +93,7 @@ const quickActions = [
 const menuOptions = [
   { label: "Notifications", icon: "bell", screen: "Notifications" },
   { label: "Terms & Conditions", icon: "file-text", urlKey: "termsUrl" },
-  { label: "Join us", icon: "link",screen:"follow" },
+  { label: "Join us", icon: "link", screen: "follow" },
 
   { label: "Privacy Policy", icon: "shield", urlKey: "privacyPolicyUrl" },
 ];

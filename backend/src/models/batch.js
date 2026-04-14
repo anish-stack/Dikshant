@@ -3,7 +3,11 @@
 module.exports = (sequelize, DataTypes) => {
   const Batch = sequelize.define('Batch', {
 
-    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true
+    },
 
     name: DataTypes.STRING,
     slug: DataTypes.STRING,
@@ -12,8 +16,43 @@ module.exports = (sequelize, DataTypes) => {
 
     displayOrder: DataTypes.INTEGER,
     programId: DataTypes.INTEGER,
-    subjectId: DataTypes.JSON,
 
+    subjectId: DataTypes.JSON,                    // Main batch subjects
+
+    separatePurchaseSubjectIds: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      defaultValue: [],
+
+      get() {
+        const val = this.getDataValue('separatePurchaseSubjectIds');
+        if (!val) return [];
+        if (typeof val === 'string') {
+          try {
+            return JSON.parse(val);
+          } catch (e) {
+            console.error('Error parsing separatePurchaseSubjectIds:', e);
+            return [];
+          }
+        }
+        return Array.isArray(val) ? val : [];
+      },
+
+      set(value) {
+        if (typeof value === 'string') {
+          try {
+            this.setDataValue('separatePurchaseSubjectIds', JSON.parse(value));
+          } catch (e) {
+            console.error('Failed to parse separatePurchaseSubjectIds:', e);
+            this.setDataValue('separatePurchaseSubjectIds', []);
+          }
+        } else if (Array.isArray(value)) {
+          this.setDataValue('separatePurchaseSubjectIds', value);
+        } else {
+          this.setDataValue('separatePurchaseSubjectIds', []);
+        }
+      },
+    },
     medium: {
       type: DataTypes.STRING(2000),
       allowNull: false,
@@ -23,24 +62,21 @@ module.exports = (sequelize, DataTypes) => {
     offerText: {
       type: DataTypes.STRING(1000),
       allowNull: true,
-      defaultValue: null,
     },
 
     fee_one_time: {
       type: DataTypes.STRING(1500),
       allowNull: true,
-      defaultValue: null,
     },
 
     fee_inst: {
       type: DataTypes.STRING(1500),
       allowNull: true,
-      defaultValue: null,
     },
+
     note: {
       type: DataTypes.STRING(2000),
       allowNull: true,
-      defaultValue: null,
     },
 
     startDate: DataTypes.DATE,
@@ -49,15 +85,16 @@ module.exports = (sequelize, DataTypes) => {
     registrationStartDate: DataTypes.DATE,
     registrationEndDate: DataTypes.DATE,
 
-    status: DataTypes.ENUM('active', 'inactive'),
+    status: DataTypes.ENUM('active', 'inactive', 'upcoming'), // Added 'upcoming' as used in frontend
 
-    shortDescription: DataTypes.STRING,
+    shortDescription: DataTypes.TEXT,     // Changed to TEXT (better for HTML content)
     longDescription: DataTypes.TEXT,
 
     batchPrice: DataTypes.FLOAT,
     batchDiscountPrice: DataTypes.FLOAT,
     gst: DataTypes.FLOAT,
     offerValidityDays: DataTypes.INTEGER,
+
     quizIds: {
       type: DataTypes.JSON,
       allowNull: true,
@@ -84,13 +121,14 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: []
     },
-    position:{
+
+    position: {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
-    category: {
-      type: DataTypes.STRING
-    },
+
+    category: DataTypes.STRING,
+
     c_status: {
       type: DataTypes.ENUM(
         "Start Soon",
@@ -100,7 +138,6 @@ module.exports = (sequelize, DataTypes) => {
       ),
       defaultValue: "Start Soon",
     },
-
 
   }, {
     tableName: 'batchs',
@@ -118,7 +155,7 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "batchId",
       otherKey: "announcementId",
     });
-    // Add this line:
+
     Batch.hasMany(models.Order, {
       foreignKey: 'itemId',
       as: 'orders',
@@ -128,4 +165,3 @@ module.exports = (sequelize, DataTypes) => {
 
   return Batch;
 };
-

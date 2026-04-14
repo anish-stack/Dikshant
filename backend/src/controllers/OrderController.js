@@ -13,6 +13,7 @@ const {
   Quizzes,
   TestSeries,
   SystemLog,
+  VideoCourse,
   Sequelize,
   sequelize
 } = require("../models");
@@ -774,15 +775,30 @@ class OrderController {
     console.log("🟡 CREATE ORDER API HIT", { body: req.body });
 
     const {
-      userId, type, itemId, amount,
-      gst = 0, couponCode, accessValidityDays, isFree = false,
+      userId,
+      type,
+      batchId,
+      itemId,
+      amount,
+      gst = 0,
+      couponCode,
+      accessValidityDays,
+      isFree = false,
     } = req.body;
 
     if (!userId || !type || !itemId || amount == null) {
       return res.status(400).json({ success: false, message: "Missing required fields" });
     }
 
-    const validTypes = ["batch", "quiz", "test", "quiz_bundle", "test_series_bundle"];
+    const validTypes = [
+      "batch",
+      "subject",
+      "quiz",
+      "test",
+      "quiz_bundle",
+      "test_series_bundle",
+    ];
+
     if (!validTypes.includes(type)) {
       return res.status(400).json({ success: false, message: "Invalid order type" });
     }
@@ -790,19 +806,122 @@ class OrderController {
     const t = await sequelize.transaction();
 
     try {
+
+      /* ================= Prevent Duplicate Purchase ================= */
+
+      if (["batch", "subject"].includes(type)) {
+
+        const existingOrder = await Order.findOne({
+          where: {
+            userId,
+            type,
+            itemId,
+            status: "success",
+            enrollmentStatus: "active",
+
+            [Op.or]: [
+              { accessValidityDays: null }, // lifetime access
+              sequelize.literal(
+                "DATE_ADD(paymentDate, INTERVAL accessValidityDays DAY) > NOW()"
+              )
+            ]
+          },
+          transaction: t,
+        });
+
+        if (existingOrder) {
+          await t.rollback();
+
+          return res.status(409).json({
+            success: false,
+            message: "Item already purchased and still active",
+          });
+        }
+      }
+
+      /* ================= Validate Item ================= */
+
+      if (type === "subject") {
+        const foundBatch = await Batch.findByPk(batchId, { transaction: t });
+
+        if (!foundBatch) {
+          await t.rollback();
+          return res.status(404).json({
+            success: false,
+            message: "Batch not found",
+          });
+        }
+        const separateSubjects = foundBatch.separatePurchaseSubjectIds || [];
+        const subjectConfig = separateSubjects.find(
+          (s) => Number(s.subjectId) === Number(itemId)
+        );
+        if (!subjectConfig) {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Subject is not available for separate purchase in this batch",
+          });
+        }
+
+        if (subjectConfig.status !== "active") {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Subject purchase is currently disabled",
+          });
+        }
+        if (Number(amount) !== Number(subjectConfig.price) &&
+          Number(amount) !== Number(subjectConfig.discountPrice)) {
+
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Invalid subject price",
+          });
+        }
+      }
+
+      if (type === "batch") {
+
+        const batch = await Batch.findByPk(itemId, { transaction: t });
+
+        if (!batch) {
+          await t.rollback();
+          return res.status(404).json({
+            success: false,
+            message: "Batch not found",
+          });
+        }
+      }
+
+      /* ================= Coupon Handling ================= */
+
       let discount = 0;
-      let couponSnapshot = { couponId: null, couponCode: null, couponDiscount: null, couponDiscountType: null };
+      let couponSnapshot = {
+        couponId: null,
+        couponCode: null,
+        couponDiscount: null,
+        couponDiscountType: null,
+      };
 
       if (couponCode) {
+
         const coupon = await Coupon.findOne({
           where: { code: couponCode.toUpperCase() },
           transaction: t,
         });
 
-        if (!coupon) { await t.rollback(); return res.status(404).json({ success: false, message: "Invalid coupon code" }); }
+        if (!coupon) {
+          await t.rollback();
+          return res.status(404).json({ success: false, message: "Invalid coupon code" });
+        }
 
         const now = new Date();
-        if (now > coupon.validTill) { await t.rollback(); return res.status(400).json({ success: false, message: "Coupon expired" }); }
+
+        if (now > coupon.validTill) {
+          await t.rollback();
+          return res.status(400).json({ success: false, message: "Coupon expired" });
+        }
 
         couponSnapshot = {
           couponId: coupon.id,
@@ -813,9 +932,14 @@ class OrderController {
 
         if (coupon.discountType === "flat") {
           discount = coupon.discount;
-        } else if (coupon.discountType === "percentage") {
+        }
+
+        if (coupon.discountType === "percentage") {
           discount = (amount * coupon.discount) / 100;
-          if (coupon.maxDiscount && discount > coupon.maxDiscount) discount = coupon.maxDiscount;
+
+          if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+            discount = coupon.maxDiscount;
+          }
         }
       }
 
@@ -823,8 +947,13 @@ class OrderController {
 
       if (finalAmount <= 0 && !isFree) {
         await t.rollback();
-        return res.status(400).json({ success: false, message: "Final amount cannot be zero or negative for paid orders" });
+        return res.status(400).json({
+          success: false,
+          message: "Final amount cannot be zero or negative",
+        });
       }
+
+      /* ================= Razorpay Order ================= */
 
       const razorOrder = await razorpay.orders.create({
         amount: Math.round(finalAmount * 100),
@@ -832,90 +961,159 @@ class OrderController {
         receipt: `ord_${Date.now()}`.slice(0, 40),
       });
 
-      let quiz = null;
-      if (type === "quiz") {
-        quiz = await Quizzes.findByPk(itemId, { transaction: t });
-        if (!quiz) { await t.rollback(); return res.status(404).json({ success: false, message: "Quiz not found" }); }
+      /* ================= Create Order ================= */
 
-        await QuizPayments.create({
-          userId, quizId: itemId, razorpayOrderId: razorOrder.id,
-          amount: finalAmount, currency: "INR", status: "pending",
-        }, { transaction: t });
-      }
-
-      // ✅ FIX: Removed dead `TestSeries.findByPk(itemId)` call that had no transaction
-      // and whose result was never used.
-
-      const newOrder = await Order.create({
-        userId, type, itemId, amount, discount, gst,
-        totalAmount: finalAmount,
-        quiz_limit: type === "quiz" ? (quiz?.attemptLimit ?? 3) : null,
-        razorpayOrderId: razorOrder.id,
-        status: "pending",
-        couponId: couponSnapshot.couponId,
-        couponCode: couponSnapshot.couponCode,
-        couponDiscount: couponSnapshot.couponDiscount,
-        couponDiscountType: couponSnapshot.couponDiscountType,
-        accessValidityDays: accessValidityDays || null,
-        enrollmentStatus: "active",
-      }, { transaction: t });
+      const newOrder = await Order.create(
+        {
+          userId,
+          type,
+          itemId,
+          amount,
+          discount,
+          batchIdOfSubject: type === "subject" ? batchId : null,
+          gst,
+          totalAmount: finalAmount,
+          razorpayOrderId: razorOrder.id,
+          status: "pending",
+          couponId: couponSnapshot.couponId,
+          couponCode: couponSnapshot.couponCode,
+          couponDiscount: couponSnapshot.couponDiscount,
+          couponDiscountType: couponSnapshot.couponDiscountType,
+          accessValidityDays: accessValidityDays || null,
+          enrollmentStatus: "active",
+        },
+        { transaction: t }
+      );
 
       await t.commit();
+
       await redis.del(`orders:${userId}`);
 
-      return res.json({ success: true, message: "Order created successfully", razorOrder, key: process.env.RAZORPAY_KEY, order: newOrder });
+      return res.json({
+        success: true,
+        message: "Order created successfully",
+        razorOrder,
+        key: process.env.RAZORPAY_KEY,
+        order: newOrder,
+      });
+
     } catch (error) {
+
       await t.rollback();
+
       console.error("[createOrder] ERROR:", error);
-      return res.status(500).json({ success: false, message: "Order creation failed", error: error.message });
+
+      return res.status(500).json({
+        success: false,
+        message: "Order creation failed",
+        error: error.message,
+      });
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // handlePostPaymentLogic — with fallback retry for batch/bundle access
-  // ─────────────────────────────────────────────────────────────────────────────
+
   static async handlePostPaymentLogic(order, transaction) {
     try {
+
       const user = await User.findByPk(order.userId, { raw: true });
+
       if (!user) {
-        OrderController._logFailure("handlePostPaymentLogic", order.id, order.userId, "User not found");
+        OrderController._logFailure(
+          "handlePostPaymentLogic",
+          order.id,
+          order.userId,
+          "User not found"
+        );
         return;
       }
 
       switch (order.type) {
 
+        /* ================= BATCH PURCHASE ================= */
+
         case "batch": {
+
           const batch = await Batch.findByPk(order.itemId, { transaction });
+
           if (!batch) {
-            OrderController._logFailure("handlePostPaymentLogic:batch", order.id, order.userId, "Batch not found", { itemId: order.itemId });
+            OrderController._logFailure(
+              "handlePostPaymentLogic:batch",
+              order.id,
+              order.userId,
+              "Batch not found",
+              { itemId: order.itemId }
+            );
             break;
           }
 
           const result = await OrderController.grantBatchChildAccess({
-            userId: order.userId, batch, parentOrderId: order.id, transaction,
+            userId: order.userId,
+            batch,
+            parentOrderId: order.id,
+            transaction,
           });
 
-          // ✅ FIX: Log if access was not actually granted
           if (result.skipped && !result.existingCount) {
             OrderController._logFailure(
               "handlePostPaymentLogic:batch",
-              order.id, order.userId,
-              "grantBatchChildAccess skipped with no existing orders — likely empty batch data",
-              { batchId: batch.id, quizIds: batch.quizIds, testSeriesIds: batch.testSeriesIds }
+              order.id,
+              order.userId,
+              "grantBatchChildAccess skipped with no existing orders",
+              {
+                batchId: batch.id,
+                quizIds: batch.quizIds,
+                testSeriesIds: batch.testSeriesIds,
+              }
             );
           }
 
           sendEmail(
             batchPurchaseConfirmationEmail(order, batch, user),
-            { receiver_email: user.email, subject: `Batch Enrollment Confirmed – ${batch.name}` }
+            {
+              receiver_email: user.email,
+              subject: `Batch Enrollment Confirmed – ${batch.name}`,
+            }
           ).catch(console.error);
+
           break;
         }
 
+        /* ================= SUBJECT PURCHASE ================= */
+
+        case "subject": {
+
+          const subject = await Subject.findByPk(order.itemId, { transaction });
+
+          if (!subject) {
+            OrderController._logFailure(
+              "handlePostPaymentLogic:subject",
+              order.id,
+              order.userId,
+              "Subject not found",
+              { itemId: order.itemId }
+            );
+            break;
+          }
+
+          console.log("Purchase success of subject")
+
+          break;
+        }
+
+        /* ================= QUIZ PURCHASE ================= */
+
         case "quiz": {
+
           const quiz = await Quizzes.findByPk(order.itemId, { transaction });
+
           if (!quiz) {
-            OrderController._logFailure("handlePostPaymentLogic:quiz", order.id, order.userId, "Quiz not found", { itemId: order.itemId });
+            OrderController._logFailure(
+              "handlePostPaymentLogic:quiz",
+              order.id,
+              order.userId,
+              "Quiz not found",
+              { itemId: order.itemId }
+            );
             break;
           }
 
@@ -925,37 +1123,79 @@ class OrderController {
           });
 
           if (quizPayment) {
-            await quizPayment.update({ status: "completed", razorpayPaymentId: order.razorpayPaymentId }, { transaction });
+            await quizPayment.update(
+              {
+                status: "completed",
+                razorpayPaymentId: order.razorpayPaymentId,
+              },
+              { transaction }
+            );
           }
 
           sendEmail(
             quizPurchaseConfirmationEmail(order, quiz, user),
-            { receiver_email: user.email, subject: `Quiz Unlocked: ${quiz.title} – Dikshant IAS` }
+            {
+              receiver_email: user.email,
+              subject: `Quiz Unlocked: ${quiz.title}`,
+            }
           ).catch(console.error);
+
           break;
         }
 
+        /* ================= TEST SERIES ================= */
+
         case "test": {
-          const testSeries = await TestSeries.findByPk(order.itemId, { transaction });
+
+          const testSeries = await TestSeries.findByPk(order.itemId, {
+            transaction,
+          });
+
           if (!testSeries) {
-            OrderController._logFailure("handlePostPaymentLogic:test", order.id, order.userId, "TestSeries not found", { itemId: order.itemId });
+            OrderController._logFailure(
+              "handlePostPaymentLogic:test",
+              order.id,
+              order.userId,
+              "TestSeries not found",
+              { itemId: order.itemId }
+            );
             break;
           }
 
           sendEmail(
             testSeriesPurchaseConfirmationEmail(order, testSeries, user),
-            { receiver_email: user.email, subject: `Test Series Unlocked: ${testSeries.title}` }
+            {
+              receiver_email: user.email,
+              subject: `Test Series Unlocked: ${testSeries.title}`,
+            }
           ).catch(console.error);
+
           break;
         }
 
+        /* ================= BUNDLE PURCHASE ================= */
+
         case "quiz_bundle":
         case "test_series_bundle": {
+
           let bundle = null;
 
           if (order.type === "test_series_bundle") {
             bundle = await TestSeriesBundle.findByPk(order.itemId, {
-              include: [{ model: TestSeries, as: "testSeries", attributes: ["id", "title", "price", "discountPrice", "imageUrl"], through: { attributes: [] } }],
+              include: [
+                {
+                  model: TestSeries,
+                  as: "testSeries",
+                  attributes: [
+                    "id",
+                    "title",
+                    "price",
+                    "discountPrice",
+                    "imageUrl",
+                  ],
+                  through: { attributes: [] },
+                },
+              ],
               transaction,
             });
           }
@@ -968,13 +1208,27 @@ class OrderController {
           }
 
           if (!bundle) {
-            OrderController._logFailure("handlePostPaymentLogic:bundle", order.id, order.userId, "Bundle not found", { itemId: order.itemId, type: order.type });
+            OrderController._logFailure(
+              "handlePostPaymentLogic:bundle",
+              order.id,
+              order.userId,
+              "Bundle not found",
+              {
+                itemId: order.itemId,
+                type: order.type,
+              }
+            );
             break;
           }
 
           await OrderController.grantBundleChildAccess({
-            userId: order.userId, bundle, bundleType: order.type, parentOrderId: order.id, transaction,
+            userId: order.userId,
+            bundle,
+            bundleType: order.type,
+            parentOrderId: order.id,
+            transaction,
           });
+
           break;
         }
 
@@ -983,14 +1237,18 @@ class OrderController {
       }
 
     } catch (err) {
-      // ✅ FIX: Structured failure log so you KNOW what failed and why
+
       OrderController._logFailure(
         "handlePostPaymentLogic",
-        order?.id, order?.userId,
+        order?.id,
+        order?.userId,
         err.message,
-        { orderType: order?.type, itemId: order?.itemId }
+        {
+          orderType: order?.type,
+          itemId: order?.itemId,
+        }
       );
-      // Don't throw — payment already succeeded
+
     }
   }
 
@@ -1061,9 +1319,6 @@ class OrderController {
     }
   }
 
-  // ────────────────────────────────────────────────
-  // ADMIN: REVOKE FREE/ADMIN-ASSIGNED ACCESS
-  // ────────────────────────────────────────────────
   static async adminReverseAssignCourse(req, res) {
     const { userId, orderId, reason } = req.body;
 
@@ -1147,147 +1402,7 @@ class OrderController {
     }
   }
 
-  // static async handlePostPaymentLogic(order, transaction) {
-  //   try {
-  //     const user = await User.findByPk(order.userId, { raw: true });
-  //     if (!user) return;
 
-  //     switch (order.type) {
-
-  //       /* ===============================
-  //          BATCH
-  //       =============================== */
-  //       case "batch": {
-  //         const batch = await Batch.findByPk(order.itemId, { transaction });
-  //         if (!batch) break;
-
-  //         await OrderController.grantBatchChildAccess({
-  //           userId: order.userId,
-  //           batch,
-  //           parentOrderId: order.id,
-  //           transaction,
-  //         });
-
-  //         sendEmail(
-  //           batchPurchaseConfirmationEmail(order, batch, user),
-  //           {
-  //             receiver_email: user.email,
-  //             subject: `Batch Enrollment Confirmed – ${batch.name}`,
-  //           }
-  //         ).catch(console.error);
-
-  //         break;
-  //       }
-
-  //       /* ===============================
-  //          SINGLE QUIZ
-  //       =============================== */
-  //       case "quiz": {
-  //         const quiz = await Quizzes.findByPk(order.itemId, { transaction });
-  //         if (!quiz) break;
-
-  //         const quizPayment = await QuizPayments.findOne({
-  //           where: { razorpayOrderId: order.razorpayOrderId },
-  //           transaction,
-  //         });
-
-  //         if (quizPayment) {
-  //           await quizPayment.update(
-  //             {
-  //               status: "completed",
-  //               razorpayPaymentId: order.razorpayPaymentId,
-  //             },
-  //             { transaction }
-  //           );
-  //         }
-
-  //         sendEmail(
-  //           quizPurchaseConfirmationEmail(order, quiz, user),
-  //           {
-  //             receiver_email: user.email,
-  //             subject: `Quiz Unlocked: ${quiz.title} – Dikshant IAS`,
-  //           }
-  //         ).catch(console.error);
-
-  //         break;
-  //       }
-
-  //       /* ===============================
-  //          SINGLE TEST SERIES
-  //       =============================== */
-  //       case "test": {
-  //         const testSeries = await TestSeries.findByPk(order.itemId, { transaction });
-  //         if (!testSeries) break;
-
-  //         sendEmail(
-  //           testSeriesPurchaseConfirmationEmail(order, testSeries, user),
-  //           {
-  //             receiver_email: user.email,
-  //             subject: `Test Series Unlocked: ${testSeries.title}`,
-  //           }
-  //         ).catch(console.error);
-
-  //         break;
-  //       }
-
-  //       /* ===============================
-  //          BUNDLES (QUIZ / TEST SERIES)
-  //       =============================== */
-  //       case "quiz_bundle":
-  //       case "test_series_bundle": {
-
-  //         let bundle = null;
-
-  //         // ✅ TEST SERIES BUNDLE (needs include)
-  //         if (order.type === "test_series_bundle") {
-  //           bundle = await TestSeriesBundle.findByPk(order.itemId, {
-  //             include: [
-  //               {
-  //                 model: TestSeries,
-  //                 as: "testSeries", // MUST match association
-  //                 attributes: ["id", "title", "price", "discountPrice", "imageUrl"],
-  //                 through: { attributes: [] },
-  //               },
-  //             ],
-  //             transaction,
-  //           });
-  //         }
-
-  //         // ✅ QUIZ BUNDLE (no include)
-  //         if (order.type === "quiz_bundle") {
-  //           bundle = await QuizesBundle.findByPk(order.itemId, {
-  //             include: [
-  //               {
-  //                 model: Quizzes,
-  //                 as: "quizzes", // MUST match association
-  //               },
-  //             ],
-  //             transaction,
-  //           });
-  //         }
-
-  //         if (!bundle) break;
-
-  //         await OrderController.grantBundleChildAccess({
-  //           userId: order.userId,
-  //           bundle,
-  //           bundleType: order.type,
-  //           parentOrderId: order.id,
-  //           transaction,
-  //         });
-
-  //         break;
-  //       }
-
-  //       default:
-  //         console.warn("Unknown order type:", order.type);
-  //     }
-
-  //   } catch (err) {
-  //     console.error("Post payment logic failed:", err);
-  //     // ❗ Don't throw — payment already succeeded
-  //   }
-  // }
   static async verifyPayment(req, res) {
     console.log("🟢 VERIFY PAYMENT API HIT");
 
@@ -1398,76 +1513,142 @@ class OrderController {
         order: [["createdAt", "DESC"]],
       });
 
-      const now = new Date(); // server current time
+      const now = new Date();
 
       const finalOrders = await Promise.all(
         orders.map(async (order) => {
           const orderJson = order.toJSON();
 
-          if (order.type !== "batch") {
-            return orderJson;
+          // ====================== BATCH PURCHASE ======================
+          if (order.type === "batch") {
+            const batch = await Batch.findOne({
+              where: { id: order.itemId },
+              attributes: { exclude: ["longDescription"] },
+              include: [
+                {
+                  model: Program,
+                  as: "program",
+                  attributes: ["id", "name", "slug"],
+                },
+              ],
+            });
+
+            if (!batch) {
+              return { ...orderJson, batch: null, subjects: [], expiryDate: null, isExpired: false };
+            }
+
+            let subjectIds = [];
+            try {
+              subjectIds = JSON.parse(batch.subjectId || "[]");
+            } catch { }
+
+            const subjects = await Subject.findAll({
+              where: { id: subjectIds },
+              attributes: ["id", "name", "slug", "description"],
+            });
+
+            let expiryDate = null;
+            let isExpired = false;
+
+            if (
+              order.accessValidityDays &&
+              Number.isInteger(order.accessValidityDays) &&
+              order.accessValidityDays > 0
+            ) {
+              const created = new Date(order.createdAt);
+              expiryDate = new Date(created);
+              expiryDate.setDate(created.getDate() + order.accessValidityDays);
+              isExpired = now > expiryDate;
+            }
+
+            return {
+              ...orderJson,
+              batch: batch.toJSON(),
+              subjects,
+              expiryDate: expiryDate ? expiryDate.toISOString() : null,
+              isExpired,
+            };
           }
 
-          const batch = await Batch.findOne({
-            where: { id: order.itemId },
-            include: [{ model: Program, as: "program", attributes: ["id", "name", "slug"] }],
-          });
+          // ====================== SUBJECT PURCHASE ======================
+          if (order.type === "subject") {
+            const batch = await Batch.findOne({
+              where: { id: order.batchIdOfSubject },
+              attributes: { exclude: ["longDescription"] },
+              include: [
+                {
+                  model: Program,
+                  as: "program",
+                  attributes: ["id", "name", "slug"],
+                },
+              ],
+            });
 
-          if (!batch) {
-            return { ...orderJson, batch: null, subjects: [], expiryDate: null, isExpired: false };
+            if (!batch) {
+              return { ...orderJson, batch: null, subjects: [], expiryDate: null, isExpired: false };
+            }
+
+            // Get subject details from separatePurchaseSubjectIds
+            const separateSubjects = Array.isArray(batch.separatePurchaseSubjectIds)
+              ? batch.separatePurchaseSubjectIds
+              : [];
+
+            const subjectConfig = separateSubjects.find(
+              (s) => Number(s.subjectId) === Number(order.itemId)
+            );
+
+            // Fetch full subject info
+            const subject = await Subject.findOne({
+              where: { id: order.itemId },
+              attributes: ["id", "name", "slug", "description"],
+            });
+
+            let expiryDate = null;
+            let isExpired = false;
+
+            if (
+              order.accessValidityDays &&
+              Number.isInteger(order.accessValidityDays) &&
+              order.accessValidityDays > 0
+            ) {
+              const created = new Date(order.createdAt);
+              expiryDate = new Date(created);
+              expiryDate.setDate(created.getDate() + order.accessValidityDays);
+              isExpired = now > expiryDate;
+            }
+
+            return {
+              ...orderJson,
+              batch: batch.toJSON(),
+              subjects: subject ? [subject] : [],           // ← This is what you wanted
+              subjectIds: [order.itemId],
+              subjectConfig: subjectConfig || null,         // Optional: full pricing info
+              expiryDate: expiryDate ? expiryDate.toISOString() : null,
+              isExpired,
+            };
           }
 
-          let subjectIds = [];
-          try {
-            subjectIds = JSON.parse(batch.subjectId || "[]");
-          } catch {
-            subjectIds = [];
-          }
-
-          const subjects = await Subject.findAll({
-            where: { id: subjectIds },
-            attributes: ["id", "name", "slug", "description"],
-          });
-
-          // ─── Expiry logic ────────────────────────────────────────────────
-          let expiryDate = null;
-          let isExpired = false;
-
-          const isBatchIncluded = order.reason === "BATCH_INCLUDED";
-
-          if (!isBatchIncluded && Number.isInteger(order.accessValidityDays) && order.accessValidityDays > 0) {
-            const created = new Date(order.createdAt);
-            expiryDate = new Date(created);
-            expiryDate.setDate(created.getDate() + order.accessValidityDays);
-
-            // Normalize to end of day (optional but common for validity)
-            // expiryDate.setHours(23, 59, 59, 999);
-
-            isExpired = now > expiryDate;
-          }
-
-          // You could also add fallback using batch.endDate if you want:
-          // if (!expiryDate && batch.endDate) {
-          //   expiryDate = new Date(batch.endDate);
-          //   isExpired = now > expiryDate;
-          // }
-
-          return {
-            ...orderJson,
-            batch: batch.toJSON(),
-            subjects,
-            expiryDate: expiryDate ? expiryDate.toISOString() : null,
-            isExpired,
-          };
+          // ====================== OTHER TYPES ======================
+          return orderJson;
         })
       );
 
-      return res.json(finalOrders);
+      return res.json({
+        success: true,
+        data: finalOrders,
+      });
+
     } catch (err) {
       console.error("[userOrders] ERROR:", err);
-      return res.status(500).json({ success: false, message: "Error fetching orders" });
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching user orders",
+        error: err.message,
+      });
     }
   }
+
+
   static async allOrders(req, res) {
     try {
       const orders = await Order.findAll();
@@ -1763,6 +1944,527 @@ class OrderController {
     }
   }
 
+  static async adminAssignSubject(req, res) {
+    const { userId, subjectId, batchId, accessValidityDays } = req.body;
+
+    if (!userId || !subjectId || !batchId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, subjectId and batchId required"
+      });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+
+      const order = await Order.create({
+        userId,
+        type: "subject",
+        itemId: subjectId,
+        batchIdOfSubject: batchId,
+
+        amount: 0,
+        discount: 0,
+        gst: 0,
+        totalAmount: 0,
+
+        razorpayOrderId: `admin_subject_${Date.now()}`.slice(0, 120),
+
+        status: "success",
+        paymentDate: new Date(),
+
+        accessValidityDays: accessValidityDays || null,
+        enrollmentStatus: "active",
+        reason: "ADMIN_SUBJECT_ASSIGN"
+      }, { transaction: t });
+
+      await NotificationController.createNotification({
+        userId,
+        title: "Subject Assigned",
+        message: "Admin has granted you access to a subject.",
+        type: "course",
+        relatedId: order.id
+      });
+
+      await t.commit();
+
+      await redis.del(`orders:${userId}`);
+      await redis.del(`user:courses:${userId}`);
+
+      return res.json({
+        success: true,
+        message: "Subject assigned successfully",
+        order
+      });
+
+    } catch (err) {
+
+      await t.rollback();
+
+      console.error("[adminAssignSubject] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to assign subject"
+      });
+
+    }
+  }
+
+  static async adminRevokeSubject(req, res) {
+
+    const { userId, subjectId } = req.body;
+
+    if (!userId || !subjectId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and subjectId required"
+      });
+    }
+
+    try {
+
+      const deleted = await Order.destroy({
+        where: {
+          userId,
+          type: "subject",
+          itemId: subjectId
+        }
+      });
+
+      await redis.del(`orders:${userId}`);
+      await redis.del(`user:courses:${userId}`);
+
+      return res.json({
+        success: true,
+        message: "Subject access revoked",
+        deleted
+      });
+
+    } catch (err) {
+
+      console.error("[adminRevokeSubject] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to revoke subject"
+      });
+
+    }
+
+  }
+
+static async getAdminSubjectAssigned(req, res) {
+
+  try {
+
+    const { userId } = req.params;
+
+    const orders = await Order.findAll({
+      where: {
+        userId,
+        type: "subject",
+        status: "success",
+        enrollmentStatus: "active"
+      },
+      order: [["createdAt", "DESC"]]
+    });
+
+    const subjectIds = orders.map(o => o.itemId);
+
+    const subjects = await Subject.findAll({
+      where: { id: subjectIds },
+      attributes: ["id", "name", "slug"]
+    });
+
+    const subjectMap = {};
+    subjects.forEach(s => {
+      subjectMap[s.id] = s;
+    });
+
+    const response = orders.map(order => ({
+
+      orderId: order.id,
+      subjectId: order.itemId,
+      batchId: order.batchIdOfSubject,
+      assignedAt: order.createdAt,
+      subject: subjectMap[order.itemId] || null
+
+    }));
+
+    return res.json({
+      success: true,
+      total: response.length,
+      items: response
+    });
+
+  } catch (err) {
+
+    console.error("[getAdminSubjectAssigned] ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch assigned subjects"
+    });
+
+  }
+
+}
+
+  static async adminAssignTestSeries(req, res) {
+
+    const { userId, testSeriesId, accessValidityDays } = req.body;
+
+    if (!userId || !testSeriesId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and testSeriesId required"
+      });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+
+      const order = await Order.create({
+        userId,
+        type: "test",
+        itemId: testSeriesId,
+
+        amount: 0,
+        discount: 0,
+        gst: 0,
+        totalAmount: 0,
+
+        razorpayOrderId: `admin_test_${Date.now()}`.slice(0, 120),
+
+        status: "success",
+        paymentDate: new Date(),
+
+        accessValidityDays: accessValidityDays || null,
+        enrollmentStatus: "active",
+
+        reason: "ADMIN_TEST_ASSIGN"
+
+      }, { transaction: t });
+
+      await t.commit();
+
+      await redis.del(`orders:${userId}`);
+
+      return res.json({
+        success: true,
+        message: "Test series assigned",
+        order
+      });
+
+    } catch (err) {
+
+      await t.rollback();
+
+      console.error("[adminAssignTestSeries] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Assignment failed"
+      });
+
+    }
+
+  }
+  static async adminRevokeQuiz(req, res) {
+
+    const { userId, quizId, reason } = req.body;
+
+    if (!userId || !quizId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and quizId required"
+      });
+    }
+
+    try {
+
+      const deleted = await Order.destroy({
+        where: {
+          userId,
+          type: "quiz",
+          itemId: quizId
+        }
+      });
+
+      if (!deleted) {
+        return res.status(404).json({
+          success: false,
+          message: "Quiz order not found"
+        });
+      }
+
+      await NotificationController.createNotification({
+        userId,
+        title: "Quiz Access Revoked",
+        message: reason
+          ? `Admin revoked your quiz access. Reason: ${reason}`
+          : "Your quiz access has been revoked by admin.",
+        type: "quiz",
+        relatedId: quizId
+      });
+
+      await Promise.all([
+        redis.del(`orders:${userId}`),
+        redis.del(`user:quizzes:${userId}`)
+      ]);
+
+      return res.json({
+        success: true,
+        message: "Quiz access revoked successfully"
+      });
+
+    } catch (err) {
+
+      console.error("[adminRevokeQuiz] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to revoke quiz access"
+      });
+
+    }
+  }
+
+  static async getUserAssignedQuizzes(req, res) {
+    try {
+
+      const { userId } = req.params;
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: "userId required"
+        });
+      }
+
+      const orders = await Order.findAll({
+        where: {
+          userId,
+          type: "quiz",
+          status: "success",
+          enrollmentStatus: "active"
+        },
+        include: [
+          {
+            model: Quizzes,
+            as: "Quizzes",
+            attributes: ["id", "title", "image", "price"]
+          }
+        ],
+        order: [["createdAt", "DESC"]]
+      });
+
+      const response = orders.map(order => ({
+        orderId: order.id,
+        quizId: order.itemId,
+        assignedAt: order.createdAt,
+        quiz: order.Quizzes
+      }));
+
+      return res.json({
+        success: true,
+        total: response.length,
+        items: response
+      });
+
+    } catch (err) {
+
+      console.error("[getUserAssignedQuizzes] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch assigned quizzes"
+      });
+
+    }
+  }
+
+  static async getUserAssignedTestSeries(req, res) {
+    try {
+
+      const { userId } = req.params;
+
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: "userId required"
+        });
+      }
+
+      const orders = await Order.findAll({
+        where: {
+          userId,
+          type: "test",
+          status: "success",
+          enrollmentStatus: "active"
+        },
+        include: [
+          {
+            model: TestSeries,
+            as: "testSeries",
+            attributes: ["id", "title", "imageUrl", "price"]
+          }
+        ],
+        order: [["createdAt", "DESC"]]
+      });
+
+      const response = orders.map(order => ({
+        orderId: order.id,
+        testSeriesId: order.itemId,
+        assignedAt: order.createdAt,
+        testSeries: order.testSeries
+      }));
+
+      return res.json({
+        success: true,
+        total: response.length,
+        items: response
+      });
+
+    } catch (err) {
+
+      console.error("[getUserAssignedTestSeries] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch assigned test series"
+      });
+
+    }
+  }
+
+  static async adminAssignQuiz(req, res) {
+
+    const { userId, quizId, quizLimit } = req.body;
+
+    if (!userId || !quizId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and quizId required"
+      });
+    }
+
+    const t = await sequelize.transaction();
+
+    try {
+
+      const order = await Order.create({
+
+        userId,
+        type: "quiz",
+        itemId: quizId,
+
+        amount: 0,
+        discount: 0,
+        gst: 0,
+        totalAmount: 0,
+
+        razorpayOrderId: `admin_quiz_${Date.now()}`.slice(0, 120),
+
+        status: "success",
+        paymentDate: new Date(),
+
+        quiz_limit: quizLimit || 3,
+        quiz_attempts_used: 0,
+
+        enrollmentStatus: "active",
+
+        reason: "ADMIN_QUIZ_ASSIGN"
+
+      }, { transaction: t });
+
+      await t.commit();
+
+      await redis.del(`orders:${userId}`);
+      await redis.del(`user:quizzes:${userId}`);
+
+      return res.json({
+        success: true,
+        message: "Quiz assigned successfully",
+        order
+      });
+
+    } catch (err) {
+
+      await t.rollback();
+
+      console.error("[adminAssignQuiz] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Quiz assignment failed"
+      });
+
+    }
+
+  }
+  static async adminRevokeTestSeries(req, res) {
+
+    const { userId, testSeriesId, reason } = req.body;
+
+    if (!userId || !testSeriesId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and testSeriesId required"
+      });
+    }
+
+    try {
+
+      const deleted = await Order.destroy({
+        where: {
+          userId,
+          type: "test",
+          itemId: testSeriesId
+        }
+      });
+
+      if (!deleted) {
+        return res.status(404).json({
+          success: false,
+          message: "Test series order not found"
+        });
+      }
+
+      await NotificationController.createNotification({
+        userId,
+        title: "Test Series Access Revoked",
+        message: reason
+          ? `Admin revoked your test series access. Reason: ${reason}`
+          : "Your test series access has been revoked by admin.",
+        type: "test",
+        relatedId: testSeriesId
+      });
+
+      await Promise.all([
+        redis.del(`orders:${userId}`),
+        redis.del(`user:courses:${userId}`)
+      ]);
+
+      return res.json({
+        success: true,
+        message: "Test series access revoked successfully"
+      });
+
+    } catch (err) {
+
+      console.error("[adminRevokeTestSeries] ERROR:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to revoke test series"
+      });
+
+    }
+  }
   // DELETE ORDER
   static async deleteOrder(req, res) {
     try {
