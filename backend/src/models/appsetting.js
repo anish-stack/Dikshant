@@ -19,6 +19,13 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "My App",
       },
 
+      isScreenRecordAllow: {
+        type: DataTypes.BOOLEAN,
+        allowNull: true,
+        defaultValue: true,
+      },
+
+
       appVersion: {
         type: DataTypes.STRING,
         allowNull: true,

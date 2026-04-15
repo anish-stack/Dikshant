@@ -13,8 +13,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+
     imageUrl: DataTypes.STRING,
     title: DataTypes.STRING,
+
     videoSource: DataTypes.ENUM("youtube", "s3"),
     url: DataTypes.STRING,
 
@@ -31,11 +33,17 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
       allowNull: false
     },
+
     isLiveEnded: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
-    LiveEndAt: { type: DataTypes.DATEONLY, allowNull: true },
+
+    LiveEndAt: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+
     DateOfLive: {
       type: DataTypes.DATEONLY,
       allowNull: true
@@ -45,6 +53,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TIME,
       allowNull: true
     },
+
     secureToken: {
       type: DataTypes.TEXT,
       allowNull: true
@@ -54,14 +63,36 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: true
     },
+
     TimeOfClass: {
       type: DataTypes.TIME,
       allowNull: true
-    }
+    },
+
+    /* -----------------------------
+       Soft Delete Extra Fields
+    ------------------------------*/
+
+    deletedById: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    statusDelete: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
+    },
+
 
   }, {
     tableName: 'videocourses',
-    timestamps: true
+    timestamps: true,
+
+    // Enables soft delete
+    paranoid: true,
+
+    // Sequelize will automatically manage this column
+    deletedAt: 'deletedAt'
   });
 
   return VideoCourse;

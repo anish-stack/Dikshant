@@ -36,6 +36,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import api from "../../../utils/axiosInstance";
+import toast from "react-hot-toast";
 
 const API_URL = "https://www.app.api.dikshantias.com/api/videocourses";
 const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
@@ -385,12 +387,32 @@ export default function CourseVideos() {
       icon: <Trash2 className="w-7 h-7 text-red-400" />,
       onConfirm: async () => {
         setConfirmLoading(true);
+
         try {
-          await axios.delete(`${API_URL}/${v.id}`);
+          // Make the delete API call
+          await api.delete(`/${v.id}`);
+
+          // Optimistically remove from UI
           setVideos((prev) => prev.filter((item) => item.id !== v.id));
+
+          // Show success feedback (optional)
+          toast.success("Video deleted successfully");
+
           closeConfirm();
-          fetchVideos();
-        } catch {
+        } catch (error: any) {
+          console.error("Delete failed:", error);
+
+          // Show error message to user
+          const errorMessage =
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to delete video. Please try again.";
+
+          toast.error(errorMessage);
+
+          // Keep confirm modal open on error so user can try again
+          // Do NOT call closeConfirm() here
+        } finally {
           setConfirmLoading(false);
         }
       },

@@ -772,64 +772,57 @@ class VideoCourseController {
     }
   }
 
-  static async delete(req, res) {
-    try {
+static async delete(req, res) {
+  try {
 
-      const item = await VideoCourse.findByPk(req.params.id);
+    const item = await VideoCourse.findByPk(req.params.id);
 
-      if (!item) {
-        return res.status(404).json({
-          success: false,
-          message: "Video course not found"
-        });
-      }
-
-      if (item.imageUrl) {
-        await deleteFromS3(item.imageUrl);
-      }
-
-      const batchId = item.batchId;
-
-      // DELETE VIDEO
-      await item.destroy();
-
-      /* ================= REORDER POSITIONS (BATCH-WISE) ================= */
-
-      const batch = await Batch.findByPk(batchId);
-
-      if (batch && batch.category === "recorded") {
-        await PositionService.reorder(
-          VideoCourse,
-          "position",
-          { batchId }
-        );
-      }
-
-
-      /* ================= CLEAR CACHE ================= */
-
-      await Promise.all([
-        redis.del("videocourses"),
-        redis.del(`videocourse:${req.params.id}`),
-        redis.del(`videocourses:batch:${batchId}`)
-      ]);
-
-      return res.json({
-        success: true,
-        message: "Video course deleted and positions reordered successfully"
-      });
-
-    } catch (error) {
-
-      console.error("Delete Error:", error);
-
-      return res.status(500).json({
+    if (!item) {
+      return res.status(404).json({
         success: false,
-        message: "Delete failed",
-        error: error.message
+        message: "Video course not found"
       });
     }
+
+    if (item.imageUrl) {
+      await deleteFromS3(item.imageUrl);
+    }
+
+    const batchId = item.batchId;
+
+    /* ================= SOFT DELETE ================= */
+
+    await item.update({
+      statusDelete: true,
+      deletedAt: new Date(),
+      deletedById: req.user?.id || null,
+      deleteReason: req.body?.reason || null
+    });
+
+    /* ================= CLEAR CACHE ================= */
+
+    await Promise.all([
+      redis.del("videocourses"),
+      redis.del(`videocourse:${req.params.id}`),
+      redis.del(`videocourses:batch:${batchId}`)
+    ]);
+
+    return res.json({
+      success: true,
+      message: "Video course deleted (soft delete) successfully"
+    });
+
+  } catch (error) {
+
+    console.error("Delete Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Delete failed",
+      error: error.message
+    });
   }
+}
 }
 
 module.exports = VideoCourseController;
