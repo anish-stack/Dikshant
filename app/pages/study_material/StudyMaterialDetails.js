@@ -203,7 +203,8 @@ const HardcopyModal = ({ visible, onClose, onSubmit, submitting }) => {
             <View style={styles.shippingNote}>
               <Icon name="truck-fast-outline" size={16} color="#ef4444" />
               <Text style={styles.shippingNoteText}>
-                Dispatched within 3–5 working days. Tracking ID sent to your mobile number.
+               The printed/hard copy of the notes will be delivered to the address provided above within 10 to 15 working days.
+
               </Text>
             </View>
 

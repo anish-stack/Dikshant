@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuizStore } from '../../../stores/useQuizStore';
 
-export default function QuizHeader({}) {
+export default function QuizHeader({ }) {
   const {
     quiz,
+    label,
     currentQuestionIndex,
     totalQuestions,
     timeRemaining,
-    currentQuestionTimer,      
+    currentQuestionTimer,
   } = useQuizStore();
 
   // Overall time
@@ -17,8 +18,8 @@ export default function QuizHeader({}) {
   const seconds = timeRemaining % 60;
 
   // Progress
-  const progress = totalQuestions > 0 
-    ? ((currentQuestionIndex + 1) / totalQuestions) * 100 
+  const progress = totalQuestions > 0
+    ? ((currentQuestionIndex + 1) / totalQuestions) * 100
     : 0;
 
   // Warning state for per-question timer (last 10 seconds)
@@ -40,7 +41,7 @@ export default function QuizHeader({}) {
 
         <View style={styles.rightSection}>
           {/* Overall Timer */}
-        
+
 
           {/* Per-Question Timer */}
           <View style={[
@@ -48,10 +49,10 @@ export default function QuizHeader({}) {
             isQuestionTimerCritical && styles.questionTimerCritical,
             isQuestionTimerUrgent && styles.questionTimerUrgent,
           ]}>
-            <Ionicons 
-              name="hourglass-outline" 
-              size={20} 
-              color={isQuestionTimerCritical ? '#fff' : '#B11226'} 
+            <Ionicons
+              name="hourglass-outline"
+              size={20}
+              color={isQuestionTimerCritical ? '#fff' : '#B11226'}
             />
             <Text style={[
               styles.questionTimerText,

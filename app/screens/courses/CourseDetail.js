@@ -792,7 +792,7 @@ export default function CourseDetail() {
               </View>
             )}
 
-            {batchData?.isEmi &&
+            {/* {batchData?.isEmi &&
               Array.isArray(batchData?.emiSchedule) &&
               batchData.emiSchedule.length > 0 && (
                 <View style={styles.emiCard}>
@@ -819,7 +819,7 @@ export default function CourseDetail() {
                     </Text>
                   </View>
                 </View>
-              )}
+              )} */}
           </View>
         </View>
         {Array.isArray(batchData?.quizzes) && batchData.quizzes.length > 0 && (

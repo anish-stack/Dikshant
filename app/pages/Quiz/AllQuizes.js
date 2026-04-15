@@ -387,7 +387,7 @@ export default function AllQuizes({ navigation }) {
             >
               <Ionicons name="layers-outline" size={16} color={activeSection === "bundles" ? "#fff" : "#64748b"} />
               <Text style={[s.toggleText, activeSection === "bundles" && s.toggleTextActive]}>
-                Bundles
+                Packages
               </Text>
               {bundles.length > 0 && (
                 <View style={s.countBadge}>
@@ -417,7 +417,7 @@ export default function AllQuizes({ navigation }) {
               <Text style={s.countText}>
                 {activeSection === "quizzes"
                   ? `${filteredQuizzes.length} quiz${filteredQuizzes.length !== 1 ? "zes" : ""}`
-                  : `${bundles.length} bundle${bundles.length !== 1 ? "s" : ""}`}
+                  : `${bundles.length} Package ${bundles.length !== 1 ? "s" : ""}`}
               </Text>
               <View style={[s.liveDot, { backgroundColor: "#16a34a" }]} />
               <Text style={[s.liveText, { color: "#166534" }]}>Live</Text>
@@ -426,59 +426,59 @@ export default function AllQuizes({ navigation }) {
         </View>
       </Animated.View>
 
-      <ScrollView style={{flex:1}}>
-      {activeSection === "quizzes" ? (
-        <>
-          {loading ? (
-            <View style={s.skeletonList}>
-              {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
-            </View>
-          ) : (
-            <FlatList
-              data={filteredQuizzes}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item, index }) => (
-                <QuizCard item={item} onPress={handleQuizPress} index={index} />
-              )}
-              contentContainerStyle={s.list}
-              ListEmptyComponent={renderEmpty}
-              ListFooterComponent={renderFooter}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.5}
-              showsVerticalScrollIndicator={false}
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-            />
-          )}
-        </>
-      ) : (
-        <>
-          {bundleLoading ? (
-            <View style={s.skeletonList}>
-              {[1, 2].map((i) => <SkeletonCard key={i} />)}
-            </View>
-          ) : (
-            <FlatList
-              data={bundles}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <BundleCard item={item} onPress={handleBundlePress} />
-              )}
-              contentContainerStyle={s.list}
-              showsVerticalScrollIndicator={false}
-              refreshing={isRefreshing}
-              onRefresh={handleRefresh}
-              ListEmptyComponent={
-                <View style={s.empty}>
-                  <Ionicons name="layers-outline" size={56} color="#64748b" />
-                  <Text style={s.emptyTitle}>No bundles available</Text>
-                  <Text style={s.emptySubtitle}>Premium collections coming soon</Text>
-                </View>
-              }
-            />
-          )}
-        </>
-      )}
+      <ScrollView style={{ flex: 1 }}>
+        {activeSection === "quizzes" ? (
+          <>
+            {loading ? (
+              <View style={s.skeletonList}>
+                {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              </View>
+            ) : (
+              <FlatList
+                data={filteredQuizzes}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item, index }) => (
+                  <QuizCard item={item} onPress={handleQuizPress} index={index} />
+                )}
+                contentContainerStyle={s.list}
+                ListEmptyComponent={renderEmpty}
+                ListFooterComponent={renderFooter}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                showsVerticalScrollIndicator={false}
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            {bundleLoading ? (
+              <View style={s.skeletonList}>
+                {[1, 2].map((i) => <SkeletonCard key={i} />)}
+              </View>
+            ) : (
+              <FlatList
+                data={bundles}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <BundleCard item={item} onPress={handleBundlePress} />
+                )}
+                contentContainerStyle={s.list}
+                showsVerticalScrollIndicator={false}
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                ListEmptyComponent={
+                  <View style={s.empty}>
+                    <Ionicons name="layers-outline" size={56} color="#64748b" />
+                    <Text style={s.emptyTitle}>No bundles available</Text>
+                    <Text style={s.emptySubtitle}>Premium collections coming soon</Text>
+                  </View>
+                }
+              />
+            )}
+          </>
+        )}
       </ScrollView>
 
       {/* ── CONTENT ── */}
@@ -701,7 +701,7 @@ const qc = StyleSheet.create({
     borderColor: "#e2e8f0",
     minHeight: 114,
   },
-  imgWrap: { width: 114,height:120, position: "relative" },
+  imgWrap: { width: 114, height: 120, position: "relative" },
   img: { width: "100%", height: "100%" },
   imgGrad: { ...StyleSheet.absoluteFillObject },
   freePill: {

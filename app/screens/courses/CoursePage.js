@@ -228,11 +228,7 @@ export default function CoursePage() {
                   <Text style={styles.originalPrice}>₹{original.toLocaleString("en-IN")}</Text>
                 )}
               </View>
-              {item.isEmi && (
-                <View style={styles.emiTag}>
-                  <Text style={styles.emiText}>EMI</Text>
-                </View>
-              )}
+           
             </View>
           )}
         </View>

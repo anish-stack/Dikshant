@@ -174,11 +174,6 @@ export default function AppRouter({ navigationRef }) {
         <Stack.Screen name="study-materials-orders" component={AllStudyMaterialsOrders} />
         <Stack.Screen name="subject-enroll" component={EnrollSubject} />
 
-{/*  */}
-
-
-
-        {/* Share */}
         <Stack.Screen name="ShareApp" component={ShareAppScreen} />
         <Stack.Screen name="RateUs" component={RateUsScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />

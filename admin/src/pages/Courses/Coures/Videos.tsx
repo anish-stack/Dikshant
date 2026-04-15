@@ -20,7 +20,20 @@ import {
   Upload,
   ChevronsLeft,
   ChevronsRight,
+  Radio,
+  Film,
+  Layers,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  StopCircle,
+  Users,
+  BarChart2,
+  Share2,
+  Video,
+  ChevronDown,
   Filter,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -75,21 +88,97 @@ interface PaginationInfo {
   totalPages: number;
 }
 
-const LIMIT_OPTIONS = [10, 20, 30, 50, 100];
+interface ConfirmConfig {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  confirmClass: string;
+  icon: React.ReactNode;
+  onConfirm: () => void;
+}
 
+const LIMIT_OPTIONS = [10, 20, 30, 50, 100];
 const getCurrentDate = () => new Date().toISOString().split("T")[0];
 const getCurrentTime = () => new Date().toTimeString().slice(0, 5);
+
+/* ── Confirm Dialog ────────────────────────────────────────────────────────── */
+function ConfirmModal({
+  config,
+  loading,
+  onCancel,
+}: {
+  config: ConfirmConfig;
+  loading: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+      <div className="relative bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-[modalIn_0.2s_ease-out]">
+        <div className="flex flex-col items-center text-center gap-3">
+          <div className="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center">
+            {config.icon}
+          </div>
+          <h3 className="text-lg font-semibold text-white">{config.title}</h3>
+          <p className="text-sm text-slate-400 leading-relaxed">{config.message}</p>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-700 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={config.onConfirm}
+            disabled={loading}
+            className={`flex-1 py-2.5 text-sm font-semibold rounded-xl text-white transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${config.confirmClass}`}
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Badge ─────────────────────────────────────────────────────────────────── */
+function Badge({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${color}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/* ── Source Chip ───────────────────────────────────────────────────────────── */
+const SOURCE_COLORS: Record<string, string> = {
+  youtube: "bg-red-500/15 text-red-400 border border-red-500/20",
+  s3: "bg-amber-500/15 text-amber-400 border border-amber-500/20",
+  vimeo: "bg-sky-500/15 text-sky-400 border border-sky-500/20",
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
 
 export default function CourseVideos() {
   const { id } = useParams<{ id: string }>();
   const batchId = id ? Number(id) : null;
-
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // URL Params
   const initialPage = Number(searchParams.get("page")) || 1;
   const initialLimit = Number(searchParams.get("limit")) || 10;
   const initialSearch = searchParams.get("search") || "";
@@ -108,18 +197,20 @@ export default function CourseVideos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // New Filters
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [subjectFilter, setSubjectFilter] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<"all" | "live" | "recorded" | "demo">("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [deleteVideo, setDeleteVideo] = useState<VideoItem | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [playing, setPlaying] = useState<VideoItem | null>(null);
+
+  const [confirmConfig, setConfirmConfig] = useState<ConfirmConfig | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     title: "",
@@ -137,7 +228,7 @@ export default function CourseVideos() {
     status: true,
   });
 
-  // Sync URL params
+  /* ── URL sync ── */
   useEffect(() => {
     const params = new URLSearchParams();
     params.set("page", pagination.page.toString());
@@ -146,13 +237,12 @@ export default function CourseVideos() {
     setSearchParams(params, { replace: true });
   }, [pagination.page, pagination.limit, search, setSearchParams]);
 
+  /* ── Fetch ── */
   const fetchVideos = useCallback(async () => {
     if (!batchId) return;
-
     try {
       setLoading(true);
       setError(false);
-
       const params: any = {
         admin: true,
         page: pagination.page,
@@ -162,27 +252,20 @@ export default function CourseVideos() {
         subjectId: subjectFilter || undefined,
         date: dateFilter || undefined,
       };
-
       const [videoRes, batchRes] = await Promise.all([
         axios.get(`${API_URL}/batch/${batchId}`, { params }),
         axios.get(`${BATCHS_API}/${batchId}`),
       ]);
-
       setBatch(batchRes.data);
       setVideos(videoRes.data.data || []);
       setSubjects(batchRes.data.subjects || []);
-
       if (videoRes.data.pagination) {
         setPagination((prev) => ({
           ...prev,
-          total: videoRes.data.pagination.total,
-          page: videoRes.data.pagination.page,
-          limit: videoRes.data.pagination.limit,
-          totalPages: videoRes.data.pagination.totalPages,
+          ...videoRes.data.pagination,
         }));
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError(true);
     } finally {
       setLoading(false);
@@ -193,11 +276,28 @@ export default function CourseVideos() {
     fetchVideos();
   }, [fetchVideos]);
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 1 }));
   }, [search, statusFilter, subjectFilter, dateFilter, typeFilter]);
 
+  /* ── Client filter by type ── */
+  const filteredVideos = videos.filter((v) => {
+    if (typeFilter === "live") return v.isLive;
+    if (typeFilter === "demo") return v.isDemo;
+    if (typeFilter === "recorded") return !v.isLive && !v.isDemo;
+    return true;
+  });
+
+  /* ── Confirm helpers ── */
+  function askConfirm(cfg: ConfirmConfig) {
+    setConfirmConfig(cfg);
+  }
+  function closeConfirm() {
+    setConfirmConfig(null);
+    setConfirmLoading(false);
+  }
+
+  /* ── Actions ── */
   const openAdd = () => {
     setEditId(null);
     setForm({
@@ -242,43 +342,84 @@ export default function CourseVideos() {
     setShowModal(true);
   };
 
-  const toggleStatus = async (v: VideoItem) => {
-    const newStatus = v.status === "active" ? "inactive" : "active";
-    try {
-      await axios.put(`${API_URL}/${v.id}`, { status: newStatus });
-      setVideos((prev) =>
-        prev.map((item) => (item.id === v.id ? { ...item, status: newStatus } : item))
-      );
-    } catch (err) {
-      console.error(err);
-    }
+  const confirmToggleStatus = (v: VideoItem) => {
+    const isActive = v.status === "active";
+    askConfirm({
+      title: isActive ? "Deactivate Video?" : "Activate Video?",
+      message: isActive
+        ? `"${v.title}" will be hidden from students.`
+        : `"${v.title}" will become visible to students.`,
+      confirmLabel: isActive ? "Deactivate" : "Activate",
+      confirmClass: isActive
+        ? "bg-orange-600 hover:bg-orange-700"
+        : "bg-emerald-600 hover:bg-emerald-700",
+      icon: isActive ? (
+        <EyeOff className="w-7 h-7 text-orange-400" />
+      ) : (
+        <Eye className="w-7 h-7 text-emerald-400" />
+      ),
+      onConfirm: async () => {
+        setConfirmLoading(true);
+        try {
+          const newStatus = isActive ? "inactive" : "active";
+          await axios.put(`${API_URL}/${v.id}`, { status: newStatus });
+          setVideos((prev) =>
+            prev.map((item) =>
+              item.id === v.id ? { ...item, status: newStatus } : item
+            )
+          );
+          closeConfirm();
+        } catch {
+          setConfirmLoading(false);
+        }
+      },
+    });
   };
 
-  const endLiveSession = async (v: VideoItem) => {
+  const confirmDelete = (v: VideoItem) => {
+    askConfirm({
+      title: "Delete Video?",
+      message: `"${v.title}" will be permanently removed. This action cannot be undone.`,
+      confirmLabel: "Delete",
+      confirmClass: "bg-red-600 hover:bg-red-700",
+      icon: <Trash2 className="w-7 h-7 text-red-400" />,
+      onConfirm: async () => {
+        setConfirmLoading(true);
+        try {
+          await axios.delete(`${API_URL}/${v.id}`);
+          setVideos((prev) => prev.filter((item) => item.id !== v.id));
+          closeConfirm();
+          fetchVideos();
+        } catch {
+          setConfirmLoading(false);
+        }
+      },
+    });
+  };
+
+  const confirmEndLive = (v: VideoItem) => {
     if (v.isLiveEnded) return;
-    try {
-      await axios.put(`${API_URL}/${v.id}`, { isLiveEnded: true });
-      setVideos((prev) =>
-        prev.map((item) => (item.id === v.id ? { ...item, isLiveEnded: true } : item))
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const removeVideo = async () => {
-    if (!deleteVideo) return;
-    setDeleteLoading(true);
-    try {
-      await axios.delete(`${API_URL}/${deleteVideo.id}`);
-      setVideos((prev) => prev.filter((v) => v.id !== deleteVideo.id));
-      setDeleteVideo(null);
-      fetchVideos();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setDeleteLoading(false);
-    }
+    askConfirm({
+      title: "End Live Session?",
+      message: `This will permanently end the live session for "${v.title}". Students will no longer be able to join.`,
+      confirmLabel: "End Live",
+      confirmClass: "bg-rose-600 hover:bg-rose-700",
+      icon: <StopCircle className="w-7 h-7 text-rose-400" />,
+      onConfirm: async () => {
+        setConfirmLoading(true);
+        try {
+          await axios.put(`${API_URL}/${v.id}`, { isLiveEnded: true });
+          setVideos((prev) =>
+            prev.map((item) =>
+              item.id === v.id ? { ...item, isLiveEnded: true } : item
+            )
+          );
+          closeConfirm();
+        } catch {
+          setConfirmLoading(false);
+        }
+      },
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -288,7 +429,6 @@ export default function CourseVideos() {
       return;
     }
     if (!batchId) return;
-
     const data = new FormData();
     data.append("title", form.title);
     data.append("videoSource", form.videoSource);
@@ -300,16 +440,13 @@ export default function CourseVideos() {
     data.append("isDemo", String(form.isDemo));
     data.append("isLive", String(form.isLive));
     data.append("status", form.status ? "active" : "inactive");
-
     if (form.isLive) {
       data.append("DateOfLive", form.DateOfLive);
       data.append("TimeOfLIve", form.TimeOfLIve);
     }
     data.append("dateOfClass", form.dateOfClass);
     data.append("TimeOfClass", form.TimeOfClass);
-
     if (thumbnail) data.append("imageUrl", thumbnail);
-
     try {
       if (editId) {
         await axios.put(`${API_URL}/${editId}`, data, {
@@ -336,9 +473,11 @@ export default function CourseVideos() {
     if (v.videoSource === "youtube") {
       const embed = getYTEmbed(v.url);
       return embed ? (
-        <iframe src={embed} className="w-full h-full" allowFullScreen />
+        <iframe src={embed} className="w-full h-full" allowFullScreen title={v.title} />
       ) : (
-        <div className="text-red-400 flex items-center justify-center h-full text-sm">Invalid YouTube URL</div>
+        <div className="flex items-center justify-center h-full text-red-400 text-sm">
+          Invalid YouTube URL
+        </div>
       );
     }
     return <video src={v.url} controls className="w-full h-full" />;
@@ -353,220 +492,514 @@ export default function CourseVideos() {
     }
   };
 
-  // Filter videos by type (client-side for better UX)
-  const filteredVideos = videos.filter((v) => {
-    if (typeFilter === "all") return true;
-    if (typeFilter === "live") return v.isLive;
-    if (typeFilter === "demo") return v.isDemo;
-    if (typeFilter === "recorded") return !v.isLive && !v.isDemo;
-    return true;
-  });
+  const activeFilterCount = [
+    statusFilter !== "all",
+    typeFilter !== "all",
+    !!subjectFilter,
+    !!dateFilter,
+  ].filter(Boolean).length;
 
-  if (!batchId) {
-    return <div className="text-center py-12 text-red-600">Invalid batch ID</div>;
-  }
+  if (!batchId)
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-red-400">
+        Invalid batch ID
+      </div>
+    );
 
+  /* ══════════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      <style>{`
+        @keyframes modalIn {
+          from { opacity: 0; transform: scale(0.95) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .row-anim { animation: fadeIn 0.2s ease-out both; }
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+      `}</style>
+
+      {/* ── Top Bar ── */}
+      <div className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Course Videos – {batch?.name || `Batch ${batchId}`}
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {batch?.category?.toUpperCase()} • Manage with advanced filters
-            </p>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                <Video className="w-4 h-4 text-white" />
+              </div>
+              <h1 className="text-lg font-bold text-white tracking-tight">
+                Course Videos
+                <span className="ml-2 text-slate-500 font-normal text-sm">
+                  Batch #{batchId}
+                </span>
+              </h1>
+            </div>
+            {pagination.total > 0 && (
+              <p className="text-xs text-slate-500 mt-0.5 ml-10">
+                {pagination.total} videos total
+              </p>
+            )}
           </div>
           <button
             onClick={openAdd}
-            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition shadow-lg"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/40"
           >
-            <Plus className="w-5 h-5" />
-            Add New Video
+            <Plus className="w-4 h-4" />
+            Add Video
           </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto">
-        {/* Filters Bar */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow border border-gray-200 dark:border-gray-700 p-4 mb-6">
-          <div className="flex flex-wrap gap-4 items-end">
-            {/* Search */}
-            <div className="flex-1 min-w-[240px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by title..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
-                />
-              </div>
-            </div>
+      {/* ── Controls ── */}
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 py-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by title..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-white placeholder-slate-500 outline-none transition-colors"
+            />
+          </div>
 
-            {/* Status Filter */}
-            <div className="min-w-[140px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Status</label>
+          {/* Show per page */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-slate-500">Show</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) =>
+                setPagination((p) => ({ ...p, limit: Number(e.target.value), page: 1 }))
+              }
+              className="px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-indigo-500 transition-colors"
+            >
+              {LIMIT_OPTIONS.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filter toggle */}
+          <button
+            onClick={() => setShowFilters((p) => !p)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-all ${showFilters || activeFilterCount > 0
+              ? "bg-indigo-600/20 border-indigo-500 text-indigo-400"
+              : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600"
+              }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Expanded Filters */}
+        {showFilters && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-800/50 rounded-xl border border-slate-700 animate-[fadeIn_0.15s_ease-out]">
+            {/* Status */}
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                className="w-full px-3 py-2 text-xs bg-slate-700 border border-slate-600 rounded-lg text-white outline-none focus:border-indigo-500"
               >
-                <option value="all">All Status</option>
+                <option value="all">All</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
 
-            {/* Subject Filter */}
-            <div className="min-w-[180px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Subject</label>
-              <select
-                value={subjectFilter}
-                onChange={(e) => setSubjectFilter(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
-              >
-                <option value="">All Subjects</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Filter */}
-            <div className="min-w-[160px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Class Date</label>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
-              />
-            </div>
-
-            {/* Type Filter */}
-            <div className="min-w-[140px]">
-              <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Type</label>
+            {/* Type */}
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Type</label>
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value as any)}
-                className="w-full px-4 py-2.5 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                className="w-full px-3 py-2 text-xs bg-slate-700 border border-slate-600 rounded-lg text-white outline-none focus:border-indigo-500"
               >
-                <option value="all">All Types</option>
+                <option value="all">All</option>
                 <option value="live">Live</option>
                 <option value="recorded">Recorded</option>
                 <option value="demo">Demo</option>
               </select>
             </div>
 
-            {/* Reset Filters */}
+            {/* Subject */}
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Subject</label>
+              <select
+                value={subjectFilter}
+                onChange={(e) => setSubjectFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-700 border border-slate-600 rounded-lg text-white outline-none focus:border-indigo-500"
+              >
+                <option value="">All</option>
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="w-full px-3 py-2 text-xs bg-slate-700 border border-slate-600 rounded-lg text-white outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            {activeFilterCount > 0 && (
+              <div className="col-span-2 sm:col-span-4 flex justify-end">
+                <button
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setTypeFilter("all");
+                    setSubjectFilter("");
+                    setDateFilter("");
+                  }}
+                  className="text-xs text-slate-400 hover:text-white underline underline-offset-2 transition-colors"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Type Quick Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          {(["all", "live", "recorded", "demo"] as const).map((t) => (
             <button
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-                setSubjectFilter("");
-                setDateFilter("");
-                setTypeFilter("all");
-              }}
-              className="px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl border border-red-200 dark:border-red-800 flex items-center gap-2"
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-4 py-1.5 text-xs font-semibold rounded-full whitespace-nowrap transition-all ${typeFilter === t
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40"
+                : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700"
+                }`}
             >
-              <X className="w-4 h-4" />
-              Reset
+              {t === "all" ? "All Videos" : t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 pb-12">
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+            <p className="text-sm text-slate-500">Loading videos...</p>
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center">
+              <AlertCircle className="w-7 h-7 text-red-500" />
+            </div>
+            <p className="text-slate-400 text-sm">Failed to load videos.</p>
+            <button
+              onClick={fetchVideos}
+              className="mt-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-sm rounded-lg transition-colors"
+            >
+              Retry
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Table Section */}
         {!loading && !error && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+            {/* Desktop Table */}
+            <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">#</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Title</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Subject</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Type</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Schedule</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300">Status</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                  {batch?.category === "recorded" && (
+                    <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                      #
+                    </th>
+                  )}
+                  <tr className="border-b border-slate-800 bg-slate-800/60">
+                    {["Video", "Subject", "Source", "Schedule", "Type", "Status", "Actions"].map((h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap"
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-slate-800/60">
                   {filteredVideos.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        No videos found matching your filters
+                      <td colSpan={8} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-14 h-14 rounded-2xl bg-slate-800 flex items-center justify-center">
+                            <Film className="w-7 h-7 text-slate-600" />
+                          </div>
+                          <p className="text-slate-500 text-sm">
+                            {search ? "No matching videos found" : "No videos yet"}
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredVideos.map((v, index) => (
-                      <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
-                        <td className="px-4 py-3 font-medium">#{v.position}</td>
+                    filteredVideos.map((v, i) => (
+                      <tr
+                        key={v.id}
+                        className="hover:bg-slate-800/40 transition-colors row-anim"
+                        style={{ animationDelay: `${i * 30}ms` }}
+                      >
+                        {batch?.category === "recorded" && (
+                          <td className="px-4 py-3">
+                            <span className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                              {v.position || 0}
+                            </span>
+                          </td>
+                        )}
+                        {/* Title */}
+                        <td className="px-4 py-3 min-w-[200px] max-w-[280px]">
+                          <div className="flex items-start gap-3">
+                            {v.imageUrl ? (
+                              <img
+                                src={v.imageUrl}
+                                alt={v.title}
+                                className="w-12 h-8 object-cover rounded-md shrink-0 border border-slate-700"
+                              />
+                            ) : (
+                              <div className="w-12 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                                <ImageIcon className="w-3.5 h-3.5 text-slate-600" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-medium text-white text-xs leading-snug line-clamp-2">
+                                {v.title}
+                              </p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {v.isDownloadable && (
+                                  <Badge color="bg-blue-500/15 text-blue-400">DL</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Subject */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-xs text-slate-400">
+                            {subjects.find((s) => s.id === v.subjectId)?.name || "—"}
+                          </span>
+                        </td>
+
+                        {/* Source */}
                         <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900 dark:text-white">{v.title}</div>
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {v.isDemo && <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded">Demo</span>}
-                            {v.isDownloadable && <span className="text-[10px] px-2 py-0.5 bg-blue-100 text-blue-700 rounded">DL</span>}
-                            {v.isLive && (
-                              <span className="text-[10px] px-2 py-0.5 bg-purple-100 text-purple-700 rounded flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse" /> LIVE
-                              </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${SOURCE_COLORS[v.videoSource]}`}>
+                            {v.videoSource}
+                          </span>
+                        </td>
+
+                        {/* Schedule */}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(v.isLive && v.DateOfLive && v.TimeOfLIve) ? (
+                            <div className="text-xs text-slate-400 space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="w-3 h-3 text-purple-400" />
+                                {v.DateOfLive.replace(/-/g, "/")}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3 text-purple-400" />
+                                {v.TimeOfLIve.slice(0, 5)}
+                              </div>
+                            </div>
+                          ) : (v.dateOfClass && v.TimeOfClass) ? (
+                            <div className="text-xs text-slate-400 space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="w-3 h-3 text-slate-500" />
+                                {v.dateOfClass.replace(/-/g, "/")}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Clock className="w-3 h-3 text-slate-500" />
+                                {v.TimeOfClass.slice(0, 5)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Type badges */}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            {v.isLive && !v.isLiveEnded && (
+                              <Badge color="bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+                                Live
+                              </Badge>
+                            )}
+                            {v.isLiveEnded && (
+                              <Badge color="bg-rose-500/15 text-rose-400 border border-rose-500/20">
+                                Ended
+                              </Badge>
+                            )}
+                            {v.isDemo && (
+                              <Badge color="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                                Demo
+                              </Badge>
+                            )}
+                            {!v.isLive && !v.isLiveEnded && !v.isDemo && (
+                              <Badge color="bg-slate-700 text-slate-400">
+                                Recorded
+                              </Badge>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                          {subjects.find((s) => s.id === v.subjectId)?.name || "—"}
-                        </td>
+
+                        {/* Status */}
                         <td className="px-4 py-3">
-                          <span className="text-xs px-3 py-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400 rounded-full font-medium">
-                            {v.videoSource.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">
-                          {v.isLive && v.DateOfLive ? (
-                            <>
-                              {v.DateOfLive} • {v.TimeOfLIve}
-                            </>
-                          ) : v.dateOfClass ? (
-                            <>
-                              {v.dateOfClass} • {v.TimeOfClass}
-                            </>
+                          {v.status === "active" ? (
+                            <Badge color="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3" /> Active
+                            </Badge>
                           ) : (
-                            "—"
+                            <Badge color="bg-slate-700 text-slate-500 border border-slate-600">
+                              <XCircle className="w-3 h-3" /> Inactive
+                            </Badge>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span
-                            className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
-                              v.status === "active"
-                                ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                            }`}
-                          >
-                            {v.status.toUpperCase()}
-                          </span>
-                        </td>
+
+                        {/* Actions */}
                         <td className="px-4 py-3">
-                          <div className="flex justify-center gap-1 flex-wrap">
-                            <button onClick={() => setPlaying(v)} className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg" title="Play">
-                              <Play className="w-4 h-4 text-indigo-600" />
-                            </button>
-                            <button onClick={() => openEdit(v)} className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg" title="Edit">
-                              <Edit2 className="w-4 h-4 text-blue-600" />
-                            </button>
-                            <button onClick={() => toggleStatus(v)} className="p-2 hover:bg-orange-100 dark:hover:bg-orange-900/30 rounded-lg" title="Toggle Status">
-                              {v.status === "active" ? <Eye className="w-4 h-4 text-orange-600" /> : <EyeOff className="w-4 h-4 text-orange-600" />}
-                            </button>
-                            <button onClick={() => setDeleteVideo(v)} className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg" title="Delete">
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
+                          <div className="flex items-center flex-wrap gap-1.5">
+                            {/* Play */}
+                            <ActionBtn
+                              title="Play"
+                              color="bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400"
+                              onClick={() => setPlaying(v)}
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </ActionBtn>
+
+                            {/* Edit */}
+                            <ActionBtn
+                              title="Edit"
+                              color="bg-sky-500/15 hover:bg-sky-500/25 text-sky-400"
+                              onClick={() => openEdit(v)}
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </ActionBtn>
+
+                            {/* Toggle Status */}
+                            <ActionBtn
+                              title={v.status === "active" ? "Deactivate" : "Activate"}
+                              color="bg-amber-500/15 hover:bg-amber-500/25 text-amber-400"
+                              onClick={() => confirmToggleStatus(v)}
+                            >
+                              {v.status === "active" ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                            </ActionBtn>
+
+                            {/* Delete */}
+                            <ActionBtn
+                              title="Delete"
+                              color="bg-red-500/15 hover:bg-red-500/25 text-red-400"
+                              onClick={() => confirmDelete(v)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </ActionBtn>
+
+                            {/* Upload PDF */}
+                            <ActionBtn
+                              title="Upload PDF"
+                              color="bg-violet-500/15 hover:bg-violet-500/25 text-violet-400"
+                              onClick={() =>
+                                navigate(
+                                  `/upload-pdf?batch=${batchId}&video=${v.id}&title=${encodeURIComponent(
+                                    v.title.trim().toLowerCase().replace(/\s+/g, "-")
+                                  )}`
+                                )
+                              }
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </ActionBtn>
+
+                            {/* View Comments */}
+                            <ActionBtn
+                              title="Comments"
+                              color="bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-400"
+                              onClick={() => navigate(`/view-comments-joined/${v.id}`)}
+                            >
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            </ActionBtn>
+
+                            {/* Live-only actions */}
+                            {v.isLive && (
+                              <>
+                                <ActionBtn
+                                  title="End Live"
+                                  color={v.isLiveEnded
+                                    ? "bg-slate-700 text-slate-500 cursor-not-allowed"
+                                    : "bg-rose-500/15 hover:bg-rose-500/25 text-rose-400"
+                                  }
+                                  onClick={() => confirmEndLive(v)}
+                                  disabled={v.isLiveEnded}
+                                >
+                                  <StopCircle className="w-3.5 h-3.5" />
+                                </ActionBtn>
+
+                                <ActionBtn
+                                  title="View Chats"
+                                  color="bg-teal-500/15 hover:bg-teal-500/25 text-teal-400"
+                                  onClick={() => navigate(`/view-chat/${v.id}`)}
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                </ActionBtn>
+
+                                <ActionBtn
+                                  title="Students Joined"
+                                  color="bg-orange-500/15 hover:bg-orange-500/25 text-orange-400"
+                                  onClick={() => navigate(`/view-studnets-joined/${v.id}`)}
+                                >
+                                  <Users className="w-3.5 h-3.5" />
+                                </ActionBtn>
+
+                                <a
+                                  href={`/stats-of-class/${v.id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Admin Check Live"
+                                  className="p-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-400 transition-colors"
+                                >
+                                  <BarChart2 className="w-3.5 h-3.5" />
+                                </a>
+
+                                <a
+                                  href={`/live-class-monitor/${v.id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title="Share Live Monitor"
+                                  className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 transition-colors"
+                                >
+                                  <Share2 className="w-3.5 h-3.5" />
+                                </a>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -578,215 +1011,216 @@ export default function CourseVideos() {
 
             {/* Pagination */}
             {pagination.total > 0 && (
-              <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
-                <div>
-                  Showing {(pagination.page - 1) * pagination.limit + 1} –{" "}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
-                </div>
+              <div className="px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <span>
+                  Showing{" "}
+                  <strong className="text-slate-300">
+                    {(pagination.page - 1) * pagination.limit + 1}
+                  </strong>{" "}
+                  –{" "}
+                  <strong className="text-slate-300">
+                    {Math.min(pagination.page * pagination.limit, pagination.total)}
+                  </strong>{" "}
+                  of <strong className="text-slate-300">{pagination.total}</strong>
+                </span>
 
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setPagination((p) => ({ ...p, page: 1 }))} disabled={pagination.page === 1} className="p-2 disabled:opacity-50">
-                    <ChevronsLeft className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))} disabled={pagination.page === 1} className="p-2 disabled:opacity-50">
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
+                <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                  <PagBtn
+                    onClick={() => setPagination((p) => ({ ...p, page: 1 }))}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </PagBtn>
+                  <PagBtn
+                    onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </PagBtn>
 
-                  <form onSubmit={handleJumpToPage} className="flex items-center gap-2">
-                    <span>Page</span>
+                  <form onSubmit={handleJumpToPage} className="flex items-center gap-1.5">
+                    <span className="text-slate-500">Page</span>
                     <input
                       type="number"
                       name="jumpPage"
                       min={1}
                       max={pagination.totalPages}
                       defaultValue={pagination.page}
-                      className="w-14 px-2 py-1 text-center border rounded dark:bg-gray-800"
+                      className="w-14 px-2 py-1.5 text-center bg-slate-800 border border-slate-700 rounded-lg text-white text-xs outline-none focus:border-indigo-500"
                     />
-                    <span>of {pagination.totalPages}</span>
-                    <button type="submit" className="px-4 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
+                    <span className="text-slate-500">of {pagination.totalPages}</span>
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-colors"
+                    >
                       Go
                     </button>
                   </form>
 
-                  <button onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))} disabled={pagination.page === pagination.totalPages} className="p-2 disabled:opacity-50">
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                  <button onClick={() => setPagination((p) => ({ ...p, page: p.totalPages }))} disabled={pagination.page === pagination.totalPages} className="p-2 disabled:opacity-50">
-                    <ChevronsRight className="w-5 h-5" />
-                  </button>
+                  <PagBtn
+                    onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </PagBtn>
+                  <PagBtn
+                    onClick={() => setPagination((p) => ({ ...p, page: p.totalPages }))}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronsRight className="w-4 h-4" />
+                  </PagBtn>
                 </div>
               </div>
             )}
           </div>
         )}
-
-        {/* Loading & Error States */}
-        {loading && (
-          <div className="text-center py-20">
-            <div className="inline-block animate-spin h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full" />
-            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading videos...</p>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="text-center py-20 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-200 dark:border-red-800">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-            <p>Failed to load videos. Please try again.</p>
-          </div>
-        )}
       </div>
 
-      {/* Video Player Modal */}
+      {/* ── Video Player Modal ── */}
       {playing && (
-        <div className="fixed inset-0 bg-black/95 z-[999999] flex items-center justify-center p-4" onClick={() => setPlaying(null)}>
-          <div className="relative w-full max-w-5xl bg-black rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setPlaying(null)} className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center">
-              <X className="w-6 h-6 text-white" />
+        <div
+          className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPlaying(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-2xl animate-[modalIn_0.25s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPlaying(null)}
+              className="absolute top-3 right-3 z-10 w-8 h-8 bg-black/60 hover:bg-black/90 rounded-full flex items-center justify-center border border-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
             </button>
             <div className="aspect-video">{renderPlayer(playing)}</div>
-            <div className="p-4 bg-gradient-to-t from-black text-white">
-              <h3 className="font-semibold">{playing.title}</h3>
+            <div className="p-4 bg-gradient-to-t from-black to-transparent">
+              <p className="font-semibold text-white text-sm">{playing.title}</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {subjects.find((s) => s.id === playing.subjectId)?.name} ·{" "}
+                {playing.videoSource.toUpperCase()}
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Form Modal */}
+      {/* ── Add / Edit Modal ── */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999] p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl max-w-md w-full my-8">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="font-semibold text-gray-900 dark:text-white">
-                {editId ? "Edit Video" : "Add Video"}
-              </h2>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            onClick={() => setShowModal(false)}
+          />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg my-8 animate-[modalIn_0.2s_ease-out]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-indigo-600/20 flex items-center justify-center">
+                  {editId ? <Edit2 className="w-3.5 h-3.5 text-indigo-400" /> : <Plus className="w-3.5 h-3.5 text-indigo-400" />}
+                </div>
+                <h2 className="font-semibold text-white text-sm">
+                  {editId ? "Edit Video" : "Add Video"}
+                </h2>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
             <form
               onSubmit={handleSubmit}
-              className="p-4 space-y-3 max-h-[70vh] overflow-y-auto"
+              className="p-5 space-y-4 max-h-[75vh] overflow-y-auto scrollbar-thin"
             >
               {/* Title */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Title *
-                </label>
+              <Field label="Title *">
                 <input
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className={INPUT_CLS}
+                  placeholder="Enter video title"
                   required
                 />
-              </div>
+              </Field>
+
               {/* Position */}
               {batch?.category === "recorded" && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Position *
-                  </label>
+                <Field label="Position *">
                   <input
                     type="number"
                     value={form.position}
                     onChange={(e) => setForm({ ...form, position: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className={INPUT_CLS}
                     required
                   />
-                </div>
+                </Field>
               )}
 
-              {/* Source */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Source *
-                </label>
-                <select
-                  value={form.videoSource}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      videoSource: e.target.value as "youtube" | "s3" | "vimeo",
-                    })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="youtube">YouTube</option>
-                  <option value="s3">S3 / Direct</option>
-                  <option value="vimeo">Vimeo</option>
-                </select>
+              {/* Source + URL row */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Source *">
+                  <select
+                    value={form.videoSource}
+                    onChange={(e) => setForm({ ...form, videoSource: e.target.value as any })}
+                    className={INPUT_CLS}
+                  >
+                    <option value="youtube">YouTube</option>
+                    <option value="s3">S3 / Direct</option>
+                    <option value="vimeo">Vimeo</option>
+                  </select>
+                </Field>
+                <Field label="Subject *">
+                  <select
+                    value={form.subjectId}
+                    onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
+                    className={INPUT_CLS}
+                    required
+                  >
+                    <option value="">Select</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </Field>
               </div>
 
               {/* URL */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  URL *
-                </label>
+              <Field label="URL *">
                 <div className="relative">
-                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                   <input
                     type="url"
                     value={form.url}
                     onChange={(e) => setForm({ ...form, url: e.target.value })}
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className={`${INPUT_CLS} pl-9`}
+                    placeholder="https://"
                     required
                   />
                 </div>
-              </div>
-
-              {/* Subject */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Subject *
-                </label>
-                <select
-                  value={form.subjectId}
-                  onChange={(e) =>
-                    setForm({ ...form, subjectId: e.target.value })
-                  }
-                  className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-                  required
-                >
-                  <option value="">Select subject</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              </Field>
 
               {/* Thumbnail */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Thumbnail
-                </label>
+              <Field label="Thumbnail">
                 {preview ? (
-                  <div className="relative">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="w-full h-24 object-cover rounded border"
-                    />
+                  <div className="relative rounded-xl overflow-hidden border border-slate-700">
+                    <img src={preview} alt="Preview" className="w-full h-28 object-cover" />
                     <button
                       type="button"
-                      onClick={() => {
-                        setThumbnail(null);
-                        setPreview("");
-                      }}
-                      className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded hover:bg-red-700"
+                      onClick={() => { setThumbnail(null); setPreview(""); }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-red-600/80 hover:bg-red-600 rounded-full flex items-center justify-center transition-colors"
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-3 h-3 text-white" />
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-400 rounded cursor-pointer hover:border-indigo-500 transition">
-                    <ImageIcon className="w-6 h-6 text-gray-400 mb-1" />
-                    <span className="text-xs text-gray-600">Upload</span>
+                  <label className="flex flex-col items-center justify-center h-24 rounded-xl border-2 border-dashed border-slate-700 hover:border-indigo-500 cursor-pointer transition-colors group">
+                    <Upload className="w-5 h-5 text-slate-600 group-hover:text-indigo-400 transition-colors" />
+                    <span className="text-xs text-slate-600 group-hover:text-slate-400 mt-1 transition-colors">
+                      Click to upload
+                    </span>
                     <input
                       type="file"
                       accept="image/*"
@@ -795,8 +1229,7 @@ export default function CourseVideos() {
                         if (file) {
                           setThumbnail(file);
                           const reader = new FileReader();
-                          reader.onloadend = () =>
-                            setPreview(reader.result as string);
+                          reader.onloadend = () => setPreview(reader.result as string);
                           reader.readAsDataURL(file);
                         }
                       }}
@@ -804,147 +1237,110 @@ export default function CourseVideos() {
                     />
                   </label>
                 )}
+              </Field>
+
+              {/* Toggles */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "isLive", label: "Live Session", icon: <Radio className="w-3 h-3" /> },
+                  { key: "isDemo", label: "Demo", icon: <Layers className="w-3 h-3" /> },
+                  { key: "isDownloadable", label: "Downloadable", icon: <Upload className="w-3 h-3" /> },
+                  { key: "status", label: "Active", icon: <CheckCircle2 className="w-3 h-3" /> },
+                ].map(({ key, label, icon }) => (
+                  <label
+                    key={key}
+                    className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${(form as any)[key]
+                      ? "bg-indigo-600/10 border-indigo-500/40 text-indigo-300"
+                      : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                      }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(form as any)[key]}
+                      onChange={(e) => {
+                        if (key === "isLive") {
+                          setForm({
+                            ...form,
+                            isLive: e.target.checked,
+                            DateOfLive: e.target.checked ? form.DateOfLive : "",
+                            TimeOfLIve: e.target.checked ? form.TimeOfLIve : "",
+                          });
+                        } else {
+                          setForm({ ...form, [key]: e.target.checked });
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <span className="flex-1 text-xs font-medium flex items-center gap-1.5">
+                      {icon} {label}
+                    </span>
+                    <div className={`w-8 h-4 rounded-full transition-colors relative ${(form as any)[key] ? "bg-indigo-600" : "bg-slate-700"}`}>
+                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${(form as any)[key] ? "translate-x-4" : "translate-x-0.5"}`} />
+                    </div>
+                  </label>
+                ))}
               </div>
 
-              {/* Checkboxes */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isLive}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        isLive: e.target.checked,
-                        DateOfLive: e.target.checked ? form.DateOfLive : "",
-                        TimeOfLIve: e.target.checked ? form.TimeOfLIve : "",
-                      })
-                    }
-                    className="w-3 h-3 rounded"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Live</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isDemo}
-                    onChange={(e) =>
-                      setForm({ ...form, isDemo: e.target.checked })
-                    }
-                    className="w-3 h-3 rounded"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">Demo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isDownloadable}
-                    onChange={(e) =>
-                      setForm({ ...form, isDownloadable: e.target.checked })
-                    }
-                    className="w-3 h-3 rounded"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">DL</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.status}
-                    onChange={(e) =>
-                      setForm({ ...form, status: e.target.checked })
-                    }
-                    className="w-3 h-3 rounded"
-                  />
-                  <span className="text-gray-700 dark:text-gray-300">
-                    Active
-                  </span>
-                </label>
-              </div>
-
+              {/* Date/Time for non-live */}
               {!form.isLive && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  {/* DATE */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Date Of Class *
-                    </label>
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800">
+                  <Field label="Date of Class *">
                     <input
                       type="date"
                       value={form.dateOfClass}
-                      onChange={(e) =>
-                        setForm({ ...form, dateOfClass: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setForm({ ...form, dateOfClass: e.target.value })}
+                      className={INPUT_CLS}
                       required
                     />
-                  </div>
-
-                  {/* TIME */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time of Class *
-                    </label>
+                  </Field>
+                  <Field label="Time of Class *">
                     <input
                       type="time"
                       value={form.TimeOfClass}
-                      onChange={(e) =>
-                        setForm({ ...form, TimeOfClass: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setForm({ ...form, TimeOfClass: e.target.value })}
+                      className={INPUT_CLS}
                       required
                     />
-                  </div>
+                  </Field>
                 </div>
               )}
-              {/* Live Date/Time */}
+
+              {/* Date/Time for live */}
               {form.isLive && (
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  {/* DATE */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Date *
-                    </label>
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800">
+                  <Field label="Live Date *">
                     <input
                       type="date"
                       value={form.DateOfLive}
-                      onChange={(e) =>
-                        setForm({ ...form, DateOfLive: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setForm({ ...form, DateOfLive: e.target.value })}
+                      className={INPUT_CLS}
                       required
                     />
-                  </div>
-
-                  {/* TIME */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time *
-                    </label>
+                  </Field>
+                  <Field label="Live Time *">
                     <input
                       type="time"
                       value={form.TimeOfLIve}
-                      onChange={(e) =>
-                        setForm({ ...form, TimeOfLIve: e.target.value })
-                      }
-                      className="w-full px-3 py-2 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      onChange={(e) => setForm({ ...form, TimeOfLIve: e.target.value })}
+                      className={INPUT_CLS}
                       required
                     />
-                  </div>
+                  </Field>
                 </div>
               )}
 
-              {/* Buttons */}
-              <div className="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+              {/* Submit */}
+              <div className="flex gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="submit"
-                  className="flex-1 py-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded font-medium transition"
+                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-indigo-900/30"
                 >
-                  {editId ? "Update" : "Add"}
+                  {editId ? "Save Changes" : "Add Video"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+                  className="flex-1 py-2.5 border border-slate-700 hover:bg-slate-800 text-slate-300 text-sm rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
@@ -954,36 +1350,75 @@ export default function CourseVideos() {
         </div>
       )}
 
-      {/* Delete Modal */}
-      {deleteVideo && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-5 max-w-xs w-full text-center shadow-xl">
-            <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-              Delete Video?
-            </h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-              "{deleteVideo.title}" will be permanently deleted.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={removeVideo}
-                disabled={deleteLoading}
-                className="flex-1 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded font-medium transition"
-              >
-                {deleteLoading ? "Please Wait ....." : "Delete"}
-              </button>
-              <button
-                onClick={() => setDeleteVideo(null)}
-                disabled={deleteLoading}
-                className="flex-1 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ── Confirm Modal ── */}
+      {confirmConfig && (
+        <ConfirmModal
+          config={confirmConfig}
+          loading={confirmLoading}
+          onCancel={closeConfirm}
+        />
       )}
     </div>
+  );
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+const INPUT_CLS =
+  "w-full px-3 py-2 text-xs bg-slate-800 border border-slate-700 hover:border-slate-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-lg text-white placeholder-slate-500 outline-none transition-colors";
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1.5">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function ActionBtn({
+  children,
+  title,
+  color,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  title: string;
+  color: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      className={`p-1.5 rounded-lg transition-colors ${color} disabled:opacity-40 disabled:cursor-not-allowed`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PagBtn({
+  children,
+  onClick,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-slate-400"
+    >
+      {children}
+    </button>
   );
 }

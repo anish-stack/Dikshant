@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -76,7 +77,55 @@ export default function Notifications() {
       console.error("Mark all read error:", error);
     }
   };
+// Function to open URL safely
+  const openUrl = async (url) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        Alert.alert("Error", "Cannot open this link");
+      }
+    } catch (error) {
+      console.error("Error opening URL:", error);
+      Alert.alert("Error", "Failed to open link");
+    }
+  };
+  const urlRegex = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+\.[^\s<>"']+)/gi;
 
+
+  const renderMessageWithLinks = (message) => {
+    if (!message) return null;
+
+    const parts = message.split(urlRegex);
+
+    return parts.map((part, index) => {
+      if (!part) return null;
+
+      // Check if this part is a URL
+      if (urlRegex.test(part)) {
+        const cleanUrl = part.startsWith("www.") ? `https://${part}` : part;
+
+        return (
+          <Text
+            key={index}
+            style={styles.linkText}
+            onPress={() => openUrl(cleanUrl)}
+          >
+            {part}
+          </Text>
+        );
+      }
+
+      // Normal text
+      return (
+        <Text key={index} style={styles.notificationMessage}>
+          {part}
+        </Text>
+      );
+    });
+  };
   // On refresh
   const onRefresh = () => {
     setRefreshing(true);
@@ -242,9 +291,9 @@ export default function Notifications() {
                       </Text>
                       {!notif.isRead && <View style={styles.unreadDot} />}
                     </View>
-                    <Text style={styles.notificationMessage} numberOfLines={4}>
-                      {notif.message}
-                    </Text>
+                  <View style={{ marginBottom: 8 }}>
+                      {renderMessageWithLinks(notif.message)}
+                    </View>
                     <Text style={styles.notificationTime}>
                       {new Date(notif.createdAt).toLocaleString([], {
                         hour: "2-digit",
@@ -416,6 +465,12 @@ const styles = StyleSheet.create({
     color: "#64748b",
     lineHeight: 20,
     marginBottom: 8,
+  },
+  linkText: {
+    fontSize: 14,
+    color: "#3b82f6",           // Nice blue color
+    lineHeight: 20,
+    textDecorationLine: "underline",
   },
   notificationTime: {
     fontSize: 12,

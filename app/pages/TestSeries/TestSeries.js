@@ -28,10 +28,10 @@ const BUNDLE_ENDPOINT = `${API_URL_LOCAL_ENDPOINT}/testseries-bundles`;
 
 // ─── Tab Config ────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'all',       label: 'All Tests',        icon: 'layers' },
-  { id: 'objective', label: 'Prelims',  icon: 'check-square' },
-  { id: 'subjective', label: 'Mains',  icon: 'check-square' },
-  { id: 'my', label: 'My Tests',   icon: 'star' },
+  { id: 'all', label: 'All Tests', icon: 'layers' },
+  { id: 'objective', label: 'Prelims', icon: 'check-square' },
+  { id: 'subjective', label: 'Mains', icon: 'check-square' },
+  { id: 'my', label: 'My Tests', icon: 'star' },
 ];
 
 // ─── Animated Tab Bar ─────────────────────────────────────────────────────────
@@ -72,7 +72,6 @@ function BundleCard({ item, onPress }) {
 
   return (
     <TouchableOpacity style={styles.bundleCard} onPress={onPress} activeOpacity={0.88}>
-      {/* Header gradient strip */}
       <View style={styles.bundleHeaderStrip}>
         <View style={styles.bundleHeaderLeft}>
           <View style={styles.bundleSavingsBadge}>
@@ -88,49 +87,40 @@ function BundleCard({ item, onPress }) {
         </View>
       </View>
 
-      {/* Included series mini-list */}
-  {item.testSeries?.length > 0 && (
-  <View style={styles.bundleSeriesList}>
-    <Text style={styles.bundleIncludedLabel}>
-      📦 Included in this bundle
-    </Text>
-
-    {item.testSeries.slice(0, 3).map((s) => (
-      <View key={s.id} style={styles.bundleSeriesItem}>
-        <Image
-          source={{ uri: s.imageUrl }}
-          style={styles.bundleSeriesThumb}
-        />
-
-        <View style={styles.bundleSeriesInfo}>
-          <Text style={styles.bundleSeriesTitle} numberOfLines={1}>
-            {s.title}
+      {item.testSeries?.length > 0 && (
+        <View style={styles.bundleSeriesList}>
+          <Text style={styles.bundleIncludedLabel}>
+            📦 Included in this Package
           </Text>
 
-          <Text style={styles.bundleSeriesPrice}>
-            ₹{s.discountPrice}
-            <Text style={styles.bundleSeriesOriginal}>
-              {"  "}₹{s.price}
+          {item.testSeries.slice(0, 3).map((s) => (
+            <View key={s.id} style={styles.bundleSeriesItem}>
+              <Image
+                source={{ uri: s.imageUrl }}
+                style={styles.bundleSeriesThumb}
+              />
+
+              <View style={styles.bundleSeriesInfo}>
+                <Text style={styles.bundleSeriesTitle} numberOfLines={1}>
+                  {s.title}
+                </Text>
+
+              </View>
+
+              <View style={styles.bundleSeriesCheck}>
+                <Feather name="check" size={14} color="#10b981" />
+              </View>
+            </View>
+          ))}
+
+          {item.testSeries.length > 3 && (
+            <Text style={styles.moreSeriesText}>
+              +{item.testSeries.length - 3} more
             </Text>
-          </Text>
+          )}
         </View>
+      )}
 
-        <View style={styles.bundleSeriesCheck}>
-          <Feather name="check" size={14} color="#10b981" />
-        </View>
-      </View>
-    ))}
-
-    {/* Show remaining count */}
-    {item.testSeries.length > 3 && (
-      <Text style={styles.moreSeriesText}>
-        +{item.testSeries.length - 3} more
-      </Text>
-    )}
-  </View>
-)}
-
-      {/* Price + CTA */}
       <View style={styles.bundlePriceRow}>
         <View>
           <Text style={styles.bundleOriginalPrice}>₹{item.price}</Text>
@@ -156,8 +146,8 @@ function TestSeriesCard({ item, isPurchased, onPress, formatDate }) {
   const getStatusBadge = (status) => {
     switch (status) {
       case 'featured': return { text: 'Featured', color: '#7c3aed' };
-      case 'popular':  return { text: 'Popular',  color: '#2563eb' };
-      default:         return { text: 'New',      color: '#059669' };
+      case 'popular': return { text: 'Popular', color: '#2563eb' };
+      default: return { text: 'New', color: '#059669' };
     }
   };
   const statusInfo = getStatusBadge(item.status);
@@ -230,127 +220,120 @@ function TestSeriesCard({ item, isPurchased, onPress, formatDate }) {
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function TestSeries({ navigation }) {
-  const [activeTab, setActiveTab]         = useState('all');
-  const [testSeries, setTestSeries]       = useState([]);
-  const [purchasedMap, setPurchasedMap]   = useState({});
-  const [bundles, setBundles]             = useState([]);
-  const [quizes, setQuizes]               = useState([]);
-  const [currentPage, setCurrentPage]     = useState(1);
-  const [totalPages, setTotalPages]       = useState(1);
-  const [isPurchased, setIsPurchased]     = useState(false);
-  const [searchQuery, setSearchQuery]     = useState('');
-  const [loading, setLoading]             = useState(true);
-  const [loadingMore, setLoadingMore]     = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [testSeries, setTestSeries] = useState([]);
+  const [bundles, setBundles] = useState([]);
+  const [quizes, setQuizes] = useState([]);
+  const [purchasedMap, setPurchasedMap] = useState({});
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
   const [bundleLoading, setBundleLoading] = useState(false);
-  const [refreshing, setRefreshing]       = useState(false);
-  const [error, setError]                 = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const { token } = useAuthStore();
 
   const triggerHaptic = useCallback(() => {
-    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch { }
   }, []);
 
-  // ── Fetch Bundles ─────────────────────────────────────────────────────────
-  const fetchBundles = useCallback(async () => {
-    setBundleLoading(true);
-    try {
-      const res = await axios.get(BUNDLE_ENDPOINT);
-      if (res.data?.success) setBundles(res.data.data || []);
-        if (token) await checkPurchased('',res.data.data);
-    } catch (err) {
-      console.error('Bundle fetch error:', err.response.data);
-    } finally {
-      setBundleLoading(false);
-    }
-  }, []);
-
-  // ── Fetch Test Series ─────────────────────────────────────────────────────
-  const fetchTestSeries = useCallback(async (isRefresh = false) => {
+  // Fetch All Data
+  const fetchAllData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     setRefreshing(isRefresh);
     setError(null);
+
     try {
-      const res = await axios.get(`${LOCAL_ENDPOINT}/testseriess`, {
+      // Fetch Test Series
+      const seriesRes = await axios.get(`${LOCAL_ENDPOINT}/testseriess`, {
         params: { limit: 120, sortBy: 'displayOrder', sortOrder: 'ASC' },
       });
-      if (!res.data?.success) throw new Error();
-      const data = Array.isArray(res.data.data) ? res.data.data : [];
-      setTestSeries(data);
-      if (token) await checkPurchased(data);
-    } catch {
-      setError('Failed to load test series. Please try again.');
+      const seriesData = Array.isArray(seriesRes.data?.data) ? seriesRes.data.data : [];
+      setTestSeries(seriesData);
+
+      // Fetch Bundles
+      const bundleRes = await axios.get(BUNDLE_ENDPOINT);
+      const bundleData = bundleRes.data?.success ? bundleRes.data.data || [] : [];
+      setBundles(bundleData);
+
+      // Check purchases
+      if (token && seriesData.length > 0) {
+        await checkPurchased(seriesData);
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to load content. Please try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [token]);
 
-const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
-  if (!token || !seriesList.length) return;
+  const checkPurchased = useCallback(async (seriesList) => {
+    if (!token || !seriesList.length) return;
 
-  const map = {};
+    const map = {};
+    await Promise.all(
+      seriesList.map(async (series) => {
+        try {
+          const res = await axios.get(`${LOCAL_ENDPOINT}/orders/already-purchased`, {
+            params: { itemId: series.id, type: "test" },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          map[series.id] = !!res.data?.purchased;
+        } catch {
+          map[series.id] = false;
+        }
+      })
+    );
+    setPurchasedMap(map);
+  }, [token]);
 
-  await Promise.all(
-    seriesList.map(async (series,bundleSeroies) => {
-      try {
-       
-        const directRes = await axios.get(`${LOCAL_ENDPOINT}/orders/already-purchased`, {
-          params: { itemId: series.id, type: "test" },
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        let isPurchased = !!directRes.data?.purchased;
-
-       
-
-        map[series.id] = isPurchased;
-      } catch (err) {
-        console.error(`Failed to check purchase for series ${series.id}:`, err.response.data);
-        map[series.id] = false;
-      }
-    })
-  );
-
-  setPurchasedMap(map);
-}, [token]);
-
-  // ── Fetch Quizzes ─────────────────────────────────────────────────────────
-  const fetchQuizes = useCallback(async (page = 1, search = '', append = false) => {
-    if (!append) setLoading(true); else setLoadingMore(true);
+  // Fetch Quizzes
+  const fetchQuizes = useCallback(async (search = '') => {
     try {
-      const params = { page, limit: ITEMS_PER_PAGE };
+      const params = { limit: 100, displayIn: 'TestSeries' };
       if (search.trim()) params.search = search.trim();
-      const res = await axios.get(`${LOCAL_ENDPOINT}/quiz/quizzes?displayIn=TestSeries`, { params });
-      const newQuizes = res.data.data || [];
-      setQuizes(append ? (prev) => [...prev, ...newQuizes] : newQuizes);
-      setTotalPages(res.data.totalPages || 1);
-      setCurrentPage(page);
+
+      const res = await axios.get(`${LOCAL_ENDPOINT}/quiz/quizzes`, { params });
+      setQuizes(res.data.data || []);
     } catch (err) {
-      if (!append) setError('Failed to load objective tests');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      console.error('Quiz fetch error:', err);
     }
   }, []);
 
-  // ── Effects ───────────────────────────────────────────────────────────────
-  useEffect(() => { fetchTestSeries(); fetchBundles(); }, []);
+  // Effects
+  useEffect(() => {
+    fetchAllData();
+  }, []);
 
   useEffect(() => {
-    if (activeTab === 'objective') {
-      setQuizes([]);
-      setCurrentPage(1);
-      fetchQuizes(1, searchQuery, false);
+    if (activeTab === 'all' || activeTab === 'objective') {
+      fetchQuizes(searchQuery);
     }
   }, [activeTab, searchQuery]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleTabChange = (tab) => { triggerHaptic(); setActiveTab(tab); };
-
-  const handleViewTestSeries = (id) => {
+  // Handlers
+  const handleTabChange = (tab) => {
     triggerHaptic();
-    navigation.navigate('testseries-view', { id, isPurchased: !!purchasedMap[id] });
+    setActiveTab(tab);
+  };
+
+  const handleRefresh = () => {
+    fetchAllData(true);
+    if (activeTab === 'all' || activeTab === 'objective') {
+      fetchQuizes(searchQuery);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   const handleBundlePress = (bundle) => {
@@ -358,106 +341,132 @@ const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
     navigation.navigate('bundle-view', { bundleId: bundle.id });
   };
 
-  const handleQuizPress = useCallback((quiz) => {
-    navigation.navigate('QuizDetails', { quizId: quiz.id, isPurchased });
-  }, [navigation, isPurchased]);
-
-  const handleLoadMore = () => {
-    if (loadingMore || currentPage >= totalPages) return;
-    fetchQuizes(currentPage + 1, searchQuery, true);
+  const handleViewTestSeries = (id) => {
+    triggerHaptic();
+    navigation.navigate('testseries-view', { id, isPurchased: !!purchasedMap[id] });
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    if (activeTab === 'objective') fetchQuizes(1, searchQuery, false);
-    else if (activeTab === 'bundle') { fetchBundles(); setRefreshing(false); }
-    else fetchTestSeries(true);
+  const handleQuizPress = (quiz) => {
+    navigation.navigate('QuizDetails', {
+      quizId: quiz.id,
+      isPurchased: false,
+      from: "testseries"
+    });
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
+  // Combined content for "All Tests" tab
+  const allContent = useMemo(() => {
+    if (activeTab !== 'all') return [];
 
-  // ── Filtered Data ─────────────────────────────────────────────────────────
-  const filteredTestSeries = useMemo(() => {
-    if (!Array.isArray(testSeries)) return [];
-    switch (activeTab) {
-      case 'objective': return testSeries.filter((i) => i.displayIn === 'Quiz');
-      case 'my':        return testSeries.filter((i) => purchasedMap[i.id]);
-      default:          return testSeries;
+    const content = [];
+
+    // Bundles
+    if (bundles.length > 0) {
+      // content.push({ type: 'header', title: 'Exclusive Bundles' });
+      bundles.forEach(bundle => {
+        content.push({ type: 'bundle', data: bundle });
+      });
     }
-  }, [activeTab, testSeries, purchasedMap]);
 
-  // ── Stats for header ──────────────────────────────────────────────────────
-  const enrolledCount = Object.values(purchasedMap).filter(Boolean).length;
+    // Test Series
+    if (testSeries.length > 0) {
+      // content.push({ type: 'header', title: 'Test Series' });
+      testSeries.forEach(item => {
+        content.push({ type: 'testseries', data: item });
+      });
+    }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  const renderBundles = () => {
-    if (bundleLoading) return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#DC3545" />
-        <Text style={styles.loadingText}>Loading bundles...</Text>
-      </View>
-    );
-    if (!bundles.length) return (
-      <View style={styles.emptyState}>
-        <Feather name="package" size={48} color="#cbd5e1" />
-        <Text style={styles.emptyTitle}>No Bundles Yet</Text>
-        <Text style={styles.emptyText}>Check back soon for exclusive bundles!</Text>
-      </View>
-    );
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.sectionHeaderDot} />
-          <Text style={styles.sectionHeaderText}>Exclusive Bundles</Text>
-          <Text style={styles.sectionHeaderSub}>{bundles.length} available</Text>
+    // Quizzes
+    if (quizes.length > 0) {
+      // content.push({ type: 'header', title: 'Objective Tests' });
+      quizes.forEach(quiz => {
+        content.push({ type: 'quiz', data: quiz });
+      });
+    }
+
+    return content;
+  }, [activeTab, bundles, testSeries, quizes]);
+
+  // Render All Content
+  const renderAllContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC3545" />
+          <Text style={styles.loadingText}>Loading everything...</Text>
         </View>
-        {bundles.map((bundle) => (
-          <BundleCard key={bundle.id} item={bundle} onPress={() => handleBundlePress(bundle)} />
-        ))}
-        <View style={{ height: 40 }} />
-      </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Feather name="alert-circle" size={48} color="#ef4444" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#DC3545" />}
+      >
+        {allContent.map((item, index) => {
+          if (item.type === 'header') {
+            return (
+              <View key={`header-${index}`} style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeaderDot} />
+                <Text style={styles.sectionHeaderText}>{item.title}</Text>
+              </View>
+            );
+          }
+
+          if (item.type === 'bundle') {
+            return (
+              <BundleCard
+                key={`bundle-${item.data.id}`}
+                item={item.data}
+                onPress={() => handleBundlePress(item.data)}
+              />
+            );
+          }
+
+          if (item.type === 'testseries') {
+            return (
+              <TestSeriesCard
+                key={`series-${item.data.id}`}
+                item={item.data}
+                isPurchased={!!purchasedMap[item.data.id]}
+                onPress={() => handleViewTestSeries(item.data.id)}
+                formatDate={formatDate}
+              />
+            );
+          }
+
+          if (item.type === 'quiz') {
+            return (
+              <QuizCard
+                key={`quiz-${item.data.id}`}
+                item={item.data}
+                onPress={() => handleQuizPress(item.data)}
+                setIsPurchased={() => { }}
+                isRefresh={refreshing}
+              />
+            );
+          }
+          return null;
+        })}
+        <View style={{ height: 60 }} />
+      </ScrollView>
     );
   };
 
-  const renderTestSeriesList = () => (
-    <View style={styles.section}>
-      {filteredTestSeries.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Feather name="bookmark" size={48} color="#cbd5e1" />
-          <Text style={styles.emptyTitle}>
-            {activeTab === 'my' ? 'No Enrolled Tests' : 'No Test Series Found'}
-          </Text>
-          <Text style={styles.emptyText}>
-            {activeTab === 'my' ? 'Enroll in a series to track progress' : 'New series coming soon!'}
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderDot} />
-            <Text style={styles.sectionHeaderText}>
-              {activeTab === 'my' ? 'My Enrolled Tests' : 'All Test Series'}
-            </Text>
-            <Text style={styles.sectionHeaderSub}>{filteredTestSeries.length} series</Text>
-          </View>
-          {filteredTestSeries.map((item) => (
-            <TestSeriesCard
-              key={item.id}
-              item={item}
-              isPurchased={!!purchasedMap[item.id]}
-              onPress={() => handleViewTestSeries(item.id)}
-              formatDate={formatDate}
-            />
-          ))}
-        </>
-      )}
-      <View style={{ height: 40 }} />
-    </View>
-  );
-
+  // Render Quiz List (for Prelims tab)
   const renderQuizList = () => (
     <View style={{ flex: 1 }}>
       <FlatList
@@ -467,7 +476,7 @@ const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
           <QuizCard
             item={item}
             onPress={() => handleQuizPress(item)}
-            setIsPurchased={setIsPurchased}
+            setIsPurchased={() => { }}
             isRefresh={refreshing}
           />
         )}
@@ -480,26 +489,110 @@ const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
             <Text style={styles.emptyText}>{searchQuery ? 'Try different keywords' : 'Check back soon!'}</Text>
           </View>
         )}
-        ListFooterComponent={loadingMore ? (
-          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-            <ActivityIndicator color="#DC3545" />
-          </View>
-        ) : null}
-        onEndReached={handleLoadMore}
+        ListFooterComponent={null}
         onEndReachedThreshold={0.5}
       />
     </View>
   );
 
-  const isLoadingMain = loading && (
-    (activeTab !== 'objective') || (!quizes.length && activeTab === 'objective')
-  );
+  // Render Test Series List (for My Tests etc.)
+  const renderTestSeriesList = () => {
+    const filteredTestSeries = activeTab === 'my'
+      ? testSeries.filter((i) => purchasedMap[i.id])
+      : testSeries;
+
+    return (
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#DC3545" />}
+      >
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#DC3545" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Feather name="alert-circle" size={48} color="#ef4444" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredTestSeries.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Feather name="bookmark" size={48} color="#cbd5e1" />
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'my' ? 'No Enrolled Tests' : 'No Test Series Found'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {activeTab === 'my' ? 'Enroll in a series to track progress' : 'New series coming soon!'}
+            </Text>
+          </View>
+        ) : (
+          <>
+
+            {filteredTestSeries.map((item) => (
+              <TestSeriesCard
+                key={item.id}
+                item={item}
+                isPurchased={!!purchasedMap[item.id]}
+                onPress={() => handleViewTestSeries(item.id)}
+                formatDate={formatDate}
+              />
+            ))}
+          </>
+        )}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    );
+  };
+
+  // Render Bundles
+  const renderBundles = () => {
+    if (bundleLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DC3545" />
+          <Text style={styles.loadingText}>Loading Packages...</Text>
+        </View>
+      );
+    }
+    if (!bundles.length) {
+      return (
+        <View style={styles.emptyState}>
+          <Feather name="package" size={48} color="#cbd5e1" />
+          <Text style={styles.emptyTitle}>No Packages Yet</Text>
+          <Text style={styles.emptyText}>Check back soon for exclusive Packages!</Text>
+        </View>
+      );
+    }
+    return (
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#DC3545" />}
+      >
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderDot} />
+            <Text style={styles.sectionHeaderText}>Exclusive Packages</Text>
+            <Text style={styles.sectionHeaderSub}>{bundles.length} available</Text>
+          </View>
+          {bundles.map((bundle) => (
+            <BundleCard key={bundle.id} item={bundle} onPress={() => handleBundlePress(bundle)} />
+          ))}
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    );
+  };
 
   return (
     <Layout>
       <StatusBar barStyle="dark-content" />
       <View style={styles.container}>
-        {/* ── Header ── */}
+        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Test Series</Text>
@@ -507,22 +600,16 @@ const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
           </View>
           <View style={styles.headerStats}>
             <View style={styles.statPill}>
-              <Text style={styles.statPillNum}>{testSeries.length}</Text>
+              <Text style={styles.statPillNum}>{testSeries.length + quizes.length}</Text>
               <Text style={styles.statPillLabel}>Tests</Text>
             </View>
-            {enrolledCount > 0 && (
-              <View style={[styles.statPill, styles.statPillGreen]}>
-                <Text style={[styles.statPillNum, { color: '#10b981' }]}>{enrolledCount}</Text>
-                <Text style={styles.statPillLabel}>Enrolled</Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {/* ── Tabs ── */}
+        {/* Tabs */}
         <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
-        {/* ── Search (Objective only) ── */}
+        {/* Search for Objective Tab */}
         {activeTab === 'objective' && (
           <View style={styles.searchContainer}>
             <Feather name="search" size={16} color="#94a3b8" style={styles.searchIcon} />
@@ -543,51 +630,20 @@ const checkPurchased = useCallback(async (seriesList ,bundleSeroies) => {
           </View>
         )}
 
-        {/* ── Content ── */}
-        {activeTab === 'objective' ? (
-          isLoadingMain ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#DC3545" />
-              <Text style={styles.loadingText}>Loading quizzes...</Text>
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Feather name="alert-circle" size={48} color="#ef4444" />
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-                <Text style={styles.retryText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : renderQuizList()
+        {/* Main Content */}
+        {activeTab === 'all' ? (
+          renderAllContent()
+        ) : activeTab === 'objective' ? (
+          renderQuizList()
+        ) : activeTab === 'bundle' ? (
+          renderBundles()
         ) : (
-          <ScrollView
-            style={styles.content}
-            showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#DC3545" />}
-          >
-            {isLoadingMain ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#DC3545" />
-                <Text style={styles.loadingText}>Loading...</Text>
-              </View>
-            ) : error ? (
-              <View style={styles.errorContainer}>
-                <Feather name="alert-circle" size={48} color="#ef4444" />
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : activeTab === 'bundle' ? renderBundles()
-              : renderTestSeriesList()
-            }
-          </ScrollView>
+          renderTestSeriesList()
         )}
       </View>
     </Layout>
   );
 }
-
 // ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f1f5f9' },
@@ -874,9 +930,9 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginTop: 16 },
   emptyText: { fontSize: 13, color: '#94a3b8', textAlign: 'center', marginTop: 6 },
   moreSeriesText: {
-  marginTop: 6,
-  fontSize: 13,
-  fontWeight: "600",
-  color: "#2563eb",
-},
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#2563eb",
+  },
 });

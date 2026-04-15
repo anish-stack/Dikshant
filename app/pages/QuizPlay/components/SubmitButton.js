@@ -2,7 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useQuizStore } from '../../../stores/useQuizStore';
 
-export default function SubmitButton({ onPress, disabled }) {
+export default function SubmitButton({ onPress, disabled ,label }) {
   const { loading } = useQuizStore();
 
   return (
@@ -14,7 +14,7 @@ export default function SubmitButton({ onPress, disabled }) {
       {loading ? (
         <ActivityIndicator color="#fff" />
       ) : (
-        <Text style={styles.buttonText}>Submit Quiz</Text>
+        <Text style={styles.buttonText}>Submit {label}</Text>
       )}
     </TouchableOpacity>
   );

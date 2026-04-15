@@ -797,9 +797,7 @@ export default function UserProfiles() {
                           <Badge color={user.is_active ? "success" : "error"}>
                             {user.is_active ? "Active" : "Blocked"}
                           </Badge>
-                          {!user.is_verified && (
-                            <Badge color="warning">Unverified</Badge>
-                          )}
+
                         </div>
                       </TableCell>
 

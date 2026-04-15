@@ -29,7 +29,7 @@ const PaymentSuccess = require("./payment_success.mp4");
 const PaymentFailed = require("./payment_failed.mp4");
 
 export default function QuizDetails({ route, navigation }) {
-  const { quizId } = route.params || {};
+  const { quizId, from } = route.params || {};
   const { user, token } = useAuthStore();
 
   const [quiz, setQuiz] = useState(null);
@@ -229,25 +229,20 @@ export default function QuizDetails({ route, navigation }) {
       createOrderAndPay();
     }
   };
+  const label = from === "testseries" ? "Test Series" : "Quiz";
 
   const startQuiz = () => {
     setConfirmModalVisible(false);
-    navigation.navigate("QuizPlay", { quizId: quiz.id });
+    navigation.navigate("QuizPlay", { quizId: quiz.id, label });
   };
 
   if (loading || loadingPurchaseStatus || !quiz) {
     return (
-      <View style={styles.fullScreenLoader}>
-        <VideoView
-          player={loadingPlayer}
-          style={StyleSheet.absoluteFill}
-          contentFit="contain"
-          nativeControls={false}
-        />
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#0A84FF" />
       </View>
     );
   }
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView showsVerticalScrollIndicator={false} style={styles.container}>
@@ -284,7 +279,7 @@ export default function QuizDetails({ route, navigation }) {
           {!quiz.isFree || !quiz.is_free && !isPurchased && (
             <View style={styles.priceSection}>
               <View>
-                <Text style={styles.priceLabel}>Quiz Price</Text>
+                <Text style={styles.priceLabel}> {from === "testseries" ? "Testseries Price" : "Quiz Price"}</Text>
                 <View style={styles.priceRow}>
                   <Text style={styles.priceAmount}>₹{quiz.price}</Text>
                   <View style={styles.discountBadge}>
@@ -403,7 +398,7 @@ export default function QuizDetails({ route, navigation }) {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Ionicons name="information-circle-outline" size={22} color="#B11226" />
-              <Text style={styles.sectionTitle}>About This Quiz</Text>
+              <Text style={styles.sectionTitle}>{from === "testseries" ? "  About This Testseries" : "About This Quiz"} </Text>
             </View>
             <Text style={styles.description}>{quiz.description}</Text>
           </View>
@@ -432,9 +427,9 @@ export default function QuizDetails({ route, navigation }) {
               />
               <Text style={styles.ctaText}>
                 {quiz.isFree || quiz.is_free
-                  ? "Start Quiz Free"
+                  ? `Start ${label} Free`
                   : isPurchased
-                    ? (canAttempt ? "Start Quiz" : "No Attempts Left")
+                    ? (canAttempt ? `Start ${label}` : "No Attempts Left")
                     : `Enroll Now • ₹${quiz.price}`}
               </Text>
             </View>
@@ -467,7 +462,7 @@ export default function QuizDetails({ route, navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Ionicons name="help-circle" size={64} color="#B11226" />
-            <Text style={styles.modalTitle}>Start Quiz?</Text>
+            <Text style={styles.modalTitle}>Start {label}?</Text>
             <Text style={styles.modalMessage}>{quiz.title}</Text>
             <Text style={styles.modalDetails}>
               • {quiz.totalQuestions} Questions • {quiz.durationMinutes} Minutes
@@ -503,6 +498,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F9FAFB",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff"
   },
   fullScreenLoader: {
     flex: 1,

@@ -18,7 +18,7 @@ import SubmitButton from './components/SubmitButton';
 import { useQuizStore } from '../../stores/useQuizStore';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function QuizPlay({ route, navigation }) {
-    const { quizId } = route.params;
+    const { quizId, label } = route.params;
     const insets = useSafeAreaInsets();
 
     const {
@@ -42,7 +42,7 @@ export default function QuizPlay({ route, navigation }) {
         useCallback(() => {
             const onBackPress = () => {
                 Alert.alert(
-                    "Quit Quiz?",
+                    `Quit ${label || "Quiz"}?`,
                     "Your progress is saved automatically.\nYou can resume this quiz later from where you left off.",
                     [
                         {
@@ -88,7 +88,7 @@ export default function QuizPlay({ route, navigation }) {
         return (
             <View style={styles.centerScreen}>
                 <ActivityIndicator size="large" color="#B11226" />
-                <Text style={styles.loadingText}>Loading your quiz...</Text>
+                <Text style={styles.loadingText}>Loading your {label || "Quiz"}...</Text>
             </View>
         );
     }
@@ -136,60 +136,65 @@ export default function QuizPlay({ route, navigation }) {
         <View style={styles.container}>
             <QuizHeader
                 quiz={quiz}
+                label={label}
                 currentIndex={currentQuestionIndex}
                 totalQuestions={quiz.totalQuestions}
                 timeRemaining={timeRemaining}
             />
-           <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        paddingHorizontal: 16,
-        paddingTop: 20,
-        paddingBottom: 120 + insets.bottom, 
-        flexGrow: 1,
-      }}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-    <QuestionCard question={currentQuestion} />
-
-            <OptionsList
-                options={currentQuestion.options}
-                selectedId={selectedId}
-                onSelect={(optionId) => {
-                    useQuizStore.getState().selectAnswer(currentQuestion.id, optionId); // local update
-                    fetchNextQuestion(optionId); // backend save + next question
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                    paddingHorizontal: 16,
+                    paddingTop: 20,
+                    paddingBottom: 120 + insets.bottom,
+                    flexGrow: 1,
                 }}
-            />
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
+                <QuestionCard question={currentQuestion} />
 
-            {isLastQuestion && (
-                <SubmitButton
-                    onPress={() => {
-                        Alert.alert(
-                            "Submit Quiz?",
-                            "Once submitted, you cannot change your answers.\nAre you sure?",
-                            [
-                                { text: "Cancel", style: "cancel" },
-                                {
-                                    text: "Submit Now",
-                                    onPress: () => {
-                                        submitQuiz((result) => {
-                                            navigation.replace('QuizResult', {
-                                                attemptId: useQuizStore.getState().attemptId,
-                                                ...result,
-                                            });
-                                        });
-                                    },
-                                },
-                            ]
-                        );
+                <OptionsList
+                    options={currentQuestion.options}
+                    label={label}
+                    selectedId={selectedId}
+                    onSelect={(optionId) => {
+                        useQuizStore.getState().selectAnswer(currentQuestion.id, optionId); // local update
+                        fetchNextQuestion(optionId); // backend save + next question
                     }}
-                    disabled={loading}
                 />
-            )}
+
+                {isLastQuestion && (
+                    <SubmitButton
+                        onPress={() => {
+                            Alert.alert(
+                                `Submit ${label || "Quiz"}?`,
+                                "Once submitted, you cannot change your answers.\nAre you sure?",
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Submit Now",
+                                        onPress: () => {
+                                            submitQuiz((result) => {
+                                                navigation.replace('QuizResult', {
+                                                    attemptId: useQuizStore.getState().attemptId,
+                                                    label,
+                                                    ...result,
+                                                });
+                                            });
+                                        },
+                                    },
+                                ]
+                            );
+                        }}
+                        disabled={loading}
+
+                        label={label}
+                    />
+                )}
             </ScrollView>
 
-        
+
         </View>
     );
 }

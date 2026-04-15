@@ -34,7 +34,7 @@ export default function QuizResult() {
 
   const routeParams = route.params || {};
   const attemptIdFromRoute = routeParams.attemptId;
-
+  const labels = routeParams.label || "Quiz"
   const [resultData, setResultData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -70,7 +70,7 @@ export default function QuizResult() {
 
   // Fallback to route params if API fails or no attemptId
   const data = resultData || routeParams;
-    
+
   const {
     percentage = 0,
     passed = false,
@@ -150,7 +150,7 @@ export default function QuizResult() {
                 {passed ? 'Congratulations!' : 'Keep Practicing!'}
               </Text>
               <Text style={styles.resultSubtitle}>
-                {passed ? 'You have passed the quiz' : 'Better luck next time'}
+                {passed ? `You have passed the ${labels}` : 'Better luck next time'}
               </Text>
             </View>
             <MaterialIcons
@@ -283,11 +283,11 @@ export default function QuizResult() {
         <View style={styles.buttons}>
           <TouchableOpacity
             style={styles.retryBtn}
-            onPress={() => navigation.navigate('AllQuizes')}
+            onPress={() => navigation.navigate(labels === "Quiz" ? "Quiz" : "TestSeries")}
           >
             <LinearGradient colors={['#3b82f6', '#2563eb']} style={styles.btnGradient}>
               <MaterialIcons name="refresh" size={20} color="#fff" />
-              <Text style={styles.btnText}>Try Similar Quiz</Text>
+              <Text style={styles.btnText}>Try Similar {labels}</Text>
             </LinearGradient>
           </TouchableOpacity>
 

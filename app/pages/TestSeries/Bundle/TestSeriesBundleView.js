@@ -387,7 +387,7 @@ const TestSeriesBundleView = ({ route, navigation }) => {
                 />
               ))
             ) : (
-              <Text style={styles.emptyText}>No test series included in this bundle.</Text>
+              <Text style={styles.emptyText}>No test series included in this Package.</Text>
             )}
           </>
         ) : (
