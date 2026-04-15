@@ -273,6 +273,7 @@ class VideoCourseController {
       const buildQueryOptions = (where) => {
         const queryOptions = {
           where,
+          paranoid: false,
           order: orderCondition,
         };
 
