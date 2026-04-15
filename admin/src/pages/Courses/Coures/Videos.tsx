@@ -390,7 +390,7 @@ export default function CourseVideos() {
 
         try {
           // Make the delete API call
-          await api.delete(`/${v.id}`);
+          await api.delete(`/videocourses/${v.id}`);
 
           // Optimistically remove from UI
           setVideos((prev) => prev.filter((item) => item.id !== v.id));
