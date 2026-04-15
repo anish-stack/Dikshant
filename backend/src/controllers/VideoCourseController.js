@@ -14,151 +14,174 @@ class VideoCourseController {
   /* ======================
       CREATE
   ====================== */
+
+
   static async create(req, res) {
-    try {
+  try {
+    console.log("==== VideoCourse CREATE API HIT ====");
+    console.log("Request Body:", req.body);
 
-      const requiredFields = [
-        "title",
-        "videoSource",
-        "url",
-        "batchId",
-        "subjectId",
-      ];
+    const requiredFields = [
+      "title",
+      "videoSource",
+      "url",
+      "batchId",
+      "subjectId",
+    ];
 
-      for (const field of requiredFields) {
-        if (!req.body[field]) {
-          return res.status(400).json({
-            success: false,
-            message: `${field} is required`,
-          });
-        }
-      }
-
-      const batchId = Number(req.body.batchId);
-
-      /* ================= GET BATCH ================= */
-
-      const batch = await Batch.findByPk(batchId);
-
-      if (!batch) {
+    for (const field of requiredFields) {
+      if (!req.body[field]) {
+        console.log(`❌ Missing field: ${field}`);
         return res.status(400).json({
           success: false,
-          message: "Batch not found",
+          message: `${field} is required`,
         });
       }
-
-      /* ================= POSITION HANDLING ================= */
-
-      let position = null;
-
-      if (batch.category === "recorded") {
-
-        position = await PositionService.insert(
-          VideoCourse,
-          "position",
-          req.body.position,
-          { batchId: batchId }
-        );
-
-      }
-
-      /* ================= LIVE VALIDATION ================= */
-
-      const isLive = req.body.isLive === true || req.body.isLive === "true";
-
-      if (isLive) {
-        if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "DateOfLive and TimeOfLIve are required when the video is live",
-          });
-        }
-      }
-
-      /* ================= IMAGE ================= */
-
-      let imageUrl = null;
-
-      if (req.file) {
-        imageUrl = await uploadToS3(req.file, "videocourses");
-      }
-
-      /* ================= PAYLOAD ================= */
-
-      const payload = {
-        title: req.body.title.trim(),
-        videoSource: req.body.videoSource,
-        url: req.body.url.trim(),
-
-        batchId,
-        subjectId: Number(req.body.subjectId),
-
-        position, // ⭐ only for recorded
-
-        isDownloadable:
-          req.body.isDownloadable === true ||
-          req.body.isDownloadable === "true",
-
-        isDemo:
-          req.body.isDemo === true ||
-          req.body.isDemo === "true",
-
-        isLive,
-        DateOfLive: isLive ? req.body.DateOfLive : null,
-        TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
-
-        dateOfClass: req.body.dateOfClass ?? null,
-        TimeOfClass: req.body.TimeOfClass ?? null,
-
-        status: "active",
-        imageUrl,
-      };
-
-      /* ================= CREATE VIDEO ================= */
-
-      const item = await VideoCourse.create(payload);
-
-      /* ================= TOKEN ================= */
-
-      const secureToken = encryptVideoPayload({
-        videoId: item.id,
-        batchId: item.batchId,
-        videoSource: item.videoSource,
-        exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      });
-
-      await item.update({ secureToken });
-
-      /* ================= CACHE CLEAR ================= */
-
-      const redis = require("../config/redis");
-
-      await redis.del("videocourses");
-      await redis.del(`videocourses:batch:${batchId}`);
-
-      /* ================= RESPONSE ================= */
-
-      return res.status(201).json({
-        success: true,
-        message: "Video course created successfully",
-        data: {
-          ...item.toJSON(),
-          secureToken,
-        },
-      });
-
-    } catch (error) {
-
-      console.error("VideoCourse Create Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Server error",
-      });
-
     }
+
+    const batchId = Number(req.body.batchId);
+    console.log("Batch ID:", batchId);
+
+    /* ================= GET BATCH ================= */
+
+    const batch = await Batch.findByPk(batchId);
+    console.log("Batch Found:", batch ? batch.id : null);
+
+    if (!batch) {
+      console.log("❌ Batch not found");
+      return res.status(400).json({
+        success: false,
+        message: "Batch not found",
+      });
+    }
+
+    /* ================= POSITION HANDLING ================= */
+
+    let position = null;
+
+    if (batch.category === "recorded") {
+      console.log("Handling position for recorded batch");
+
+      position = await PositionService.insert(
+        VideoCourse,
+        "position",
+        req.body.position,
+        { batchId: batchId }
+      );
+
+      console.log("Assigned Position:", position);
+    }
+
+    /* ================= LIVE VALIDATION ================= */
+
+    const isLive = req.body.isLive === true || req.body.isLive === "true";
+    console.log("Is Live:", isLive);
+
+    if (isLive) {
+      if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
+        console.log("❌ Live validation failed");
+        return res.status(400).json({
+          success: false,
+          message:
+            "DateOfLive and TimeOfLIve are required when the video is live",
+        });
+      }
+    }
+
+    /* ================= IMAGE ================= */
+
+    let imageUrl = null;
+
+    if (req.file) {
+      console.log("Uploading image to S3...");
+      imageUrl = await uploadToS3(req.file, "videocourses");
+      console.log("Image Uploaded:", imageUrl);
+    }
+
+    /* ================= PAYLOAD ================= */
+
+    const payload = {
+      title: req.body.title.trim(),
+      videoSource: req.body.videoSource,
+      url: req.body.url.trim(),
+
+      batchId,
+      subjectId: Number(req.body.subjectId),
+
+      position,
+
+      isDownloadable:
+        req.body.isDownloadable === true ||
+        req.body.isDownloadable === "true",
+
+      isDemo:
+        req.body.isDemo === true ||
+        req.body.isDemo === "true",
+
+      isLive,
+      DateOfLive: isLive ? req.body.DateOfLive : null,
+      TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
+
+      dateOfClass: req.body.dateOfClass ?? null,
+      TimeOfClass: req.body.TimeOfClass ?? null,
+
+      status: "active",
+      isDeleted: false, // ✅ Explicitly set isDeleted to false
+      statusDelete: 0,  // ✅ Added field (statusDelete set to 0)
+
+      imageUrl,
+    };
+
+    console.log("Payload तैयार:", payload);
+
+    /* ================= CREATE VIDEO ================= */
+
+    const item = await VideoCourse.create(payload);
+    console.log("✅ Video Created with ID:", item.id);
+
+    /* ================= TOKEN ================= */
+
+    const secureToken = encryptVideoPayload({
+      videoId: item.id,
+      batchId: item.batchId,
+      videoSource: item.videoSource,
+      exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    });
+
+    await item.update({ secureToken });
+    console.log("🔐 Secure Token Generated");
+
+    /* ================= CACHE CLEAR ================= */
+
+    await redis.del("videocourses");
+    await redis.del(`videocourses:batch:${batchId}`);
+
+    console.log("🧹 Cache cleared");
+
+    /* ================= RESPONSE ================= */
+
+    return res.status(201).json({
+      success: true,
+      message: "Video course created successfully",
+      data: {
+        ...item.toJSON(),
+        secureToken,
+      },
+    });
+
+  } catch (error) {
+    console.error("🔥 VideoCourse Create Error:");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    console.error("Body:", req.body);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message, // optional for debugging
+    });
   }
+}
   /* ======================
       GET ALL
   ====================== */
