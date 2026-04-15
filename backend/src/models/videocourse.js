@@ -82,7 +82,10 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
       allowNull: false
     },
-
+    deletedAt: {
+      type: DataTypes.DATE,
+      allowNull: true
+    }
 
   }, {
     tableName: 'videocourses',
@@ -92,7 +95,7 @@ module.exports = (sequelize, DataTypes) => {
     paranoid: true,
 
     // Sequelize will automatically manage this column
-    deletedAt: 'deletedAt'
+
   });
 
   return VideoCourse;

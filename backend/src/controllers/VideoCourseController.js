@@ -195,7 +195,6 @@ class VideoCourseController {
   static async FindByBatchId(req, res) {
     try {
 
-      console.log(req.query);
 
       const isAdmin = req.query.admin === "true";
       const { id } = req.params;
@@ -233,12 +232,15 @@ class VideoCourseController {
          Primary WHERE condition
       =============================== */
 
-      let whereCondition = { batchId: id };
-
+      let whereCondition = {
+        batchId: id,
+        statusDelete: false
+      };
       // If student purchased only one subject
       if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
         whereCondition = {
           batchId: id,
+          statusDelete: false,
           subjectId: Number(subjectId),
         };
       }
@@ -348,12 +350,13 @@ class VideoCourseController {
 
         let fallbackWhere = {
           subjectId: { [Op.in]: subjectIds },
+          statusDelete: false
         };
-
         // If subject purchased only
         if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
           fallbackWhere = {
             subjectId: Number(subjectId),
+            statusDelete: false
           };
         }
 
@@ -772,57 +775,57 @@ class VideoCourseController {
     }
   }
 
-static async delete(req, res) {
-  try {
+  static async delete(req, res) {
+    try {
 
-    const item = await VideoCourse.findByPk(req.params.id);
+      const item = await VideoCourse.findByPk(req.params.id);
 
-    if (!item) {
-      return res.status(404).json({
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: "Video course not found"
+        });
+      }
+
+      if (item.imageUrl) {
+        await deleteFromS3(item.imageUrl);
+      }
+
+      const batchId = item.batchId;
+
+      /* ================= SOFT DELETE ================= */
+
+      await item.update({
+        statusDelete: true,
+        deletedAt: new Date(),
+        deletedById: req.user?.id || null,
+        deleteReason: req.body?.reason || null
+      });
+
+      /* ================= CLEAR CACHE ================= */
+
+      await Promise.all([
+        redis.del("videocourses"),
+        redis.del(`videocourse:${req.params.id}`),
+        redis.del(`videocourses:batch:${batchId}`)
+      ]);
+
+      return res.json({
+        success: true,
+        message: "Video course deleted (soft delete) successfully"
+      });
+
+    } catch (error) {
+
+      console.error("Delete Error:", error);
+
+      return res.status(500).json({
         success: false,
-        message: "Video course not found"
+        message: "Delete failed",
+        error: error.message
       });
     }
-
-    if (item.imageUrl) {
-      await deleteFromS3(item.imageUrl);
-    }
-
-    const batchId = item.batchId;
-
-    /* ================= SOFT DELETE ================= */
-
-    await item.update({
-      statusDelete: true,
-      deletedAt: new Date(),
-      deletedById: req.user?.id || null,
-      deleteReason: req.body?.reason || null
-    });
-
-    /* ================= CLEAR CACHE ================= */
-
-    await Promise.all([
-      redis.del("videocourses"),
-      redis.del(`videocourse:${req.params.id}`),
-      redis.del(`videocourses:batch:${batchId}`)
-    ]);
-
-    return res.json({
-      success: true,
-      message: "Video course deleted (soft delete) successfully"
-    });
-
-  } catch (error) {
-
-    console.error("Delete Error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Delete failed",
-      error: error.message
-    });
   }
-}
 }
 
 module.exports = VideoCourseController;

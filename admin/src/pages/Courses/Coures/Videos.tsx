@@ -755,7 +755,7 @@ export default function CourseVideos() {
                     </th>
                   )}
                   <tr className="border-b border-slate-800 bg-slate-800/60">
-                    {["Video", "Subject", "Source", "Schedule", "Type", "Status", "Actions"].map((h) => (
+                    {["Video", "Subject", "Source", "Schedule", "Type", "Status", "Deleted", "Actions"].map((h) => (
                       <th
                         key={h}
                         className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap"
@@ -902,7 +902,17 @@ export default function CourseVideos() {
                             </Badge>
                           )}
                         </td>
-
+                        <td className="px-4 py-3">
+                          {v?.statusDelete ? (
+                            <Badge color="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle2 className="w-3 h-3" /> Deleted by You
+                            </Badge>
+                          ) : (
+                            <Badge color="bg-slate-700 text-slate-500 border border-slate-600">
+                              <XCircle className="w-3 h-3" /> Not Deleted
+                            </Badge>
+                          )}
+                        </td>
                         {/* Actions */}
                         <td className="px-4 py-3">
                           <div className="flex items-center flex-wrap gap-1.5">
