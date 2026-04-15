@@ -795,57 +795,87 @@ class VideoCourseController {
     }
   }
 
-  static async delete(req, res) {
-    try {
+static async delete(req, res) {
+  try {
+    console.log("==== DELETE VIDEO API HIT ====");
+    console.log("Params:", req.params);
+    console.log("User:", req.user);
 
-      const item = await VideoCourse.findByPk(req.params.id);
+    const videoId = req.params.id;
 
-      if (!item) {
-        return res.status(404).json({
-          success: false,
-          message: "Video course not found"
-        });
-      }
+    /* ================= FIND VIDEO ================= */
 
-      if (item.imageUrl) {
-        await deleteFromS3(item.imageUrl);
-      }
+    const item = await VideoCourse.findByPk(videoId);
 
-      const batchId = item.batchId;
+    console.log("Fetched Video:", item ? item.id : null);
 
-      /* ================= SOFT DELETE ================= */
-
-      await item.update({
-        statusDelete: true,
-        deletedAt: new Date(),
-        deletedById: req.user?.id || null,
-        deleteReason: req.body?.reason || null
+    if (!item) {
+      console.log("❌ Video not found");
+      return res.status(404).json({
+        success: false,
+        message: "Video course not found"
       });
+    }
 
-      /* ================= CLEAR CACHE ================= */
+    const batchId = item.batchId;
+
+    /* ================= DELETE IMAGE FROM S3 ================= */
+
+    if (item.imageUrl) {
+      try {
+        console.log("Deleting image from S3:", item.imageUrl);
+        await deleteFromS3(item.imageUrl);
+        console.log("✅ Image deleted from S3");
+      } catch (s3Error) {
+        console.error("❌ S3 Delete Error:", s3Error.message);
+      }
+    }
+
+    /* ================= HARD DELETE ================= */
+
+    console.log("Deleting video permanently from DB...");
+
+    await item.destroy(); // ✅ HARD DELETE
+
+    console.log("✅ Video permanently deleted:", videoId);
+
+    /* ================= CLEAR CACHE ================= */
+
+    try {
+      console.log("Clearing cache...");
 
       await Promise.all([
         redis.del("videocourses"),
-        redis.del(`videocourse:${req.params.id}`),
+        redis.del(`videocourse:${videoId}`),
         redis.del(`videocourses:batch:${batchId}`)
       ]);
 
-      return res.json({
-        success: true,
-        message: "Video course deleted (soft delete) successfully"
-      });
-
-    } catch (error) {
-
-      console.error("Delete Error:", error);
-
-      return res.status(500).json({
-        success: false,
-        message: "Delete failed",
-        error: error.message
-      });
+      console.log("✅ Cache cleared");
+    } catch (cacheError) {
+      console.error("❌ Cache Clear Error:", cacheError.message);
     }
+
+    /* ================= RESPONSE ================= */
+
+    return res.json({
+      success: true,
+      message: "Video course permanently deleted"
+    });
+
+  } catch (error) {
+
+    console.error("🔥 DELETE ERROR");
+    console.error("Message:", error.message);
+    console.error("Stack:", error.stack);
+    console.error("Params:", req.params);
+
+    return res.status(500).json({
+      success: false,
+      message: "Delete failed",
+      error: error.message
+    });
   }
+}
 }
 
 module.exports = VideoCourseController;
