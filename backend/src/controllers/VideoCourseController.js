@@ -233,14 +233,12 @@ class VideoCourseController {
       =============================== */
 
       let whereCondition = {
-        batchId: id,
-        statusDelete: false
+        batchId: id
       };
       // If student purchased only one subject
       if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
         whereCondition = {
           batchId: id,
-          statusDelete: false,
           subjectId: Number(subjectId),
         };
       }
@@ -349,14 +347,12 @@ class VideoCourseController {
         }
 
         let fallbackWhere = {
-          subjectId: { [Op.in]: subjectIds },
-          statusDelete: false
+          subjectId: { [Op.in]: subjectIds }
         };
         // If subject purchased only
         if (subjectId && batchIdOfSubject && Number(batchIdOfSubject) === Number(id)) {
           fallbackWhere = {
-            subjectId: Number(subjectId),
-            statusDelete: false
+            subjectId: Number(subjectId)
           };
         }
 
