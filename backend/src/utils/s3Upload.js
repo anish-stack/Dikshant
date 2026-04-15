@@ -11,8 +11,7 @@ async function uploadToS3(file, folder = "programs") {
     Bucket: process.env.AWS_BUCKET,
     Key: fileKey,
     Body: file.buffer,
-    ContentType: file.mimetype,
-    ACL: "public-read"
+    ContentType: file.mimetype
   };
 
   await s3.send(new PutObjectCommand(uploadParams));
