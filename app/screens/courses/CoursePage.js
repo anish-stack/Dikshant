@@ -102,7 +102,7 @@ export default function CoursePage() {
       list = list.filter(
         (b) =>
           b.name?.toLowerCase().includes(q) ||
-        
+
           b.program?.name?.toLowerCase().includes(q)
       );
     }
@@ -148,7 +148,7 @@ export default function CoursePage() {
     const isPurchased = !!status.purchased;
     if (purchased && canAccess) {
       // Go to classroom
-      const screen =['online', 'offline'].includes(batch.category) ? "my-course" : "my-course-subjects";
+      const screen = ['online', 'offline'].includes(batch.category) ? "my-course" : "my-course-subjects";
       navigation.navigate(screen, {
         unlocked: true,
         courseId: batch.id,
@@ -174,7 +174,6 @@ export default function CoursePage() {
     const isPurchased = status.purchased === true;
     const canAccess = status.canAccess !== false; // default true if missing
     const expired = isPurchased && !canAccess;
-
     return (
       <TouchableOpacity
         style={[styles.card, expired]}
@@ -199,16 +198,16 @@ export default function CoursePage() {
               <Feather name="check-circle" size={10} color="#ffffff" />
               <Text style={styles.subscribedText}>SUBSCRIBED</Text>
             </View>
-          ) :null}
+          ) : null}
 
-         
+
         </View>
 
         <View style={styles.cardContent}>
           <Text style={styles.title} numberOfLines={2}>
             {item.name || "Untitled Course"}
           </Text>
-                    <Text style={styles.programTag}>{item.program?.name || "—"}</Text>
+          <Text style={styles.programTag}>{item.program?.name || "—"}</Text>
 
 
           {expired ? (
@@ -223,12 +222,19 @@ export default function CoursePage() {
           ) : (
             <View style={styles.priceRow}>
               <View style={styles.priceContainer}>
-                <Text style={styles.price}>₹{price.toLocaleString("en-IN")}</Text>
-                {original && (
-                  <Text style={styles.originalPrice}>₹{original.toLocaleString("en-IN")}</Text>
+                {price === 0   ? (
+                  <Text style={styles.freeText}>FREE</Text>
+                ) : (
+                  <>
+                    <Text style={styles.price}>₹{price.toLocaleString("en-IN")}</Text>
+                    {original && (
+                      <Text style={styles.originalPrice}>
+                        ₹{original.toLocaleString("en-IN")}
+                      </Text>
+                    )}
+                  </>
                 )}
               </View>
-           
             </View>
           )}
         </View>

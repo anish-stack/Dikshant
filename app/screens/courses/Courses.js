@@ -158,7 +158,7 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses, category
               ) : batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
                 <>
                   <Text style={styles.strikePrice}>
-                    ₹{batch.batchPrice.toLocaleString("en-IN")}
+                    ₹{batch.batchPrice.toLocaleString("en-IN")} 
                   </Text>
                   <Text style={styles.salePrice}>
                     ₹{batch.batchDiscountPrice.toLocaleString("en-IN")}

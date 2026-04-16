@@ -586,13 +586,7 @@ const handleActionPress = () => {
           )}
 
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Feather name="calendar" size={14} color={colors.primary} />
-              <Text style={styles.statText}>
-                {formatDate(batchData?.startDate)}
-              </Text>
-            </View>
-            <View style={styles.statDivider} />
+            
             <View style={styles.statItem}>
               <Feather name="book-open" size={14} color={colors.primary} />
               <Text style={styles.statText}>
@@ -850,39 +844,8 @@ const handleActionPress = () => {
 
 
 
-        {/* Important Dates */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Important Dates</Text>
-          <View style={styles.datesCard}>
-            <View style={styles.dateRow}>
-              <Feather name="calendar" size={16} color={colors.primary} />
-              <View style={styles.dateInfo}>
-                <Text style={styles.dateLabel}>Course Starts</Text>
-                <Text style={styles.dateValue}>
-                  {formatDate(batchData?.startDate)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.dateRow}>
-              <Feather name="calendar" size={16} color={colors.danger} />
-              <View style={styles.dateInfo}>
-                <Text style={styles.dateLabel}>Course Ends</Text>
-                <Text style={styles.dateValue}>
-                  {formatDate(batchData?.endDate)}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.dateRow}>
-              <Feather name="clock" size={16} color={colors.success} />
-              <View style={styles.dateInfo}>
-                <Text style={styles.dateLabel}>Registration Closes</Text>
-                <Text style={styles.dateValue}>
-                  {formatDate(batchData?.registrationEndDate)}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+   
+ 
 
         <View style={{ height: 40 }} />
       </ScrollView>

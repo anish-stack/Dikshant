@@ -33,7 +33,9 @@ router.post(
     '/materials',
     upload.fields([
         { name: 'pdf', maxCount: 1 },
-        { name: 'image', maxCount: 1 }
+        { name: 'image', maxCount: 1 },
+        { name: 'samplePdf', maxCount: 1 }
+
     ]),
     StudyMaterialController.createMaterial
 );
@@ -42,7 +44,9 @@ router.put(
     '/materials/:id',
     upload.fields([
         { name: 'pdf', maxCount: 1 },
-        { name: 'image', maxCount: 1 }
+        { name: 'image', maxCount: 1 },
+        { name: 'samplePdf', maxCount: 1 }
+
     ]),
     StudyMaterialController.updateMaterial
 );

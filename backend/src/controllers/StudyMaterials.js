@@ -226,112 +226,212 @@ class StudyMaterialController {
       STUDY MATERIAL CRUD (Complete)
   ======================================================= */
 
-  static async createMaterial(req, res) {
-    try {
-      const {
-        title,
-        description,
-        categoryId,
-        isPaid,
-        price
-      } = req.body;
+static async createMaterial(req, res) {
+  try {
 
-      if (!title || !categoryId) {
-        return res.status(400).json({
-          success: false,
-          message: "Title and Category are required"
-        });
-      }
+    const {
+      title,
+      slug,
+      shortDescription,
+      description,
+      categoryId,
+      isPaid,
+      price,
+      isHardCopy,
+      isDownloadable,
+      featured,
+      position,
+      status
+    } = req.body;
 
-      let fileUrl = null;
-      let coverImage = null;
-
-      if (req.files?.pdf) {
-        fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
-      }
-
-      if (req.files?.image) {
-        coverImage = await uploadToS3(req.files.image[0], "study-materials");
-      }
-
-      const material = await StudyMaterial.create({
-        title,
-        slug: generateSlug(title),
-        description,
-        fileUrl,
-        coverImage,
-        categoryId,
-        isPaid: isPaid === "true" || isPaid === true,
-        price: isPaid === "true" || isPaid === true ? (price || 0) : 0
-      });
-
-      await redis.del("study_materials");
-
-      return res.json({
-        success: true,
-        message: "Study material created successfully",
-        data: material
-      });
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({
+    if (!title || !categoryId) {
+      return res.status(400).json({
         success: false,
-        message: error.message
+        message: "Title and Category are required"
       });
     }
+
+    let fileUrl = null;
+    let coverImage = null;
+    let samplePdf = null;
+
+    // Upload main PDF
+    if (req.files?.pdf) {
+      fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
+    }
+
+    // Upload cover image
+    if (req.files?.image) {
+      coverImage = await uploadToS3(req.files.image[0], "study-materials");
+    }
+
+    // Upload sample PDF
+    if (req.files?.samplePdf) {
+      samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
+    }
+
+    const material = await StudyMaterial.create({
+
+      title,
+      slug: slug && slug.trim() !== "" ? slug : generateSlug(title),
+
+      shortDescription,
+      description,
+
+      fileUrl,
+      samplePdf,
+      coverImage,
+
+      categoryId: parseInt(categoryId),
+
+      isPaid: isPaid === "true" || isPaid === true,
+      price: (isPaid === "true" || isPaid === true) ? (price || 0) : 0,
+
+      isHardCopy: isHardCopy === "true" || isHardCopy === true,
+      isDownloadable: isDownloadable === "true" || isDownloadable === true,
+
+      featured: featured === "true" || featured === true,
+
+      position: position ? parseInt(position) : 0,
+
+      status: status || "active"
+
+    });
+
+    await redis.del("study_materials");
+
+    return res.json({
+      success: true,
+      message: "Study material created successfully",
+      data: material
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+
   }
+}
 
-  static async updateMaterial(req, res) {
-    try {
-      const material = await StudyMaterial.findByPk(req.params.id);
+static async updateMaterial(req, res) {
+  try {
 
-      if (!material) {
-        return res.status(404).json({
-          success: false,
-          message: "Study material not found"
-        });
-      }
+    const material = await StudyMaterial.findByPk(req.params.id);
 
-      let fileUrl = material.fileUrl;
-      let coverImage = material.coverImage;
-
-      if (req.files?.pdf) {
-        if (fileUrl) await deleteFromS3(fileUrl);
-        fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
-      }
-
-      if (req.files?.image) {
-        if (coverImage) await deleteFromS3(coverImage);
-        coverImage = await uploadToS3(req.files.image[0], "study-materials");
-      }
-
-      await material.update({
-        title: req.body.title ?? material.title,
-        description: req.body.description ?? material.description,
-        categoryId: req.body.categoryId ?? material.categoryId,
-        isPaid: req.body.isPaid !== undefined ? (req.body.isPaid === "true" || req.body.isPaid === true) : material.isPaid,
-        price: req.body.price ?? material.price,
-        fileUrl,
-        coverImage
-      });
-
-      await redis.del("study_materials");
-
-      return res.json({
-        success: true,
-        message: "Study material updated successfully",
-        data: material
-      });
-
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({
+    if (!material) {
+      return res.status(404).json({
         success: false,
-        message: error.message
+        message: "Study material not found"
       });
     }
+
+    let fileUrl = material.fileUrl;
+    let coverImage = material.coverImage;
+    let samplePdf = material.samplePdf;
+
+    // Replace main PDF
+    if (req.files?.pdf) {
+      if (fileUrl) await deleteFromS3(fileUrl);
+      fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
+    }
+
+    // Replace cover image
+    if (req.files?.image) {
+      if (coverImage) await deleteFromS3(coverImage);
+      coverImage = await uploadToS3(req.files.image[0], "study-materials");
+    }
+
+    // Replace sample PDF
+    if (req.files?.samplePdf) {
+      if (samplePdf) await deleteFromS3(samplePdf);
+      samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
+    }
+
+    const {
+      title,
+      slug,
+      shortDescription,
+      description,
+      categoryId,
+      isPaid,
+      price,
+      isHardCopy,
+      isDownloadable,
+      featured,
+      position,
+      status
+    } = req.body;
+
+    await material.update({
+
+      title: title ?? material.title,
+
+      slug: slug && slug.trim() !== ""
+        ? slug
+        : title
+        ? generateSlug(title)
+        : material.slug,
+
+      shortDescription: shortDescription ?? material.shortDescription,
+
+      description: description ?? material.description,
+
+      categoryId: categoryId ?? material.categoryId,
+
+      isPaid: isPaid !== undefined
+        ? (isPaid === "true" || isPaid === true)
+        : material.isPaid,
+
+      price: price ?? material.price,
+
+      isHardCopy: isHardCopy !== undefined
+        ? (isHardCopy === "true" || isHardCopy === true)
+        : material.isHardCopy,
+
+      isDownloadable: isDownloadable !== undefined
+        ? (isDownloadable === "true" || isDownloadable === true)
+        : material.isDownloadable,
+
+      featured: featured !== undefined
+        ? (featured === "true" || featured === true)
+        : material.featured,
+
+      position: position !== undefined
+        ? parseInt(position)
+        : material.position,
+
+      status: status ?? material.status,
+
+      fileUrl,
+      coverImage,
+      samplePdf
+
+    });
+
+    await redis.del("study_materials");
+
+    return res.json({
+      success: true,
+      message: "Study material updated successfully",
+      data: material
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+
   }
+}
 
   static async deleteMaterial(req, res) {
     try {

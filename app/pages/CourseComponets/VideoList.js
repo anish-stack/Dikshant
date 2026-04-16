@@ -46,6 +46,7 @@ export default function VideoList({
   const modalScale = useState(new Animated.Value(0))[0];
 
   // Generate all months between startDate and endDate
+  
   const allMonths = useMemo(() => {
     if (!startDate || !endDate) return [];
 
