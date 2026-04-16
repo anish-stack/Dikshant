@@ -158,7 +158,7 @@ export default function Login({ navigation }) {
       setShowModal(false);
       navigation.replace("Home");
     } catch (error) {
-      console.error("Login Error:", error);
+      console.error("Login Error new:", error.response.data);
       setPasswordError(error.message || "Failed to sign in. Please try again.");
     } finally {
       setIsLoading(false);

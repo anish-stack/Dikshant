@@ -233,8 +233,8 @@ export const useAuthStore = create((set, get) => ({
       };
     } catch (error) {
       console.error(
-        "Login Error:",
-        error.response?.data?.error || error.message
+        "Login Error Olod:",
+        error.response
       );
       const errorMessage =
         error.response?.data?.error || error.message || "Login failed";
