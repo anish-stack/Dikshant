@@ -143,9 +143,9 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
             const inRange =
               tempStart && (tempEnd || hoverDate)
                 ? isWithinInterval(day, {
-                    start: startOfDay(tempStart),
-                    end: startOfDay(tempEnd || hoverDate!),
-                  })
+                  start: startOfDay(tempStart),
+                  end: startOfDay(tempEnd || hoverDate!),
+                })
                 : false;
             const isToday = isSameDay(day, new Date());
 
@@ -160,8 +160,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({ startDate, endDate, o
                   isStart || isEnd
                     ? "bg-indigo-600 text-white rounded-lg font-semibold z-10"
                     : inRange
-                    ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg",
+                      ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg",
                   isToday && !isStart && !isEnd ? "ring-1 ring-indigo-400 rounded-lg" : "",
                 ].join(" ")}
               >
@@ -424,11 +424,10 @@ const Transactions = () => {
             <button
               key={p}
               onClick={() => updateParams({ statsPeriod: p })}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                statsPeriod === p
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${statsPeriod === p
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-indigo-400 hover:text-indigo-600"
-              }`}
+                }`}
             >
               {p === "all" ? "All Time" : p}
             </button>
@@ -540,7 +539,9 @@ const Transactions = () => {
                         <td className="px-5 py-4 whitespace-nowrap">
                           <div className="text-sm font-semibold text-gray-900 dark:text-white">#{order.id}</div>
                           <div className="text-xs text-gray-400 mt-0.5 font-mono">
-                            {order.razorpayOrderId.slice(0, 14)}…
+                            {order.razorpayOrderId
+                              ? `${order.razorpayOrderId.slice(0, 14)}…`
+                              : "FREE-ORDER"}
                           </div>
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap">
