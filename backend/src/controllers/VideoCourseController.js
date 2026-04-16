@@ -490,79 +490,105 @@ class VideoCourseController {
 
 
 
-  static async decryptAndPassVideo(req, res) {
+static async decryptAndPassVideo(req, res) {
+  try {
+    console.log("🔹 decryptAndPassVideo API called");
+
+    const { token } = req.body;
+    const userId = req.params.userId;
+
+    console.log("Incoming Data:", { token, userId });
+
+    if (!token || !userId) {
+      console.log("❌ Token or userId missing");
+      return res.status(400).json({ message: "Token & userId required" });
+    }
+
+    let payload;
+
     try {
-      const { token } = req.body;
-      const userId = req.params.userId;
+      payload = decryptVideoToken(token);
+      console.log("✅ Decrypted Payload:", payload);
+    } catch (e) {
+      console.log("❌ Token Decryption Failed:", e.message);
+      return res.status(401).json({ message: "Invalid or tampered token" });
+    }
 
-      if (!token || !userId) {
-        return res.status(400).json({ message: "Token & userId required" });
-      }
+    const { videoId, batchId, exp, videoSource } = payload;
 
-      let payload;
-      try {
-        payload = decryptVideoToken(token);
-      } catch (e) {
-        return res.status(401).json({ message: "Invalid or tampered token" });
-      }
+    console.log("🔎 Searching video:", { videoId, batchId });
 
-      const { videoId, batchId, exp, videoSource } = payload;
+    // include soft deleted videos
+    const video = await VideoCourse.findOne({
+      where: {
+        id: videoId,
+        batchId,
+        status: "active",
+      },
+      paranoid: false,
+    });
 
-      // Video exists?
-      const video = await VideoCourse.findOne({
-        where: {
-          id: videoId,
-          batchId,
-          status: "active",
-        },
-      });
+    console.log("📹 Video Result:", video ? video.id : "NOT FOUND");
 
-      if (!video) {
-        return res.status(404).json({ message: "Video not found" });
-      }
+    if (!video) {
+      console.log("❌ Video not found in DB");
+      return res.status(404).json({ message: "Video not found" });
+    }
 
+    console.log("🔎 Checking user batch access");
 
-      const hasAccess = await Order.findOne({
-        where: {
-          userId,
-          type: "batch",
-          itemId: batchId,
-          status: "success",
-        },
-      });
+    const hasAccess = await Order.findOne({
+      where: {
+        userId,
+        type: "batch",
+        itemId: batchId,
+        status: "success",
+      },
+      paranoid: false,
+    });
 
-      if (!hasAccess && !video.isDemo) {
-        return res.status(403).json({
-          message: "You do not have access to this batch",
-        });
-      }
+    console.log("📦 Access Result:", hasAccess ? "ACCESS GRANTED" : "NO ACCESS");
 
-      // Token refresh if expired
-      let refreshedToken = null;
-      if (exp && exp < Date.now()) {
-        refreshedToken = encryptVideoPayload({
-          videoId: video.id,
-          batchId: video.batchId,
-          videoSource: video.videoSource,
-          exp: Date.now() + 30 * 60 * 1000, // new 30 min session
-        });
-      }
-
-      return res.json({
-        success: true,
-        videoUrl: video.url,
-        videoSource: video.videoSource,
-        videoId: video.id,
-        refreshedToken, // frontend can update if wants
-      });
-    } catch (err) {
-      console.error("decryptAndPassVideo error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Server error",
+    if (!hasAccess && !video.isDemo) {
+      console.log("❌ User does not own batch");
+      return res.status(403).json({
+        message: "You do not have access to this batch",
       });
     }
+
+    // Token refresh
+    let refreshedToken = null;
+
+    if (exp && exp < Date.now()) {
+      console.log("⏰ Token expired, generating new token");
+
+      refreshedToken = encryptVideoPayload({
+        videoId: video.id,
+        batchId: video.batchId,
+        videoSource: video.videoSource,
+        exp: Date.now() + 30 * 60 * 1000,
+      });
+    }
+
+    console.log("✅ Video access granted");
+
+    return res.json({
+      success: true,
+      videoUrl: video.url,
+      videoSource: video.videoSource,
+      videoId: video.id,
+      refreshedToken,
+    });
+
+  } catch (err) {
+    console.error("🔥 decryptAndPassVideo error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
+}
 
   static async update(req, res) {
     try {

@@ -902,6 +902,7 @@ export default function CourseVideos() {
                             </Badge>
                           )}
                         </td>
+                        
                         <td className="px-4 py-3">
                           {v?.statusDelete ? (
                             <Badge color="bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
