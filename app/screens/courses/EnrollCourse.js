@@ -46,7 +46,8 @@ const colors = {
 export default function EnrollCourse() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { batchId } = route.params || {};
+  const { batchId, userId, isRenewal, isFreeCourse } = route.params;
+
   const { user, token } = useAuthStore();
 
   const [couponCode, setCouponCode] = useState("");
@@ -103,6 +104,7 @@ export default function EnrollCourse() {
   // Apply Coupon
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
+    if (isFreeCourse) return;
 
     setIsApplying(true);
     triggerHaptic();
@@ -150,30 +152,81 @@ export default function EnrollCourse() {
 
   // Create Razorpay Order & Pay
   const initiatePayment = async () => {
-    if (paymentLoading) {
-      console.log("⏳ Payment already in progress");
-      return;
-    }
 
-    console.log("🚀 Initiating payment...");
+    if (paymentLoading) return;
+
     setPaymentLoading(true);
 
     try {
-      if (!token) {
-        console.error("❌ Token missing");
-        showPaymentResult("failed", "User token missing. Please login again.");
-        setPaymentLoading(false);
+
+      /* ================= CHECK FREE COURSE ================= */
+
+      const isFree = isFreeCourse || totalAmount === 0;
+
+      if (isFree) {
+
+        console.log("🎁 Free course enrollment started");
+
+        const res = await axios.post(
+          `${API_URL_LOCAL_ENDPOINT}/orders`,
+          {
+            userId: user.id,
+            type: "batch",
+            itemId: batchId,
+            amount: 0,
+            gst: 0,
+            couponCode: appliedCoupon?.code || null,
+            isFree: true
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!res.data.success) {
+          throw new Error(res.data.message);
+        }
+
+        const order = res.data.order;
+
+        console.log("✅ Free course enrolled:", order);
+
+        showPaymentResult(
+          "success",
+          "You are successfully enrolled in this FREE course."
+        );
+
+        setTimeout(() => {
+
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 1,
+              routes: [
+                { name: "Home" },
+                {
+                  name:
+                    batchData?.category === "online"
+                      ? "my-course"
+                      : "my-course-subjects",
+                  params: {
+                    unlocked: true,
+                    courseId: order.itemId,
+                  },
+                },
+              ],
+            })
+          );
+
+        }, 1500);
+
         return;
       }
 
-      console.log("📦 Creating order with payload:", {
-        userId: user.id,
-        type: "batch",
-        itemId: batchId,
-        amount: subtotal,
-        gst: 0,
-        couponCode: appliedCoupon?.code || null,
-      });
+      /* ================= CREATE ORDER ================= */
+
+      console.log("📦 Creating paid order...");
 
       const orderResponse = await axios.post(
         `${API_URL_LOCAL_ENDPOINT}/orders`,
@@ -187,32 +240,28 @@ export default function EnrollCourse() {
         },
         {
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      console.log("✅ Order API response:", orderResponse.data);
-
       if (!orderResponse.data.success) {
-        throw new Error(orderResponse.data.message || "Failed to create order");
+        throw new Error(orderResponse.data.message);
       }
 
       const { razorOrder, key } = orderResponse.data;
 
-      console.log("🧾 Razorpay order created:", razorOrder);
+      /* ================= OPEN RAZORPAY ================= */
 
       const options = {
         description: `Enrollment for ${batchData?.name}`,
-        image:
-          "https://www.dikshantias.com/_next/image?url=https%3A%2F%2Fdikshantiasnew-web.s3.ap-south-1.amazonaws.com%2Fweb%2F1757750048833-e5243743-d7ec-40f6-950d-849cd31d525f-dikshant-logo.png&w=384&q=75",
         currency: "INR",
-        key: key || "rzp_live_S0aOl8Cd5iz5jk",
+        key: key,
         amount: razorOrder.amount,
         name: "Dikshant IAS",
         order_id: razorOrder.id,
         theme: { color: colors.primary },
+
         prefill: {
           name: user?.name,
           email: user?.email,
@@ -220,16 +269,15 @@ export default function EnrollCourse() {
         },
       };
 
-      console.log("💳 Opening Razorpay with options:", options);
-
       RazorpayCheckout.open(options)
+
         .then(async (data) => {
-          console.log("✅ Razorpay success callback:", data);
+
+          console.log("💳 Razorpay success:", data);
 
           try {
-            console.log("🔐 Verifying payment with backend...");
 
-            const res = await axios.post(
+            const verifyRes = await axios.post(
               `${API_URL_LOCAL_ENDPOINT}/orders/verify`,
               {
                 razorpayOrderId: data.razorpay_order_id,
@@ -243,62 +291,72 @@ export default function EnrollCourse() {
               }
             );
 
-            console.log("✅ Payment verification response:", res.data);
+            if (!verifyRes.data.success) {
+              throw new Error("Payment verification failed");
+            }
 
-            const { order, relatedId } = res.data;
-            const courseId = order.itemId || relatedId;
-
-            console.log("🎓 Enrollment success, courseId:", courseId);
+            const order = verifyRes.data.order;
 
             showPaymentResult(
               "success",
-              "Payment successful! You are now enrolled in the course."
+              "Payment successful! You are now enrolled."
             );
+
             setTimeout(() => {
+
               navigation.dispatch(
                 CommonActions.reset({
                   index: 1,
                   routes: [
                     { name: "Home" },
                     {
-                      name: "my-course-subjects",
+                      name:
+                        batchData?.category === "online"
+                          ? "my-course"
+                          : "my-course-subjects",
                       params: {
                         unlocked: true,
-                        courseId,
+                        courseId: order.itemId,
                       },
                     },
                   ],
                 })
               );
-            }, 2000)
 
-          } catch (verifyErr) {
-            console.error("❌ Payment verification failed:", verifyErr);
+            }, 1500);
+
+          } catch (verifyError) {
+
+            console.error("❌ Payment verification error:", verifyError);
+
             showPaymentResult(
               "failed",
-              "Payment verification failed. Please contact support."
+              "Payment verification failed. Contact support."
             );
           }
         })
+
         .catch((error) => {
-          console.error("❌ Razorpay payment failed:", error);
+
+          console.error("❌ Razorpay failed:", error);
+
           showPaymentResult(
             "failed",
-            error?.description?.error?.description ||
-            "Payment failed. Please try again."
+            error?.description || "Payment cancelled or failed"
           );
-        })
-        .finally(() => {
-          console.log("🔚 Razorpay flow ended");
-          setPaymentLoading(false);
         });
 
     } catch (error) {
+
       console.error("❌ initiatePayment error:", error);
+
       showPaymentResult(
         "failed",
-        error.message || "Payment failed. Please try again."
+        error.message || "Payment failed"
       );
+
+    } finally {
+
       setPaymentLoading(false);
     }
   };
@@ -380,7 +438,7 @@ export default function EnrollCourse() {
                     androidLayerType="hardware"
                     nestedScrollEnabled={true}
                     source={{ html: htmlContent }}
-                  style={{ height: 100 }}
+                    style={{ height: 100 }}
 
                     scrollEnabled={true}
                     showsVerticalScrollIndicator={true}
@@ -400,7 +458,7 @@ export default function EnrollCourse() {
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Course Fee</Text>
               <Text style={styles.priceValue}>
-                ₹{subtotal.toLocaleString("en-IN")}
+                {isFreeCourse ? "FREE" : `₹${subtotal.toLocaleString("en-IN")}`}
               </Text>
             </View>
 
@@ -426,80 +484,85 @@ export default function EnrollCourse() {
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total Amount</Text>
               <Text style={styles.totalValue}>
-                ₹{totalAmount.toLocaleString("en-IN")}
+                {isFreeCourse || totalAmount === 0
+                  ? "FREE"
+                  : `₹${totalAmount.toLocaleString("en-IN")}`}
               </Text>
             </View>
           </View>
 
           {/* Coupon Section */}
-          <View style={styles.couponCard}>
-            <View style={styles.couponHeader}>
-              <Text style={styles.sectionTitle}>Apply Coupon</Text>
-              {validCoupons.length > 0 && (
-                <TouchableOpacity
-                  style={styles.viewCouponsBtn}
-                  onPress={() => setShowCouponsModal(true)}
-                >
-                  <Text style={styles.viewCouponsText}>View Available</Text>
-                  <Feather
-                    name="chevron-right"
-                    size={12}
-                    color={colors.primary}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.couponInputContainer}>
-              <TextInput
-                style={[
-                  styles.couponInput,
-                  appliedCoupon && styles.couponInputDisabled,
-                ]}
-                placeholder="Enter coupon code"
-                value={couponCode}
-                onChangeText={setCouponCode}
-                autoCapitalize="characters"
-                editable={!appliedCoupon}
-                placeholderTextColor={colors.textLight}
-              />
-              {appliedCoupon ? (
-                <TouchableOpacity
-                  style={styles.removeBtn}
-                  onPress={removeCoupon}
-                >
-                  <Feather name="x" size={16} color={colors.danger} />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.applyBtn,
-                    isApplying && styles.applyBtnDisabled,
-                  ]}
-                  onPress={applyCoupon}
-                  disabled={isApplying}
-                >
-                  {isApplying ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Text style={styles.applyBtnText}>Apply</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {appliedCoupon && (
-              <View style={styles.couponSuccessContainer}>
-                <Feather name="check-circle" size={12} color={colors.success} />
-                <Text style={styles.couponSuccess}>
-                  Coupon applied! You saved ₹{Math.round(discount)}
-                </Text>
+          {!isFreeCourse && (
+            <View style={styles.couponCard}>
+              <View style={styles.couponHeader}>
+                <Text style={styles.sectionTitle}>Apply Coupon</Text>
+                {validCoupons.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.viewCouponsBtn}
+                    onPress={() => setShowCouponsModal(true)}
+                  >
+                    <Text style={styles.viewCouponsText}>View Available</Text>
+                    <Feather
+                      name="chevron-right"
+                      size={12}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </View>
+
+              <View style={styles.couponInputContainer}>
+                <TextInput
+                  style={[
+                    styles.couponInput,
+                    appliedCoupon && styles.couponInputDisabled,
+                  ]}
+                  placeholder="Enter coupon code"
+                  value={couponCode}
+                  onChangeText={setCouponCode}
+                  autoCapitalize="characters"
+                  editable={!appliedCoupon}
+                  placeholderTextColor={colors.textLight}
+                />
+                {appliedCoupon ? (
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={removeCoupon}
+                  >
+                    <Feather name="x" size={16} color={colors.danger} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.applyBtn,
+                      isApplying && styles.applyBtnDisabled,
+                    ]}
+                    onPress={applyCoupon}
+                    disabled={isApplying}
+                  >
+                    {isApplying ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={styles.applyBtnText}>Apply</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {appliedCoupon && (
+                <View style={styles.couponSuccessContainer}>
+                  <Feather name="check-circle" size={12} color={colors.success} />
+                  <Text style={styles.couponSuccess}>
+                    Coupon applied! You saved ₹{Math.round(discount)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
 
           {/* Quick Coupon Chips */}
-          {validCoupons.length > 0 && !appliedCoupon && (
+          {!isFreeCourse && validCoupons.length > 0 && !appliedCoupon && (
             <View style={styles.quickCoupons}>
               <Text style={styles.quickCouponsTitle}>Quick Apply:</Text>
               <View style={styles.couponChipsContainer}>
@@ -527,7 +590,9 @@ export default function EnrollCourse() {
           <View style={styles.finalAmountContainer}>
             <Text style={styles.finalAmountLabel}>You Pay</Text>
             <Text style={styles.finalAmount}>
-              ₹{totalAmount.toLocaleString("en-IN")}
+              {isFreeCourse || totalAmount === 0
+                ? "FREE"
+                : `₹${totalAmount.toLocaleString("en-IN")}`}
             </Text>
           </View>
           <TouchableOpacity
@@ -542,7 +607,9 @@ export default function EnrollCourse() {
               <ActivityIndicator color={colors.white} size="small" />
             ) : (
               <>
-                <Text style={styles.payButtonText}>Pay Securely</Text>
+                <Text style={styles.payButtonText}>
+                  {isFreeCourse || totalAmount === 0 ? "Get Free Access" : "Pay Securely"}
+                </Text>
                 <Feather name="shield" size={16} color={colors.white} />
               </>
             )}

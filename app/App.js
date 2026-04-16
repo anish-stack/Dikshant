@@ -58,7 +58,8 @@ export default function App() {
   const navigationRef = useRef();
 
   // ================== SCREEN CAPTURE PREVENTION ==================
-  const shouldPreventScreenCapture = settings?.isScreenRecordAllow === false;
+  const ScreenRecordAllow = settings?.isScreenRecordAllow || settings?.is_screen_record_allow || true
+  const shouldPreventScreenCapture = ScreenRecordAllow
 
   if (shouldPreventScreenCapture) {
     usePreventScreenCapture();
@@ -81,8 +82,8 @@ export default function App() {
   const checkAppVersion = useCallback(() => {
     if (!settings?.appVersion || settingsLoading) return;
 
-    const currentVersion = Application.nativeApplicationVersion; 
-    const serverVersion = settings.appVersion;                  
+    const currentVersion = Application.nativeApplicationVersion;
+    const serverVersion = settings.appVersion;
 
     console.log("Current App Version:", currentVersion);
     console.log("Server Latest Version:", serverVersion);

@@ -772,7 +772,8 @@ class OrderController {
   }
 
   static async createOrder(req, res) {
-    console.log("🟡 CREATE ORDER API HIT", { body: req.body });
+
+    console.log("🟢 CREATE ORDER API HIT");
 
     const {
       userId,
@@ -783,11 +784,14 @@ class OrderController {
       gst = 0,
       couponCode,
       accessValidityDays,
-      isFree = false,
+      isFree = false
     } = req.body;
 
     if (!userId || !type || !itemId || amount == null) {
-      return res.status(400).json({ success: false, message: "Missing required fields" });
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields"
+      });
     }
 
     const validTypes = [
@@ -796,18 +800,21 @@ class OrderController {
       "quiz",
       "test",
       "quiz_bundle",
-      "test_series_bundle",
+      "test_series_bundle"
     ];
 
     if (!validTypes.includes(type)) {
-      return res.status(400).json({ success: false, message: "Invalid order type" });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order type"
+      });
     }
 
     const t = await sequelize.transaction();
 
     try {
 
-      /* ================= Prevent Duplicate Purchase ================= */
+      /* ================= PREVENT DUPLICATE PURCHASE ================= */
 
       if (["batch", "subject"].includes(type)) {
 
@@ -818,68 +825,28 @@ class OrderController {
             itemId,
             status: "success",
             enrollmentStatus: "active",
-
             [Op.or]: [
-              { accessValidityDays: null }, // lifetime access
+              { accessValidityDays: null },
               sequelize.literal(
                 "DATE_ADD(paymentDate, INTERVAL accessValidityDays DAY) > NOW()"
               )
             ]
           },
-          transaction: t,
+          transaction: t
         });
 
         if (existingOrder) {
+
           await t.rollback();
 
           return res.status(409).json({
             success: false,
-            message: "Item already purchased and still active",
+            message: "Item already purchased and still active"
           });
         }
       }
 
-      /* ================= Validate Item ================= */
-
-      if (type === "subject") {
-        const foundBatch = await Batch.findByPk(batchId, { transaction: t });
-
-        if (!foundBatch) {
-          await t.rollback();
-          return res.status(404).json({
-            success: false,
-            message: "Batch not found",
-          });
-        }
-        const separateSubjects = foundBatch.separatePurchaseSubjectIds || [];
-        const subjectConfig = separateSubjects.find(
-          (s) => Number(s.subjectId) === Number(itemId)
-        );
-        if (!subjectConfig) {
-          await t.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Subject is not available for separate purchase in this batch",
-          });
-        }
-
-        if (subjectConfig.status !== "active") {
-          await t.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Subject purchase is currently disabled",
-          });
-        }
-        if (Number(amount) !== Number(subjectConfig.price) &&
-          Number(amount) !== Number(subjectConfig.discountPrice)) {
-
-          await t.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "Invalid subject price",
-          });
-        }
-      }
+      /* ================= VALIDATE ITEM ================= */
 
       if (type === "batch") {
 
@@ -889,45 +856,100 @@ class OrderController {
           await t.rollback();
           return res.status(404).json({
             success: false,
-            message: "Batch not found",
+            message: "Batch not found"
           });
         }
       }
 
-      /* ================= Coupon Handling ================= */
+      if (type === "subject") {
+
+        const foundBatch = await Batch.findByPk(batchId, { transaction: t });
+
+        if (!foundBatch) {
+          await t.rollback();
+          return res.status(404).json({
+            success: false,
+            message: "Batch not found"
+          });
+        }
+
+        const separateSubjects = foundBatch.separatePurchaseSubjectIds || [];
+
+        const subjectConfig = separateSubjects.find(
+          (s) => Number(s.subjectId) === Number(itemId)
+        );
+
+        if (!subjectConfig) {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Subject not available for separate purchase"
+          });
+        }
+
+        if (subjectConfig.status !== "active") {
+          await t.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "Subject purchase disabled"
+          });
+        }
+
+        if (
+          Number(amount) !== Number(subjectConfig.price) &&
+          Number(amount) !== Number(subjectConfig.discountPrice)
+        ) {
+
+          await t.rollback();
+
+          return res.status(400).json({
+            success: false,
+            message: "Invalid subject price"
+          });
+        }
+      }
+
+      /* ================= COUPON HANDLING ================= */
 
       let discount = 0;
+
       let couponSnapshot = {
         couponId: null,
         couponCode: null,
         couponDiscount: null,
-        couponDiscountType: null,
+        couponDiscountType: null
       };
 
       if (couponCode) {
 
         const coupon = await Coupon.findOne({
           where: { code: couponCode.toUpperCase() },
-          transaction: t,
+          transaction: t
         });
 
         if (!coupon) {
           await t.rollback();
-          return res.status(404).json({ success: false, message: "Invalid coupon code" });
+          return res.status(404).json({
+            success: false,
+            message: "Invalid coupon code"
+          });
         }
 
         const now = new Date();
 
         if (now > coupon.validTill) {
           await t.rollback();
-          return res.status(400).json({ success: false, message: "Coupon expired" });
+          return res.status(400).json({
+            success: false,
+            message: "Coupon expired"
+          });
         }
 
         couponSnapshot = {
           couponId: coupon.id,
           couponCode: coupon.code,
           couponDiscount: coupon.discount,
-          couponDiscountType: coupon.discountType,
+          couponDiscountType: coupon.discountType
         };
 
         if (coupon.discountType === "flat") {
@@ -935,6 +957,7 @@ class OrderController {
         }
 
         if (coupon.discountType === "percentage") {
+
           discount = (amount * coupon.discount) / 100;
 
           if (coupon.maxDiscount && discount > coupon.maxDiscount) {
@@ -945,45 +968,80 @@ class OrderController {
 
       const finalAmount = Math.max(0, amount - discount + gst);
 
-      if (finalAmount <= 0 && !isFree) {
-        await t.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Final amount cannot be zero or negative",
-        });
-      }
+      console.log("💰 Final Amount:", finalAmount);
 
-      /* ================= Razorpay Order ================= */
+      /* ================= HANDLE FREE ORDER ================= */
 
-      const razorOrder = await razorpay.orders.create({
-        amount: Math.round(finalAmount * 100),
-        currency: "INR",
-        receipt: `ord_${Date.now()}`.slice(0, 40),
-      });
+      if (isFree || finalAmount === 0) {
 
-      /* ================= Create Order ================= */
+        console.log("🎁 Free order detected");
 
-      const newOrder = await Order.create(
-        {
+        const freeOrder = await Order.create({
           userId,
           type,
           itemId,
-          amount,
+          amount: 0,
           discount,
           batchIdOfSubject: type === "subject" ? batchId : null,
-          gst,
-          totalAmount: finalAmount,
-          razorpayOrderId: razorOrder.id,
-          status: "pending",
+          gst: 0,
+          totalAmount: 0,
+          status: "success",
+          razorpayOrderId: null,
+          razorpayPaymentId: null,
+          razorpaySignature: null,
           couponId: couponSnapshot.couponId,
           couponCode: couponSnapshot.couponCode,
           couponDiscount: couponSnapshot.couponDiscount,
           couponDiscountType: couponSnapshot.couponDiscountType,
-          accessValidityDays: accessValidityDays || null,
+          accessValidityDays: accessValidityDays || 365,
           enrollmentStatus: "active",
-        },
-        { transaction: t }
-      );
+          paymentDate: new Date()
+        }, { transaction: t });
+
+        await OrderController.handlePostPaymentLogic(freeOrder, t);
+
+        await t.commit();
+
+        await redis.del(`orders:${userId}`);
+
+        return res.json({
+          success: true,
+          message: "Free course assigned successfully",
+          order: freeOrder,
+          isFree: true
+        });
+      }
+
+      /* ================= RAZORPAY ORDER ================= */
+
+      const razorOrder = await razorpay.orders.create({
+        amount: Math.round(finalAmount * 100),
+        currency: "INR",
+        receipt: `ord_${Date.now()}`.slice(0, 40)
+      });
+
+      /* ================= CREATE ORDER ================= */
+
+      const newOrder = await Order.create({
+
+        userId,
+        type,
+        itemId,
+        amount,
+        discount,
+        batchIdOfSubject: type === "subject" ? batchId : null,
+        gst,
+        totalAmount: finalAmount,
+        razorpayOrderId: razorOrder.id,
+        status: "pending",
+        couponId: couponSnapshot.couponId,
+        couponCode: couponSnapshot.couponCode,
+        couponDiscount: couponSnapshot.couponDiscount,
+        couponDiscountType: couponSnapshot.couponDiscountType,
+        accessValidityDays: accessValidityDays || null,
+        enrollmentStatus: "active"
+
+      }, { transaction: t });
 
       await t.commit();
 
@@ -994,19 +1052,19 @@ class OrderController {
         message: "Order created successfully",
         razorOrder,
         key: process.env.RAZORPAY_KEY,
-        order: newOrder,
+        order: newOrder
       });
 
     } catch (error) {
 
       await t.rollback();
 
-      console.error("[createOrder] ERROR:", error);
+      console.error("🔥 CREATE ORDER ERROR:", error);
 
       return res.status(500).json({
         success: false,
         message: "Order creation failed",
-        error: error.message,
+        error: error.message
       });
     }
   }
@@ -2055,62 +2113,62 @@ class OrderController {
 
   }
 
-static async getAdminSubjectAssigned(req, res) {
+  static async getAdminSubjectAssigned(req, res) {
 
-  try {
+    try {
 
-    const { userId } = req.params;
+      const { userId } = req.params;
 
-    const orders = await Order.findAll({
-      where: {
-        userId,
-        type: "subject",
-        status: "success",
-        enrollmentStatus: "active"
-      },
-      order: [["createdAt", "DESC"]]
-    });
+      const orders = await Order.findAll({
+        where: {
+          userId,
+          type: "subject",
+          status: "success",
+          enrollmentStatus: "active"
+        },
+        order: [["createdAt", "DESC"]]
+      });
 
-    const subjectIds = orders.map(o => o.itemId);
+      const subjectIds = orders.map(o => o.itemId);
 
-    const subjects = await Subject.findAll({
-      where: { id: subjectIds },
-      attributes: ["id", "name", "slug"]
-    });
+      const subjects = await Subject.findAll({
+        where: { id: subjectIds },
+        attributes: ["id", "name", "slug"]
+      });
 
-    const subjectMap = {};
-    subjects.forEach(s => {
-      subjectMap[s.id] = s;
-    });
+      const subjectMap = {};
+      subjects.forEach(s => {
+        subjectMap[s.id] = s;
+      });
 
-    const response = orders.map(order => ({
+      const response = orders.map(order => ({
 
-      orderId: order.id,
-      subjectId: order.itemId,
-      batchId: order.batchIdOfSubject,
-      assignedAt: order.createdAt,
-      subject: subjectMap[order.itemId] || null
+        orderId: order.id,
+        subjectId: order.itemId,
+        batchId: order.batchIdOfSubject,
+        assignedAt: order.createdAt,
+        subject: subjectMap[order.itemId] || null
 
-    }));
+      }));
 
-    return res.json({
-      success: true,
-      total: response.length,
-      items: response
-    });
+      return res.json({
+        success: true,
+        total: response.length,
+        items: response
+      });
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error("[getAdminSubjectAssigned] ERROR:", err);
+      console.error("[getAdminSubjectAssigned] ERROR:", err);
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch assigned subjects"
-    });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch assigned subjects"
+      });
+
+    }
 
   }
-
-}
 
   static async adminAssignTestSeries(req, res) {
 

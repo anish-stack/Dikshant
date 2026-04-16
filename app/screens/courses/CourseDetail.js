@@ -280,22 +280,32 @@ export default function CourseDetail() {
   }, [videos]);
 
 
-  const handleActionPress = () => {
-    if (isActive) {
-      const screen = batchData?.category === "online" ? "my-course" : "my-course-subjects";
-      navigation.navigate(screen, {
-        unlocked: true,
-        courseId: batchId,
-      });
-    } else {
-      // Enroll or Renew → same screen
-      navigation.navigate("enroll-course", {
-        batchId: batchData?.id || passedBatchData?.id,
-        userId: userId || 456,
-        isRenewal: isExpired,
-      });
-    }
-  };
+const handleActionPress = () => {
+
+  if (isActive) {
+
+    const screen =
+      batchData?.category === "online"
+        ? "my-course"
+        : "my-course-subjects";
+
+    navigation.navigate(screen, {
+      unlocked: true,
+      courseId: batchId,
+    });
+
+  } else {
+
+    navigation.navigate("enroll-course", {
+      batchId: batchData?.id || passedBatchData?.id,
+      userId: userId || 456,
+      isRenewal: isExpired,
+      isFreeCourse: isFreeCourse,   // ✅ important
+      price: finalPrice             // optional but useful
+    });
+
+  }
+};
 
   // Safe price calculations with null checks
   const hasDiscount = useMemo(() => {
@@ -353,6 +363,8 @@ export default function CourseDetail() {
     });
     // }
   };
+
+  const isFreeCourse = finalPrice === 0;
 
   const handlePaymentSelect = (type) => {
     triggerHaptic();
@@ -762,7 +774,7 @@ export default function CourseDetail() {
 
                 <View style={styles.finalPriceRow}>
                   <Text style={styles.finalPrice}>
-                    ₹{formatCurrency(finalPrice)}
+                    {isFreeCourse ? "FREE" : `₹${formatCurrency(finalPrice)}`}
                   </Text>
                 </View>
               </View>
@@ -779,7 +791,7 @@ export default function CourseDetail() {
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total Amount (incl. GST)</Text>
               <Text style={styles.totalValue}>
-                ₹{formatCurrency(finalPrice)}
+                {isFreeCourse ? "FREE" : `₹${formatCurrency(finalPrice)}`}
               </Text>
             </View>
 
@@ -897,13 +909,17 @@ export default function CourseDetail() {
                 {isExpired ? "Renewal Price" : "Total Price"}
               </Text>
               <Text style={styles.enrollPriceValue}>
-                ₹{formatCurrency(finalPrice ?? 0)}
+                {isFreeCourse ? "FREE" : `₹${formatCurrency(finalPrice ?? 0)}`}
               </Text>
             </View>
 
             <TouchableOpacity style={styles.enrollButton} onPress={handleActionPress}>
               <Text style={styles.enrollButtonText}>
-                {isExpired ? "Renew Now" : "Enroll Now"}
+                {isExpired
+                  ? "Renew Now"
+                  : isFreeCourse
+                    ? "Get Free Access"
+                    : "Enroll Now"}
               </Text>
             </TouchableOpacity>
           </View>

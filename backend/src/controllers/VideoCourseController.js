@@ -17,171 +17,171 @@ class VideoCourseController {
 
 
   static async create(req, res) {
-  try {
-    console.log("==== VideoCourse CREATE API HIT ====");
-    console.log("Request Body:", req.body);
+    try {
+      console.log("==== VideoCourse CREATE API HIT ====");
+      console.log("Request Body:", req.body);
 
-    const requiredFields = [
-      "title",
-      "videoSource",
-      "url",
-      "batchId",
-      "subjectId",
-    ];
+      const requiredFields = [
+        "title",
+        "videoSource",
+        "url",
+        "batchId",
+        "subjectId",
+      ];
 
-    for (const field of requiredFields) {
-      if (!req.body[field]) {
-        console.log(`❌ Missing field: ${field}`);
+      for (const field of requiredFields) {
+        if (!req.body[field]) {
+          console.log(`❌ Missing field: ${field}`);
+          return res.status(400).json({
+            success: false,
+            message: `${field} is required`,
+          });
+        }
+      }
+
+      const batchId = Number(req.body.batchId);
+      console.log("Batch ID:", batchId);
+
+      /* ================= GET BATCH ================= */
+
+      const batch = await Batch.findByPk(batchId);
+      console.log("Batch Found:", batch ? batch.id : null);
+
+      if (!batch) {
+        console.log("❌ Batch not found");
         return res.status(400).json({
           success: false,
-          message: `${field} is required`,
+          message: "Batch not found",
         });
       }
-    }
 
-    const batchId = Number(req.body.batchId);
-    console.log("Batch ID:", batchId);
+      /* ================= POSITION HANDLING ================= */
 
-    /* ================= GET BATCH ================= */
+      let position = null;
 
-    const batch = await Batch.findByPk(batchId);
-    console.log("Batch Found:", batch ? batch.id : null);
+      if (batch.category === "recorded") {
+        console.log("Handling position for recorded batch");
 
-    if (!batch) {
-      console.log("❌ Batch not found");
-      return res.status(400).json({
+        position = await PositionService.insert(
+          VideoCourse,
+          "position",
+          req.body.position,
+          { batchId: batchId }
+        );
+
+        console.log("Assigned Position:", position);
+      }
+
+      /* ================= LIVE VALIDATION ================= */
+
+      const isLive = req.body.isLive === true || req.body.isLive === "true";
+      console.log("Is Live:", isLive);
+
+      if (isLive) {
+        if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
+          console.log("❌ Live validation failed");
+          return res.status(400).json({
+            success: false,
+            message:
+              "DateOfLive and TimeOfLIve are required when the video is live",
+          });
+        }
+      }
+
+      /* ================= IMAGE ================= */
+
+      let imageUrl = null;
+
+      if (req.file) {
+        console.log("Uploading image to S3...");
+        imageUrl = await uploadToS3(req.file, "videocourses");
+        console.log("Image Uploaded:", imageUrl);
+      }
+
+      /* ================= PAYLOAD ================= */
+
+      const payload = {
+        title: req.body.title.trim(),
+        videoSource: req.body.videoSource,
+        url: req.body.url.trim(),
+
+        batchId,
+        subjectId: Number(req.body.subjectId),
+
+        position,
+
+        isDownloadable:
+          req.body.isDownloadable === true ||
+          req.body.isDownloadable === "true",
+
+        isDemo:
+          req.body.isDemo === true ||
+          req.body.isDemo === "true",
+
+        isLive,
+        DateOfLive: isLive ? req.body.DateOfLive : null,
+        TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
+
+        dateOfClass: req.body.dateOfClass ?? null,
+        TimeOfClass: req.body.TimeOfClass ?? null,
+
+        status: "active",
+        isDeleted: false, // ✅ Explicitly set isDeleted to false
+        statusDelete: 0,  // ✅ Added field (statusDelete set to 0)
+
+        imageUrl,
+      };
+
+      console.log("Payload तैयार:", payload);
+
+      /* ================= CREATE VIDEO ================= */
+
+      const item = await VideoCourse.create(payload);
+      console.log("✅ Video Created with ID:", item.id);
+
+      /* ================= TOKEN ================= */
+
+      const secureToken = encryptVideoPayload({
+        videoId: item.id,
+        batchId: item.batchId,
+        videoSource: item.videoSource,
+        exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      });
+
+      await item.update({ secureToken });
+      console.log("🔐 Secure Token Generated");
+
+      /* ================= CACHE CLEAR ================= */
+
+      await redis.del("videocourses");
+      await redis.del(`videocourses:batch:${batchId}`);
+
+      console.log("🧹 Cache cleared");
+
+      /* ================= RESPONSE ================= */
+
+      return res.status(201).json({
+        success: true,
+        message: "Video course created successfully",
+        data: {
+          ...item.toJSON(),
+          secureToken,
+        },
+      });
+
+    } catch (error) {
+      console.error("🔥 VideoCourse Create Error:");
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
+      console.error("Body:", req.body);
+
+      return res.status(500).json({
         success: false,
-        message: "Batch not found",
+        message: "Server error",
+        error: error.message, // optional for debugging
       });
     }
-
-    /* ================= POSITION HANDLING ================= */
-
-    let position = null;
-
-    if (batch.category === "recorded") {
-      console.log("Handling position for recorded batch");
-
-      position = await PositionService.insert(
-        VideoCourse,
-        "position",
-        req.body.position,
-        { batchId: batchId }
-      );
-
-      console.log("Assigned Position:", position);
-    }
-
-    /* ================= LIVE VALIDATION ================= */
-
-    const isLive = req.body.isLive === true || req.body.isLive === "true";
-    console.log("Is Live:", isLive);
-
-    if (isLive) {
-      if (!req.body.DateOfLive || !req.body.TimeOfLIve) {
-        console.log("❌ Live validation failed");
-        return res.status(400).json({
-          success: false,
-          message:
-            "DateOfLive and TimeOfLIve are required when the video is live",
-        });
-      }
-    }
-
-    /* ================= IMAGE ================= */
-
-    let imageUrl = null;
-
-    if (req.file) {
-      console.log("Uploading image to S3...");
-      imageUrl = await uploadToS3(req.file, "videocourses");
-      console.log("Image Uploaded:", imageUrl);
-    }
-
-    /* ================= PAYLOAD ================= */
-
-    const payload = {
-      title: req.body.title.trim(),
-      videoSource: req.body.videoSource,
-      url: req.body.url.trim(),
-
-      batchId,
-      subjectId: Number(req.body.subjectId),
-
-      position,
-
-      isDownloadable:
-        req.body.isDownloadable === true ||
-        req.body.isDownloadable === "true",
-
-      isDemo:
-        req.body.isDemo === true ||
-        req.body.isDemo === "true",
-
-      isLive,
-      DateOfLive: isLive ? req.body.DateOfLive : null,
-      TimeOfLIve: isLive ? req.body.TimeOfLIve : null,
-
-      dateOfClass: req.body.dateOfClass ?? null,
-      TimeOfClass: req.body.TimeOfClass ?? null,
-
-      status: "active",
-      isDeleted: false, // ✅ Explicitly set isDeleted to false
-      statusDelete: 0,  // ✅ Added field (statusDelete set to 0)
-
-      imageUrl,
-    };
-
-    console.log("Payload तैयार:", payload);
-
-    /* ================= CREATE VIDEO ================= */
-
-    const item = await VideoCourse.create(payload);
-    console.log("✅ Video Created with ID:", item.id);
-
-    /* ================= TOKEN ================= */
-
-    const secureToken = encryptVideoPayload({
-      videoId: item.id,
-      batchId: item.batchId,
-      videoSource: item.videoSource,
-      exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-    });
-
-    await item.update({ secureToken });
-    console.log("🔐 Secure Token Generated");
-
-    /* ================= CACHE CLEAR ================= */
-
-    await redis.del("videocourses");
-    await redis.del(`videocourses:batch:${batchId}`);
-
-    console.log("🧹 Cache cleared");
-
-    /* ================= RESPONSE ================= */
-
-    return res.status(201).json({
-      success: true,
-      message: "Video course created successfully",
-      data: {
-        ...item.toJSON(),
-        secureToken,
-      },
-    });
-
-  } catch (error) {
-    console.error("🔥 VideoCourse Create Error:");
-    console.error("Message:", error.message);
-    console.error("Stack:", error.stack);
-    console.error("Body:", req.body);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error: error.message, // optional for debugging
-    });
   }
-}
   /* ======================
       GET ALL
   ====================== */
@@ -490,105 +490,105 @@ class VideoCourseController {
 
 
 
-static async decryptAndPassVideo(req, res) {
-  try {
-    console.log("🔹 decryptAndPassVideo API called");
-
-    const { token } = req.body;
-    const userId = req.params.userId;
-
-    console.log("Incoming Data:", { token, userId });
-
-    if (!token || !userId) {
-      console.log("❌ Token or userId missing");
-      return res.status(400).json({ message: "Token & userId required" });
-    }
-
-    let payload;
-
+  static async decryptAndPassVideo(req, res) {
     try {
-      payload = decryptVideoToken(token);
-      console.log("✅ Decrypted Payload:", payload);
-    } catch (e) {
-      console.log("❌ Token Decryption Failed:", e.message);
-      return res.status(401).json({ message: "Invalid or tampered token" });
-    }
+      console.log("🔹 decryptAndPassVideo API called");
 
-    const { videoId, batchId, exp, videoSource } = payload;
+      const { token } = req.body;
+      const userId = req.params.userId;
 
-    console.log("🔎 Searching video:", { videoId, batchId });
+      console.log("Incoming Data:", { token, userId });
 
-    // include soft deleted videos
-    const video = await VideoCourse.findOne({
-      where: {
-        id: videoId,
-        batchId,
-        status: "active",
-      },
-      paranoid: false,
-    });
+      if (!token || !userId) {
+        console.log("❌ Token or userId missing");
+        return res.status(400).json({ message: "Token & userId required" });
+      }
 
-    console.log("📹 Video Result:", video ? video.id : "NOT FOUND");
+      let payload;
 
-    if (!video) {
-      console.log("❌ Video not found in DB");
-      return res.status(404).json({ message: "Video not found" });
-    }
+      try {
+        payload = decryptVideoToken(token);
+        console.log("✅ Decrypted Payload:", payload);
+      } catch (e) {
+        console.log("❌ Token Decryption Failed:", e.message);
+        return res.status(401).json({ message: "Invalid or tampered token" });
+      }
 
-    console.log("🔎 Checking user batch access");
+      const { videoId, batchId, exp, videoSource } = payload;
 
-    const hasAccess = await Order.findOne({
-      where: {
-        userId,
-        type: "batch",
-        itemId: batchId,
-        status: "success",
-      },
-      paranoid: false,
-    });
+      console.log("🔎 Searching video:", { videoId, batchId });
 
-    console.log("📦 Access Result:", hasAccess ? "ACCESS GRANTED" : "NO ACCESS");
-
-    if (!hasAccess && !video.isDemo) {
-      console.log("❌ User does not own batch");
-      return res.status(403).json({
-        message: "You do not have access to this batch",
+      // include soft deleted videos
+      const video = await VideoCourse.findOne({
+        where: {
+          id: videoId,
+          batchId,
+          status: "active",
+        },
+        paranoid: false,
       });
-    }
 
-    // Token refresh
-    let refreshedToken = null;
+      console.log("📹 Video Result:", video ? video.id : "NOT FOUND");
 
-    if (exp && exp < Date.now()) {
-      console.log("⏰ Token expired, generating new token");
+      if (!video) {
+        console.log("❌ Video not found in DB");
+        return res.status(404).json({ message: "Video not found" });
+      }
 
-      refreshedToken = encryptVideoPayload({
-        videoId: video.id,
-        batchId: video.batchId,
+      console.log("🔎 Checking user batch access");
+
+      const hasAccess = await Order.findOne({
+        where: {
+          userId,
+          type: "batch",
+          itemId: batchId,
+          status: "success",
+        },
+        paranoid: false,
+      });
+
+      console.log("📦 Access Result:", hasAccess ? "ACCESS GRANTED" : "NO ACCESS");
+
+      if (!hasAccess && !video.isDemo) {
+        console.log("❌ User does not own batch");
+        return res.status(403).json({
+          message: "You do not have access to this batch",
+        });
+      }
+
+      // Token refresh
+      let refreshedToken = null;
+
+      if (exp && exp < Date.now()) {
+        console.log("⏰ Token expired, generating new token");
+
+        refreshedToken = encryptVideoPayload({
+          videoId: video.id,
+          batchId: video.batchId,
+          videoSource: video.videoSource,
+          exp: Date.now() + 30 * 60 * 1000,
+        });
+      }
+
+      console.log("✅ Video access granted");
+
+      return res.json({
+        success: true,
+        videoUrl: video.url,
         videoSource: video.videoSource,
-        exp: Date.now() + 30 * 60 * 1000,
+        videoId: video.id,
+        refreshedToken,
+      });
+
+    } catch (err) {
+      console.error("🔥 decryptAndPassVideo error:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
       });
     }
-
-    console.log("✅ Video access granted");
-
-    return res.json({
-      success: true,
-      videoUrl: video.url,
-      videoSource: video.videoSource,
-      videoId: video.id,
-      refreshedToken,
-    });
-
-  } catch (err) {
-    console.error("🔥 decryptAndPassVideo error:", err);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
   }
-}
 
   static async update(req, res) {
     try {
@@ -821,87 +821,91 @@ static async decryptAndPassVideo(req, res) {
     }
   }
 
-static async delete(req, res) {
-  try {
-    console.log("==== DELETE VIDEO API HIT ====");
-    console.log("Params:", req.params);
-    console.log("User:", req.user);
+  static async delete(req, res) {
+    try {
+      console.log("==== DELETE VIDEO API HIT ====");
+      console.log("Params:", req.params);
+      console.log("User:", req.user);
 
-    const videoId = req.params.id;
+      const videoId = req.params.id;
 
-    /* ================= FIND VIDEO ================= */
+      /* ================= FIND VIDEO ================= */
 
-    const item = await VideoCourse.findByPk(videoId);
+      const item = await VideoCourse.findByPk(videoId, {
+        paranoid: false // fetch even soft deleted records
+      });
 
-    console.log("Fetched Video:", item ? item.id : null);
+      console.log("Fetched Video:", item ? item.id : null);
 
-    if (!item) {
-      console.log("❌ Video not found");
-      return res.status(404).json({
+      if (!item) {
+        console.log("❌ Video not found");
+        return res.status(404).json({
+          success: false,
+          message: "Video course not found"
+        });
+      }
+
+      const batchId = item.batchId;
+
+      /* ================= DELETE IMAGE FROM S3 ================= */
+
+      if (item.imageUrl) {
+        try {
+          console.log("Deleting image from S3:", item.imageUrl);
+          await deleteFromS3(item.imageUrl);
+          console.log("✅ Image deleted from S3");
+        } catch (s3Error) {
+          console.error("❌ S3 Delete Error:", s3Error.message);
+        }
+      }
+
+      /* ================= HARD DELETE ================= */
+
+      console.log("Deleting video permanently from DB...");
+
+      await item.destroy({
+        force: true // permanent delete even if paranoid enabled
+      });
+
+      console.log("✅ Video permanently deleted:", videoId);
+
+      /* ================= CLEAR CACHE ================= */
+
+      try {
+        console.log("Clearing cache...");
+
+        await Promise.all([
+          redis.del("videocourses"),
+          redis.del(`videocourse:${videoId}`),
+          redis.del(`videocourses:batch:${batchId}`)
+        ]);
+
+        console.log("✅ Cache cleared");
+      } catch (cacheError) {
+        console.error("❌ Cache Clear Error:", cacheError.message);
+      }
+
+      /* ================= RESPONSE ================= */
+
+      return res.json({
+        success: true,
+        message: "Video course permanently deleted"
+      });
+
+    } catch (error) {
+
+      console.error("🔥 DELETE ERROR");
+      console.error("Message:", error.message);
+      console.error("Stack:", error.stack);
+      console.error("Params:", req.params);
+
+      return res.status(500).json({
         success: false,
-        message: "Video course not found"
+        message: "Delete failed",
+        error: error.message
       });
     }
-
-    const batchId = item.batchId;
-
-    /* ================= DELETE IMAGE FROM S3 ================= */
-
-    if (item.imageUrl) {
-      try {
-        console.log("Deleting image from S3:", item.imageUrl);
-        await deleteFromS3(item.imageUrl);
-        console.log("✅ Image deleted from S3");
-      } catch (s3Error) {
-        console.error("❌ S3 Delete Error:", s3Error.message);
-      }
-    }
-
-    /* ================= HARD DELETE ================= */
-
-    console.log("Deleting video permanently from DB...");
-
-    await item.destroy(); // ✅ HARD DELETE
-
-    console.log("✅ Video permanently deleted:", videoId);
-
-    /* ================= CLEAR CACHE ================= */
-
-    try {
-      console.log("Clearing cache...");
-
-      await Promise.all([
-        redis.del("videocourses"),
-        redis.del(`videocourse:${videoId}`),
-        redis.del(`videocourses:batch:${batchId}`)
-      ]);
-
-      console.log("✅ Cache cleared");
-    } catch (cacheError) {
-      console.error("❌ Cache Clear Error:", cacheError.message);
-    }
-
-    /* ================= RESPONSE ================= */
-
-    return res.json({
-      success: true,
-      message: "Video course permanently deleted"
-    });
-
-  } catch (error) {
-
-    console.error("🔥 DELETE ERROR");
-    console.error("Message:", error.message);
-    console.error("Stack:", error.stack);
-    console.error("Params:", req.params);
-
-    return res.status(500).json({
-      success: false,
-      message: "Delete failed",
-      error: error.message
-    });
   }
-}
 }
 
 module.exports = VideoCourseController;

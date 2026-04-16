@@ -64,10 +64,7 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses, category
   const purchaseData = purchasedCourses[batch.id];
   const isPurchased = !!purchaseData;
 
-  const discountPercent =
-    batch.batchPrice && batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice
-      ? Math.round(((batch.batchPrice - batch.batchDiscountPrice) / batch.batchPrice) * 100)
-      : 0;
+
 
   const handlePress = () => {
     if (isPurchased) {
@@ -156,7 +153,9 @@ const CourseCard = ({ item: batch, navigation, token, purchasedCourses, category
             </TouchableOpacity>
           ) : (
             <View style={styles.priceBlock}>
-              {batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
+              {(batch.batchPrice === 0 || batch.batchDiscountPrice === 0) ? (
+                <Text style={styles.freePrice}>FREE</Text>
+              ) : batch.batchDiscountPrice && batch.batchDiscountPrice < batch.batchPrice ? (
                 <>
                   <Text style={styles.strikePrice}>
                     ₹{batch.batchPrice.toLocaleString("en-IN")}
@@ -491,7 +490,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   enrollBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
-
+freePrice: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#22c55e"
+},
   goBtn: {
     flex: 1,
     flexDirection: "row",
