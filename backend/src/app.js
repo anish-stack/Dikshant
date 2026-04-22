@@ -8,6 +8,7 @@ const app = express();
 const morgan = require('morgan');
 const logger = require('./config/logger');
 const { sendNotification } = require('./utils/sendNotifications');
+const { fixer } = require('../fixer');
 
 // app.use(
 //   morgan("combined", {
@@ -46,6 +47,7 @@ app.get('/', (req, res) => {
   logger.info("Root endpoint hit");
   res.json({ message: 'API is running' });
 });
+
 
 
 async function clearAllRedisCache() {
@@ -87,6 +89,8 @@ async function init() {
   await sequelize.sync();
   // await sequelize.sync({ alter: true });
   console.log('DB synced successfully');
+  // fixer()
+
 }
 init().catch(err => console.error('DB sync error', err));
 

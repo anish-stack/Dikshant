@@ -796,17 +796,7 @@ export default function CourseVideos() {
                         {/* Title */}
                         <td className="px-4 py-3 min-w-[200px] max-w-[280px]">
                           <div className="flex items-start gap-3">
-                            {v.imageUrl ? (
-                              <img
-                                src={v.imageUrl}
-                                alt={v.title}
-                                className="w-12 h-8 object-cover rounded-md shrink-0 border border-slate-700"
-                              />
-                            ) : (
-                              <div className="w-12 h-8 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
-                                <ImageIcon className="w-3.5 h-3.5 text-slate-600" />
-                              </div>
-                            )}
+                            
                             <div className="min-w-0">
                               <p className="font-medium text-white text-xs leading-snug line-clamp-2">
                                 {v.title}

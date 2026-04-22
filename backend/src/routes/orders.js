@@ -24,6 +24,8 @@ router.post("/admin/assign-testseries", ctrl.adminAssignTestSeries);
 router.post("/admin/revoke-subject", ctrl.adminRevokeSubject);
 router.post("/admin/revoke-quiz", ctrl.adminRevokeQuiz);
 router.post("/admin/revoke-testseries", ctrl.adminRevokeTestSeries);
+router.post("/admin/update-access-validity-days", ctrl.updateAccessValidityDays);
+
 
 router.get("/admin/user/:userId/quizzes", ctrl.getUserAssignedQuizzes);
 router.get("/admin/user/:userId/subjets", ctrl.getAdminSubjectAssigned);

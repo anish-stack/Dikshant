@@ -112,17 +112,17 @@ export default function Home() {
       setMonthlyData(monthlyRes.data.data);
       setTopBatches(batchesRes.data.data);
     } catch (err) {
-  const error = err as AxiosError<{ message?: string }>;
-  console.error("Failed to fetch statistics:", error);
+      const error = err as AxiosError<{ message?: string }>;
+      console.error("Failed to fetch statistics:", error);
 
-  if (!error.response) {
-    toast.error("Network error. Please check your internet.");
-  } else {
-    toast.error(error.response.data?.message || "Failed to load dashboard statistics");
-  }
-} finally {
-  setLoading(false);
-}
+      if (!error.response) {
+        toast.error("Network error. Please check your internet.");
+      } else {
+        toast.error(error.response.data?.message || "Failed to load dashboard statistics");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => {
     fetchAdminStatistics();
@@ -649,139 +649,139 @@ export default function Home() {
                     </th>
                   </tr>
                 </thead>
-          <tbody>
-  {loading ? (
-    // Skeleton Rows
-    Array.from({ length: 5 }).map((_, i) => (
-      <tr
-        key={i}
-        className="border-b border-gray-100 dark:border-gray-800"
-      >
-        <td className="py-4 px-6">
-          <div className="flex items-center gap-3">
-            <Skeleton className="w-12 h-12 rounded-lg" />
-            <div>
-              <Skeleton className="h-4 w-40 mb-2" />
-              <Skeleton className="h-3 w-24" />
-            </div>
-          </div>
-        </td>
-        <td className="py-4 px-6 text-center">
-          <Skeleton className="h-6 w-20 mx-auto" />
-        </td>
-        <td className="py-4 px-6 text-center">
-          <Skeleton className="h-5 w-16 mx-auto" />
-        </td>
-        <td className="py-4 px-6 text-center">
-          <Skeleton className="h-5 w-24 mx-auto" />
-        </td>
-        <td className="py-4 px-6 text-center">
-          <Skeleton className="h-5 w-20 mx-auto" />
-        </td>
-        <td className="py-4 px-6 text-center">
-          <Skeleton className="h-6 w-20 mx-auto rounded-full" />
-        </td>
-      </tr>
-    ))
-  ) : topBatches.length === 0 ? (
-    <tr>
-      <td colSpan={6} className="text-center py-12 text-gray-500">
-        <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
-        <p className="text-sm">No batch data available</p>
-      </td>
-    </tr>
-  ) : (
-    topBatches.map((batch, index) => {
-      // ❌ Invalid batch safety
-      if (!batch || !batch.batchDetails) {
-        console.warn("Invalid batch data:", batch);
-        return (
-          <tr key={index}>
-            <td colSpan={6} className="text-center py-6 text-gray-400">
-              Batch data unavailable
-            </td>
-          </tr>
-        );
-      }
+                <tbody>
+                  {loading ? (
+                    // Skeleton Rows
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr
+                        key={i}
+                        className="border-b border-gray-100 dark:border-gray-800"
+                      >
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="w-12 h-12 rounded-lg" />
+                            <div>
+                              <Skeleton className="h-4 w-40 mb-2" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <Skeleton className="h-6 w-20 mx-auto" />
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <Skeleton className="h-5 w-16 mx-auto" />
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <Skeleton className="h-5 w-24 mx-auto" />
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <Skeleton className="h-5 w-20 mx-auto" />
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <Skeleton className="h-6 w-20 mx-auto rounded-full" />
+                        </td>
+                      </tr>
+                    ))
+                  ) : topBatches.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-gray-500">
+                        <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-700" />
+                        <p className="text-sm">No batch data available</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    topBatches.map((batch, index) => {
+                      // ❌ Invalid batch safety
+                      if (!batch || !batch.batchDetails) {
+                        console.warn("Invalid batch data:", batch);
+                        return (
+                          <tr key={index}>
+                            <td colSpan={6} className="text-center py-6 text-gray-400">
+                              Batch data unavailable
+                            </td>
+                          </tr>
+                        );
+                      }
 
-      const {
-        name = "Untitled Batch",
-        imageUrl,
-        batchDiscountPrice = 0,
-        category = "General",
-        c_status = "Draft",
-      } = batch.batchDetails;
+                      const {
+                        name = "Untitled Batch",
+                        imageUrl,
+                        batchDiscountPrice = 0,
+                        category = "General",
+                        c_status = "Draft",
+                      } = batch.batchDetails;
 
-      return (
-        <tr
-          key={batch.batchId || index}
-          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
-        >
-          <td className="py-4 px-6">
-            <div className="flex items-center gap-4">
-              <img
-                src={imageUrl || "/placeholder-batch.jpg"}
-                alt={name}
-                className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
-                onError={(e) => {
-                  e.currentTarget.src = "/placeholder-batch.jpg";
-                }}
-              />
-              <div>
-                <p className="font-medium text-gray-900 dark:text-white">
-                  {name}
-                </p>
-                <p className="text-sm text-gray-500 mt-1">
-                  {formatCurrency(batchDiscountPrice)}
-                </p>
-              </div>
-            </div>
-          </td>
+                      return (
+                        <tr
+                          key={batch.batchId || index}
+                          className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors"
+                        >
+                          <td className="py-4 px-6">
+                            <div className="flex items-center gap-4">
+                              <img
+                                src={imageUrl || "/placeholder-batch.jpg"}
+                                alt={name}
+                                className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+                                onError={(e) => {
+                                  e.currentTarget.src = "/placeholder-batch.jpg";
+                                }}
+                              />
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {name}
+                                </p>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  {formatCurrency(batchDiscountPrice)}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
 
-          <td className="py-4 px-6 text-center">
-           <Badge variant="light" size="sm" color="light">
-  {category}
-</Badge>
+                          <td className="py-4 px-6 text-center">
+                            <Badge variant="light" size="sm" color="light">
+                              {category}
+                            </Badge>
 
-          </td>
+                          </td>
 
-          <td className="py-4 px-6 text-center">
-            <span className="font-semibold text-gray-800 dark:text-white text-lg">
-              {batch.enrollments ?? 0}
-            </span>
-          </td>
+                          <td className="py-4 px-6 text-center">
+                            <span className="font-semibold text-gray-800 dark:text-white text-lg">
+                              {batch.enrollments ?? 0}
+                            </span>
+                          </td>
 
-          <td className="py-4 px-6 text-center">
-            <span className="font-semibold text-green-600 dark:text-green-400 text-lg">
-              {formatCurrency(batch.revenue ?? 0)}
-            </span>
-          </td>
+                          <td className="py-4 px-6 text-center">
+                            <span className="font-semibold text-green-600 dark:text-green-400 text-lg">
+                              {formatCurrency(batch.revenue ?? 0)}
+                            </span>
+                          </td>
 
-          <td className="py-4 px-6 text-center">
-            <span className="text-gray-700 dark:text-gray-300">
-              {formatCurrency(batch.avgOrderValue ?? 0)}
-            </span>
-          </td>
+                          <td className="py-4 px-6 text-center">
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {formatCurrency(batch.avgOrderValue ?? 0)}
+                            </span>
+                          </td>
 
-          <td className="py-4 px-6 text-center">
-            <Badge
-  color={
-    c_status === "Live"
-      ? "success"
-      : c_status === "Upcoming"
-      ? "warning"
-      : "dark"
-  }
->
-  {c_status}
-</Badge>
+                          <td className="py-4 px-6 text-center">
+                            <Badge
+                              color={
+                                c_status === "Live"
+                                  ? "success"
+                                  : c_status === "Upcoming"
+                                    ? "warning"
+                                    : "dark"
+                              }
+                            >
+                              {c_status}
+                            </Badge>
 
-          </td>
-        </tr>
-      );
-    })
-  )}
-</tbody>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
 
               </table>
             </div>
@@ -795,6 +795,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-      </div>
+    </div>
 
-)}
+  )
+}

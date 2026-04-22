@@ -191,6 +191,12 @@ export default function UserProfiles() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [batchSearchTerm, setBatchSearchTerm] = useState("");
 
+
+  const [isEditValidityOpen, setIsEditValidityOpen] = useState(false);
+  const [selectedCourseForEdit, setSelectedCourseForEdit] = useState<Course | null>(null);
+  const [newExpiryDate, setNewExpiryDate] = useState("");
+  const [editValidityLoading, setEditValidityLoading] = useState(false);
+
   // Reverse assignment states
   const [selectedCourseToRemove, setSelectedCourseToRemove] = useState<Course | null>(null);
   const [reverseReason, setReverseReason] = useState<string>("");
@@ -379,6 +385,51 @@ export default function UserProfiles() {
     setSelectedUser(user);
     setIsAssignCourseOpen(true);
     fetchBatches();
+  };
+
+
+  // Add handler
+  const handleUpdateValidity = async () => {
+    if (!selectedCourseForEdit || !newExpiryDate) {
+      toast.error("Select a date");
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selected = new Date(newExpiryDate);
+    selected.setHours(0, 0, 0, 0);
+    const days = Math.ceil((selected.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (days <= 0) {
+      toast.error("Date must be in future");
+      return;
+    }
+
+    setEditValidityLoading(true);
+    try {
+      const token = localStorage.getItem("accessToken");
+      await axios.post(
+        `${API_URL}/orders/admin/update-access-validity-days`,
+        {
+          userId: selectedUser?.id,
+          orderId: selectedCourseForEdit.id,
+          accessValidityDays: days,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      toast.success("Validity updated successfully");
+      setIsEditValidityOpen(false);
+      setSelectedCourseForEdit(null);
+      setNewExpiryDate("");
+      fetchUsers(page, searchTerm, limit);
+    } catch (err) {
+      const error = err as AxiosError<{ message?: string }>;
+      toast.error(error.response?.data?.message || "Update failed");
+    } finally {
+      setEditValidityLoading(false);
+    }
   };
 
   const handleAssignCourse = async () => {
@@ -1070,7 +1121,20 @@ export default function UserProfiles() {
 
                     </p>
                   )}
-
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedCourseForEdit(course);
+                      // prefill current expiry date if exists
+                      if (expiryDate) {
+                        setNewExpiryDate(expiryDate.toISOString().split("T")[0]);
+                      }
+                      setIsEditValidityOpen(true);
+                    }}
+                  >
+                    Edit Validity
+                  </Button>
                 </div>
               </div>
 
@@ -1090,6 +1154,69 @@ export default function UserProfiles() {
           );
         })}
 
+      </Modal>
+
+      <Modal
+        isOpen={isEditValidityOpen}
+        onClose={() => {
+          setIsEditValidityOpen(false);
+          setSelectedCourseForEdit(null);
+          setNewExpiryDate("");
+        }}
+        title={`Edit Validity — ${selectedCourseForEdit?.batch?.name || "Course"}`}
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4 border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              <strong>Student:</strong> {selectedUser?.name}
+            </p>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              <strong>Course:</strong> {selectedCourseForEdit?.batch?.name || "N/A"}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              New Expiry Date
+            </label>
+            <Input
+              type="date"
+              value={newExpiryDate}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setNewExpiryDate(e.target.value)}
+            />
+            {newExpiryDate && (
+              <p className="text-xs text-gray-500 mt-1">
+                Valid for{" "}
+                {Math.ceil(
+                  (new Date(newExpiryDate).getTime() - new Date().setHours(0, 0, 0, 0)) /
+                  (1000 * 60 * 60 * 24)
+                )}{" "}
+                days from today
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditValidityOpen(false);
+                setSelectedCourseForEdit(null);
+                setNewExpiryDate("");
+              }}
+              disabled={editValidityLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateValidity}
+              disabled={!newExpiryDate || editValidityLoading}
+            >
+              {editValidityLoading ? "Updating..." : "Update Validity"}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Assign Course Modal */}
