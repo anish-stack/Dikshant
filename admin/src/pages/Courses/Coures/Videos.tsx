@@ -39,8 +39,8 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../../utils/axiosInstance";
 import toast from "react-hot-toast";
 
-const API_URL = "http://localhost:5001/api/videocourses";
-const BATCHS_API = "http://localhost:5001/api/batchs";
+const API_URL = "https://www.app.api.dikshantias.com/api/videocourses";
+const BATCHS_API = "https://www.app.api.dikshantias.com/api/batchs";
 
 interface Subject {
   id: number;
