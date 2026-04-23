@@ -20,10 +20,10 @@ const Scholarship = () => {
         <View style={styles.imageWrapper}>
           <Image
             source={{
-              uri: "https://res.cloudinary.com/dglihfwse/image/upload/v1766726612/scholarship-heros_ydcbde.jpg",
+              uri: "https://api.imagecloud.adsdigitalmedia.com/api/images/124165f1-b017-409a-84db-d6888a949876/serve",
             }}
             style={styles.bannerImage}
-            contentFit="contain"
+            contentFit="cover"
             cachePolicy="memory-disk"
           />
 
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     width: "100%",
-    height: 200,
+    height: 240,
     position: "relative",
   },
   bannerImage: {

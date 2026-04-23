@@ -263,231 +263,297 @@ class VideoCourseController {
   }
 
 
-static async FindByBatchId(req, res) {
-  try {
-    const isAdmin = req.query.admin === "true";
-    const { id } = req.params;
+  static async FindByBatchId(req, res) {
+    try {
+      const isAdmin = req.query.admin === "true";
+      const { id } = req.params;
 
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search ? req.query.search.trim() : null;
-    const offset = (page - 1) * limit;
+      console.log("=== REQUEST START ===");
+      console.log("Requested Batch ID:", id);
+      console.log("Is Admin:", isAdmin);
 
-    const subjectId = req.query.subjectId;
-    const batchIdOfSubject = req.query.batchIdOfSubject;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search ? req.query.search.trim() : null;
+      const offset = (page - 1) * limit;
 
-    console.log("subjectId", subjectId);
-    console.log("batchIdOfSubject", batchIdOfSubject);
+      const subjectId = req.query.subjectId;
+      const batchIdOfSubject = req.query.batchIdOfSubject;
 
-    const batch = await Batch.findByPk(id);
+      console.log("Pagination - Page:", page, "Limit:", limit, "Offset:", offset);
+      console.log("Filters - Search:", search, "SubjectId:", subjectId, "BatchIdOfSubject:", batchIdOfSubject);
 
-    /* ===============================
-       Order Condition
-    =============================== */
-    let orderCondition = [["position", "DESC"]];
-    if (batch) {
-      if (batch.category === "online") {
-        orderCondition = [["DateOfLive", "DESC"], ["TimeOfLIve", "DESC"]];
-      } else if (batch.category === "offline") {
-        orderCondition = [["dateOfClass", "ASC"], ["TimeOfClass", "ASC"]];
-      } else {
-        orderCondition = [["position", "ASC"]];
+      const batch = await Batch.findByPk(id);
+
+      console.log("=== BATCH LOOKUP ===");
+      console.log("Batch Found:", batch ? "YES" : "NO");
+      if (batch) {
+        console.log("Batch ID from DB:", batch.id);
+        console.log("Batch Category:", batch.category);
       }
-    }
 
-    /* ===============================
-       Subject Filter Helper
-       FIX: batchIdOfSubject optional — 
-       if subjectId exists + (no batchIdOfSubject OR matches id) → filter
-    =============================== */
-    const shouldFilterSubject =
-      subjectId &&
-      (!batchIdOfSubject || Number(batchIdOfSubject) === Number(id));
-
-    /* ===============================
-       Primary WHERE
-    =============================== */
-    let whereCondition = { batchId: id };
-
-    if (shouldFilterSubject) {
-      whereCondition.subjectId = Number(subjectId);
-    }
-
-    if (isAdmin && search) {
-      whereCondition.title = { [Op.like]: `%${search}%` };
-    }
-
-    /* ===============================
-       Query Builder
-    =============================== */
-    const buildQueryOptions = (where) => {
-      const opts = { where, paranoid: false, order: orderCondition };
-      if (isAdmin) {
-        opts.limit = limit;
-        opts.offset = offset;
-      }
-      return opts;
-    };
-
-    let result = await VideoCourse.findAndCountAll(buildQueryOptions(whereCondition));
-
-    /* ===============================
-       Normalize Subject IDs
-    =============================== */
-    const normalizeSubjectIds = (raw) => {
-      if (raw == null) return [];
-      let val = raw;
-
-      if (typeof val === "string") {
-        let s = val.trim();
-        if (
-          (s.startsWith('"') && s.endsWith('"')) ||
-          (s.startsWith("'") && s.endsWith("'"))
-        ) {
-          s = s.slice(1, -1).trim();
+      /* ===============================
+         Order Condition
+      =============================== */
+      let orderCondition = [["position", "DESC"]];
+      if (batch) {
+        if (batch.category === "online") {
+          orderCondition = [["DateOfLive", "DESC"], ["TimeOfLIve", "DESC"]];
+          console.log("Order: ONLINE (by DateOfLive DESC, TimeOfLIve DESC)");
+        } else if (batch.category === "offline") {
+          orderCondition = [["dateOfClass", "ASC"], ["TimeOfClass", "ASC"]];
+          console.log("Order: OFFLINE (by dateOfClass ASC, TimeOfClass ASC)");
+        } else {
+          orderCondition = [["position", "ASC"]];
+          console.log("Order: DEFAULT (by position ASC)");
         }
-        try { val = JSON.parse(s); } catch { val = s; }
       }
 
-      const flatten = (arr) =>
-        arr.reduce((acc, item) => {
-          if (Array.isArray(item)) acc.push(...flatten(item));
-          else acc.push(item);
-          return acc;
-        }, []);
+      /* ===============================
+         Subject Filter Helper
+         FIX: batchIdOfSubject optional — 
+         if subjectId exists + (no batchIdOfSubject OR matches id) → filter
+      =============================== */
+      const shouldFilterSubject =
+        subjectId &&
+        (!batchIdOfSubject || Number(batchIdOfSubject) === Number(id));
 
-      if (Array.isArray(val)) val = flatten(val);
-      else val = [val];
+      console.log("=== FILTER LOGIC ===");
+      console.log("Should Filter Subject:", shouldFilterSubject);
 
-      return [
-        ...new Set(
-          val
-            .map((x) => {
-              if (x == null) return null;
-              if (typeof x === "string") x = x.trim();
-              const n = Number(x);
-              return Number.isFinite(n) ? n : null;
-            })
-            .filter((x) => x !== null)
-        ),
-      ];
-    };
+      /* ===============================
+         FALLBACK CONFIGURATION
+         Set to true/false to enable/disable fallback logic
+      =============================== */
+      const doFallback = false;  // ✅ CHANGE THIS TO true/false
+      console.log("Fallback Enabled:", doFallback);
 
-    /* ===============================
-       Fallback if no videos
-    =============================== */
-    if (result.rows.length === 0) {
-      if (!batch) {
-        return res.json({
-          success: true,
-          data: [],
-          ...(isAdmin && { pagination: { total: 0, page, limit, totalPages: 0 } }),
-        });
+      /* ===============================
+         Primary WHERE
+      =============================== */
+      let whereCondition = { batchId: id };
+
+      console.log("Initial WHERE (before filters):", JSON.stringify(whereCondition));
+
+      if (shouldFilterSubject) {
+        whereCondition.subjectId = Number(subjectId);
+        console.log("Added Subject Filter:", whereCondition.subjectId);
       }
-
-      const subjectIds = normalizeSubjectIds(batch.subjectId);
-
-      if (subjectIds.length === 0) {
-        return res.json({
-          success: true,
-          data: [],
-          ...(isAdmin && { pagination: { total: 0, page, limit, totalPages: 0 } }),
-        });
-      }
-
-      // FIX: same shouldFilterSubject logic in fallback
-      let fallbackWhere = shouldFilterSubject
-        ? { subjectId: Number(subjectId) }
-        : { subjectId: { [Op.in]: subjectIds } };
 
       if (isAdmin && search) {
-        fallbackWhere.title = { [Op.like]: `%${search}%` };
+        whereCondition.title = { [Op.like]: `%${search}%` };
+        console.log("Added Search Filter:", search);
       }
 
-      result = await VideoCourse.findAndCountAll(buildQueryOptions(fallbackWhere));
-    }
+      console.log("Final WHERE Condition:", JSON.stringify(whereCondition));
 
-    const { rows: items, count } = result;
+      /* ===============================
+         Query Builder
+      =============================== */
+      const buildQueryOptions = (where) => {
+        const opts = { where, paranoid: false, order: orderCondition };
+        if (isAdmin) {
+          opts.limit = limit;
+          opts.offset = offset;
+        }
+        return opts;
+      };
 
-    if (!items || items.length === 0) {
+      console.log("=== DATABASE QUERY ===");
+      let result = await VideoCourse.findAndCountAll(buildQueryOptions(whereCondition));
+
+      console.log("Videos Found (Primary Query):", result.rows.length);
+      console.log("Total Count (Primary Query):", result.count);
+
+      /* ===============================
+         Normalize Subject IDs (only used if fallback is enabled)
+      =============================== */
+      const normalizeSubjectIds = (raw) => {
+        if (raw == null) return [];
+        let val = raw;
+
+        if (typeof val === "string") {
+          let s = val.trim();
+          if (
+            (s.startsWith('"') && s.endsWith('"')) ||
+            (s.startsWith("'") && s.endsWith("'"))
+          ) {
+            s = s.slice(1, -1).trim();
+          }
+          try { val = JSON.parse(s); } catch { val = s; }
+        }
+
+        const flatten = (arr) =>
+          arr.reduce((acc, item) => {
+            if (Array.isArray(item)) acc.push(...flatten(item));
+            else acc.push(item);
+            return acc;
+          }, []);
+
+        if (Array.isArray(val)) val = flatten(val);
+        else val = [val];
+
+        return [
+          ...new Set(
+            val
+              .map((x) => {
+                if (x == null) return null;
+                if (typeof x === "string") x = x.trim();
+                const n = Number(x);
+                return Number.isFinite(n) ? n : null;
+              })
+              .filter((x) => x !== null)
+          ),
+        ];
+      };
+
+      /* ===============================
+         Fallback if no videos (Optional)
+      =============================== */
+      if (doFallback && result.rows.length === 0) {
+        console.log("=== FALLBACK TRIGGERED (No videos found) ===");
+
+        if (!batch) {
+          console.log("Batch does not exist. Returning empty array.");
+          return res.json({
+            success: true,
+            data: [],
+            ...(isAdmin && { pagination: { total: 0, page, limit, totalPages: 0 } }),
+          });
+        }
+
+        const subjectIds = normalizeSubjectIds(batch.subjectId);
+        console.log("Batch Subject IDs (normalized):", subjectIds);
+
+        if (subjectIds.length === 0) {
+          console.log("No subject IDs in batch. Returning empty array.");
+          return res.json({
+            success: true,
+            data: [],
+            ...(isAdmin && { pagination: { total: 0, page, limit, totalPages: 0 } }),
+          });
+        }
+
+        // Same shouldFilterSubject logic in fallback
+        let fallbackWhere = shouldFilterSubject
+          ? { subjectId: Number(subjectId) }
+          : { subjectId: { [Op.in]: subjectIds } };
+
+        if (isAdmin && search) {
+          fallbackWhere.title = { [Op.like]: `%${search}%` };
+        }
+
+        console.log("Fallback WHERE Condition:", JSON.stringify(fallbackWhere));
+        console.log("Executing fallback query...");
+
+        result = await VideoCourse.findAndCountAll(buildQueryOptions(fallbackWhere));
+
+        console.log("Videos Found (Fallback Query):", result.rows.length);
+        console.log("Total Count (Fallback Query):", result.count);
+      } else if (result.rows.length === 0) {
+        console.log("=== NO VIDEOS FOUND & FALLBACK DISABLED ===");
+      }
+
+      const { rows: items, count } = result;
+
+      if (!items || items.length === 0) {
+        console.log("=== FINAL RESULT: EMPTY ===");
+        return res.json({
+          success: true,
+          data: [],
+          ...(isAdmin && {
+            pagination: {
+              total: count || 0,
+              page,
+              limit,
+              totalPages: Math.ceil((count || 0) / limit),
+            },
+          }),
+        });
+      }
+
+      console.log("=== PROCESSING VIDEOS ===");
+      console.log("Total Videos to Process:", items.length);
+
+      /* ===============================
+         Secure Token + Response Map
+      =============================== */
+      const response = await Promise.all(
+        items.map(async (video, index) => {
+          console.log(`Processing video ${index + 1}/${items.length}: ID=${video.id}, BatchId=${video.batchId}`);
+
+          let secureToken = video.secureToken;
+
+          if (!secureToken) {
+            console.log(`  → Generating new token for video ${video.id}`);
+            secureToken = encryptVideoPayload({
+              videoId: video.id,
+              batchId: video.batchId,
+              videoSource: video.videoSource,
+              exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
+            });
+            try {
+              await video.update({ secureToken });
+              console.log(`  → Token saved successfully`);
+            } catch (err) {
+              console.error(`  → Token save failed for video ${video.id}:`, err.message);
+            }
+          } else {
+            console.log(`  → Token already exists`);
+          }
+
+          return {
+            id: video.id,
+            title: video.title,
+            imageUrl: video.imageUrl,
+            videoSource: video.videoSource,
+            batchId: video.batchId,
+            subjectId: video.subjectId,
+            position: video.position,
+            isDownloadable: video.isDownloadable,
+            isDemo: video.isDemo,
+            status: video.status,
+            isLive: video.isLive,
+            isLiveEnded: video.isLiveEnded,
+            LiveEndAt: video.LiveEndAt,
+            DateOfLive: video.DateOfLive,
+            TimeOfLIve: video.TimeOfLIve,
+            dateOfClass: video.dateOfClass,
+            TimeOfClass: video.TimeOfClass,
+            createdAt: video.createdAt,
+            secureToken,
+            ...(isAdmin ? { url: video.url } : {}),
+          };
+        })
+      );
+
+      console.log("=== FINAL RESPONSE ===");
+      console.log("Total Videos in Response:", response.length);
+      console.log("Pagination Enabled:", isAdmin);
+      if (isAdmin) {
+        console.log("Pagination Details - Page:", page, "Limit:", limit, "Total:", count, "TotalPages:", Math.ceil(count / limit));
+      }
+
       return res.json({
         success: true,
-        data: [],
+        data: response,
         ...(isAdmin && {
           pagination: {
-            total: count || 0,
+            total: count,
             page,
             limit,
-            totalPages: Math.ceil((count || 0) / limit),
+            totalPages: Math.ceil(count / limit),
           },
         }),
       });
+
+    } catch (error) {
+      console.error("=== ERROR OCCURRED ===");
+      console.error("Error Message:", error.message);
+      console.error("Error Stack:", error.stack);
+      return res.status(500).json({ success: false, message: "Server error" });
     }
-
-    /* ===============================
-       Secure Token + Response Map
-    =============================== */
-    const response = await Promise.all(
-      items.map(async (video) => {
-        let secureToken = video.secureToken;
-
-        if (!secureToken) {
-          secureToken = encryptVideoPayload({
-            videoId: video.id,
-            batchId: video.batchId,
-            videoSource: video.videoSource,
-            exp: Date.now() + 365 * 24 * 60 * 60 * 1000,
-          });
-          try {
-            await video.update({ secureToken });
-          } catch (err) {
-            console.error(`Token save failed for video ${video.id}`, err);
-          }
-        }
-
-        return {
-          id: video.id,
-          title: video.title,
-          imageUrl: video.imageUrl,
-          videoSource: video.videoSource,
-          batchId: video.batchId,
-          subjectId: video.subjectId,
-          position: video.position,
-          isDownloadable: video.isDownloadable,
-          isDemo: video.isDemo,
-          status: video.status,
-          isLive: video.isLive,
-          isLiveEnded: video.isLiveEnded,
-          LiveEndAt: video.LiveEndAt,
-          DateOfLive: video.DateOfLive,
-          TimeOfLIve: video.TimeOfLIve,
-          dateOfClass: video.dateOfClass,
-          TimeOfClass: video.TimeOfClass,
-          createdAt: video.createdAt,
-          secureToken,
-          ...(isAdmin ? { url: video.url } : {}),
-        };
-      })
-    );
-
-    return res.json({
-      success: true,
-      data: response,
-      ...(isAdmin && {
-        pagination: {
-          total: count,
-          page,
-          limit,
-          totalPages: Math.ceil(count / limit),
-        },
-      }),
-    });
-
-  } catch (error) {
-    console.error("FindByBatchId error:", error);
-    return res.status(500).json({ success: false, message: "Server error" });
   }
-}
 
 
   static async decryptAndPassVideo(req, res) {

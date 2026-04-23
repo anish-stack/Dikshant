@@ -86,9 +86,7 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
     }));
 
     // Sort subjects (you can customize sorting logic)
-    const sortedSubjectList = [...subjectList].sort((a, b) =>
-        (a?.name || '').localeCompare(b?.name || '')
-    );
+    const sortedSubjectList = [...subjectList]
 
     const handleSubjectPress = (subjectId) => {
         if (!subjectId) {

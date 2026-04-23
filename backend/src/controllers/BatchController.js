@@ -462,107 +462,131 @@ class BatchController {
   // =========================
   // FIND ONE
   // =========================
-  static async findOne(req, res) {
-    try {
-      const id = req.params.id;
+static async findOne(req, res) {
+  try {
+    const id = req.params.id;
 
-      const item = await Batch.findByPk(id, {
-        include: [
-          {
-            model: Program,
-            as: "program",
-            attributes: ["id", "name", "slug"],
-          },
-        ],
-      });
+    const item = await Batch.findByPk(id, {
+      include: [
+        {
+          model: Program,
+          as: "program",
+          attributes: ["id", "name", "slug"],
+        },
+      ],
+    });
 
-      if (!item) {
-        return res.status(404).json({ message: "Batch not found" });
-      }
-
-      const { Op } = require("sequelize");
-
-      let subjectIds = [];
-
-      try {
-        let raw = item.subjectId;
-
-        if (typeof raw === "string") {
-          raw = JSON.parse(raw);
-        }
-
-        if (typeof raw === "string") {
-          raw = JSON.parse(raw);
-        }
-
-        if (Array.isArray(raw)) {
-          subjectIds = raw.map(Number);
-        }
-      } catch {
-        subjectIds = [];
-      }
-
-      let subjectsList = [];
-
-      if (subjectIds.length) {
-        const subjects = await Subject.findAll({
-          where: {
-            id: { [Op.in]: subjectIds },
-          },
-          attributes: ["id", "name"],
-        });
-
-        const subjectMap = {};
-        subjects.forEach((s) => {
-          subjectMap[s.id] = s.name;
-        });
-
-        subjectsList = subjectIds.map((id) => ({
-          id,
-          name: subjectMap[id] || null,
-        }));
-      }
-
-      /* ================= Parse Separate Purchase Subjects ================= */
-      let separatePurchaseSubjects = [];
-      try {
-        let rawSeparate = item.separatePurchaseSubjectIds;
-
-        if (typeof rawSeparate === "string") {
-          rawSeparate = JSON.parse(rawSeparate);
-        }
-
-        if (Array.isArray(rawSeparate)) {
-          separatePurchaseSubjects = rawSeparate.map((sub) => ({
-            subjectId: Number(sub.subjectId),
-            price: Number(sub.price) || 0,
-            discountPrice: Number(sub.discountPrice) || 0,
-            expiryDays: Number(sub.expiryDays) || 365,
-            position: Number(sub.position) || 1,
-            status: sub.status || "active",
-            tag: sub.tag || null,
-          }));
-        }
-      } catch (e) {
-        console.error("Error parsing separatePurchaseSubjectIds:", e);
-        separatePurchaseSubjects = [];
-      }
-      const response = {
-        ...item.toJSON(),
-        subjects: subjectsList,
-        separatePurchaseSubjects,
-      };
-      delete response.subjectId;
-      delete response.separatePurchaseSubjectIds;
-      return res.json(response);
-    } catch (err) {
-      return res.status(500).json({
-        message: "Error fetching batch",
-        error: err.message,
+    if (!item) {
+      return res.status(404).json({
+        message: "Batch not found",
       });
     }
-  }
 
+    const { Op } = require("sequelize");
+
+    /* =========================================
+       Parse subjectId
+    ========================================= */
+    let subjectIds = [];
+
+    try {
+      let raw = item.subjectId;
+
+      if (typeof raw === "string") {
+        raw = JSON.parse(raw);
+      }
+
+      if (typeof raw === "string") {
+        raw = JSON.parse(raw);
+      }
+
+      if (Array.isArray(raw)) {
+        subjectIds = raw.map(Number);
+      }
+    } catch {
+      subjectIds = [];
+    }
+
+    /* =========================================
+       Subjects List
+    ========================================= */
+    let subjectsList = [];
+
+    if (subjectIds.length) {
+      const subjects = await Subject.findAll({
+        where: {
+          id: {
+            [Op.in]: subjectIds,
+          },
+        },
+        attributes: ["id", "name"],
+      });
+
+      const subjectMap = {};
+
+      subjects.forEach((s) => {
+        subjectMap[s.id] = s.name;
+      });
+
+      subjectsList = subjectIds
+        .map((id) => ({
+          id,
+          name: subjectMap[id] || null,
+        }))
+        .filter((item) => item.name !== null); // remove null names
+    }
+
+    /* =========================================
+       Separate Purchase Subjects
+    ========================================= */
+    let separatePurchaseSubjects = [];
+
+    try {
+      let rawSeparate = item.separatePurchaseSubjectIds;
+
+      if (typeof rawSeparate === "string") {
+        rawSeparate = JSON.parse(rawSeparate);
+      }
+
+      if (Array.isArray(rawSeparate)) {
+        separatePurchaseSubjects = rawSeparate.map((sub) => ({
+          subjectId: Number(sub.subjectId),
+          price: Number(sub.price) || 0,
+          discountPrice: Number(sub.discountPrice) || 0,
+          expiryDays: Number(sub.expiryDays) || 365,
+          position: Number(sub.position) || 1,
+          status: sub.status || "active",
+          tag: sub.tag || null,
+        }));
+      }
+    } catch (e) {
+      console.error(
+        "Error parsing separatePurchaseSubjectIds:",
+        e
+      );
+      separatePurchaseSubjects = [];
+    }
+
+    /* =========================================
+       Final Response
+    ========================================= */
+    const response = {
+      ...item.toJSON(),
+      subjects: subjectsList,
+      separatePurchaseSubjects,
+    };
+
+    delete response.subjectId;
+    delete response.separatePurchaseSubjectIds;
+
+    return res.json(response);
+  } catch (err) {
+    return res.status(500).json({
+      message: "Error fetching batch",
+      error: err.message,
+    });
+  }
+}
   static async findOneBySlug(req, res) {
     try {
       const slug = req.params.slug;
