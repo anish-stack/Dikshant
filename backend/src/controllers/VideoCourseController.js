@@ -1,6 +1,6 @@
 "use strict";
 
-const { VideoCourse, Order, Coupon, Batch, Program, Subject, } = require("../models");
+const { VideoCourse, Order, Coupon, Batch, Program, Subject, sequelize, } = require("../models");
 const redis = require("../config/redis");
 const uploadToS3 = require("../utils/s3Upload");
 const deleteFromS3 = require("../utils/s3Delete");
@@ -658,10 +658,17 @@ class VideoCourseController {
 
   static async update(req, res) {
     try {
-      const item = await VideoCourse.findByPk(
-        req.params.id
-      );
 
+      const parsedId = Number(req.params.id);
+      if (isNaN(parsedId)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid video ID",
+        });
+      }
+      const item = await VideoCourse.findByPk(parsedId, {
+        paranoid: false
+      });
       if (!item) {
         return res.status(404).json({
           success: false,

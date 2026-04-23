@@ -217,7 +217,7 @@ export default function CourseSubjectEnrolled({ route, navigation }) {
                                         onPress={() => handleSubjectPress(item?.id)}
                                     >
                                         <View style={styles.cardInner}>
-                                            <Text style={styles.subjectName} numberOfLines={2}>
+                                            <Text style={styles.subjectName} numberOfLines={4}>
                                                 {subjectName}
                                             </Text>
 
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     subjectName: {
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: '600',
         color: '#1e293b',
         textAlign: 'center',
