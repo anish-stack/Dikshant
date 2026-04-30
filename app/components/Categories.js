@@ -21,8 +21,11 @@ const CategoryCard = ({ item }) => {
   const navigation = useNavigation();
 
   const handlePress = () => {
-    if (item.comingSoon) return;
+    console.log("Category Pressed:", item.title, "Screen:", item.screen); // Debug log
+    if (item.comingSoon) {
+      navigation.navigate(item.screen);
 
+    }
     if (item.screen === "Courses" && item.filter) {
       navigation.navigate(item.screen, { filter: item.filter });
     } else {
@@ -35,7 +38,7 @@ const CategoryCard = ({ item }) => {
       style={[styles.categoryCard, { width: CARD_WIDTH }]}
       onPress={handlePress}
       activeOpacity={0.8}
-      disabled={item.comingSoon}
+    // disabled={item.comingSoon}
     >
       <LinearGradient
         colors={item.gradient}

@@ -1,22 +1,22 @@
 class helpers {
-static generateSlug(name) {
-    if (!name || typeof name !== 'string') {
-        console.warn("Slug received invalid value:", name);
-        return '';
+    static generateSlug(name) {
+        if (!name || typeof name !== 'string') {
+            console.warn("Slug received invalid value:", name);
+            return '';
+        }
+
+        const baseSlug = name
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        const timestamp = Date.now(); // milliseconds (more unique)
+
+        return `${baseSlug}-${timestamp}`;
     }
-
-    const baseSlug = name
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9-]/g, '')
-        .replace(/-+/g, '-')
-        .replace(/^-+|-+$/g, '');
-
-    const timestamp = Date.now(); // milliseconds (more unique)
-
-    return `${baseSlug}-${timestamp}`;
-}
     static normalizeArray(value) {
         if (!value) return [];
         if (Array.isArray(value)) return value;

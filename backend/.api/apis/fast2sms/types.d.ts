@@ -1,0 +1,14 @@
+import type { FromSchema } from 'json-schema-to-ts';
+import * as schemas from './schemas';
+export type GetDevbulkV21BodyParam = FromSchema<typeof schemas.GetDevbulkV21.body>;
+export type GetDevbulkV21MetadataParam = FromSchema<typeof schemas.GetDevbulkV21.metadata>;
+export type GetDevbulkV21Response200 = FromSchema<typeof schemas.GetDevbulkV21.response['200']>;
+export type GetDevbulkV2MetadataParam = FromSchema<typeof schemas.GetDevbulkV2.metadata>;
+export type GetDevbulkV2Response200 = FromSchema<typeof schemas.GetDevbulkV2.response['200']>;
+export type GetDevdlt1MetadataParam = FromSchema<typeof schemas.GetDevdlt1.metadata>;
+export type GetDevdlt1Response200 = FromSchema<typeof schemas.GetDevdlt1.response['200']>;
+export type GetDevdltMetadataParam = FromSchema<typeof schemas.GetDevdlt.metadata>;
+export type GetDevdltResponse200 = FromSchema<typeof schemas.GetDevdlt.response['200']>;
+export type PostDevbulkV21BodyParam = FromSchema<typeof schemas.PostDevbulkV21.body>;
+export type PostDevbulkV21MetadataParam = FromSchema<typeof schemas.PostDevbulkV21.metadata>;
+export type PostDevbulkV21Response200 = FromSchema<typeof schemas.PostDevbulkV21.response['200']>;

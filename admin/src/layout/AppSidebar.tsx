@@ -29,7 +29,7 @@ const navItems: NavItem[] = [
     name: "Student Profiles",
     path: "/profile",
   },
-    {
+  {
     icon: <FerrisWheelIcon />,
     name: "Free Videos",
     path: "/free-videos",
@@ -44,6 +44,15 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    name: "New Testseries",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "Testseries", path: "/new-admin" },
+      { name: "Tests", path: "/new-testsPage" },
+      { name: "Questions", path: "/new-questions" },
+    ],
+  },
+  {
     name: "Quizzes & Test Series",
     icon: <ListIcon />,
     subItems: [
@@ -53,7 +62,7 @@ const navItems: NavItem[] = [
       { name: "All Test Series Bundle", path: "/all-test-series-bundle" },
     ],
   },
-      {
+  {
     icon: <BookDashed />,
     name: "Study Materials",
     subItems: [
@@ -203,11 +212,10 @@ const AppSidebar = () => {
                 <>
                   <span className="flex-1 text-left font-medium">{item.name}</span>
                   <ChevronDownIcon
-                    className={`h-5 w-5 transition-transform ${
-                      openSubmenu?.type === menuType && openSubmenu?.index === idx
+                    className={`h-5 w-5 transition-transform ${openSubmenu?.type === menuType && openSubmenu?.index === idx
                         ? "rotate-180"
                         : ""
-                    }`}
+                      }`}
                   />
                 </>
               )}

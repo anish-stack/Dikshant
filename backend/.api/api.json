@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "fast2sms",
+      "source": "@fast2sms/v1.0#exkv1wmhw27hkn",
+      "integrity": "sha512-GdwlXvifTDCcWmzvsUpuoKm/NZTkbFmwctk71UhkNxTLSR7/WBKc2pnHCHoL9lF506lXqZ5Iq4gEjqfDVeglpA==",
+      "installerVersion": "6.1.3"
+    }
+  ]
+}

@@ -39,13 +39,13 @@ const quickActions = [
     color: "#22C55E",
     screen: "all-my-quiz"
   },
-  {
-    label: "Test Series",
-    icon: "file-text",
-    bg: "#FEF3C7",
-    color: "#F59E0B",
-    screen: "TestSeries" // tera test series screen name daal dena
-  },
+  // {
+  //   label: "Test Series",
+  //   icon: "file-text",
+  //   bg: "#FEF3C7",
+  //   color: "#F59E0B",
+  //   screen: "TestSeries" // tera test series screen name daal dena
+  // },
   {
     label: "Study Materials",
     icon: "book",

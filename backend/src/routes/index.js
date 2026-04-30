@@ -35,6 +35,7 @@ router.use('/app-ratings',require("./ratting"))
 router.use('/support',require("./support.routes"))
 router.use('/doubt',require("./doubt.routes"))
 router.use('/study-materials',require("./studyMaterialRoutes"))
+router.use('/new',require("./new_testseries.routes"))
 
 router.use('/assets',require('./appassets'))
 

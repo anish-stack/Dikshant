@@ -1,0 +1,534 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "DLT SMS API"
+  },
+  "servers": [
+    {
+      "url": "https://www.fast2sms.com"
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/dev/bulkV2": {
+      "get": {
+        "description": "",
+        "operationId": "get_devbulkV2",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean",
+                      "default": "true"
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "default": "lwdtp7cjyqxvfe9"
+                    },
+                    "message": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "default": "Message sent successfully"
+                    }
+                  },
+                  "required": [
+                    "return",
+                    "request_id",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "authorization",
+            "schema": {
+              "type": "string",
+              "default": "YOUR_API_KEY"
+            },
+            "required": true,
+            "description": "Provide \"YOUR_API_KEY\". "
+          },
+          {
+            "in": "query",
+            "name": "sender_id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Your 3-6 letter DLT approved Sender ID like \"FSTSMS\", before using you need to first submit it to Fast2SMS for approval."
+          },
+          {
+            "in": "query",
+            "name": "message",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Your Message_ID like, \"111111\" you can get your approved Message ID."
+          },
+          {
+            "in": "query",
+            "name": "variables_values",
+            "schema": {
+              "type": "string",
+              "default": "var1|var2"
+            },
+            "required": true,
+            "description": "If you've used {#var#} inside your DLT approved SMS then you can submit values for those variables like: \"Rahul|8888888888|6695\" seperated by pipe \"|\"."
+          },
+          {
+            "in": "query",
+            "name": "route",
+            "schema": {
+              "type": "string",
+              "default": "dlt"
+            },
+            "required": true,
+            "description": "For DLT SMS route use \"dlt\""
+          },
+          {
+            "in": "query",
+            "name": "numbers",
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "You can send multiple mobile numbers seperated by comma like: \"8888888888,9999999999,6666666666\""
+          },
+          {
+            "in": "query",
+            "name": "flash",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ],
+              "default": "0"
+            },
+            "description": "This field is optional, it will use \"0\" as default value or you can set to \"1\" for sending flash message."
+          },
+          {
+            "in": "query",
+            "name": "schedule_time",
+            "schema": {
+              "type": "string"
+            },
+            "description": "This field is optional, it will use \"null\" as default value or you can set to a future date and time in format YYYY-MM-DD-HH-MM"
+          }
+        ]
+      },
+      "post": {
+        "description": "",
+        "operationId": "get_devbulkV2-1",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean",
+                      "default": "true"
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "default": "lwdtp7cjyqxvfe9"
+                    },
+                    "message": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "default": "Message sent successfully"
+                    }
+                  },
+                  "required": [
+                    "return"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "schema": {
+              "type": "string",
+              "default": "YOUR_API_KEY"
+            },
+            "required": true,
+            "description": "Provide \"YOUR_API_KEY\"."
+          }
+        ],
+        "summary": "Copy of ",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sender_id": {
+                    "type": "string",
+                    "description": "Your 3-6 letter DLT approved Sender ID like \"FSTSMS\", before using you need to first submit it to Fast2SMS for approval"
+                  },
+                  "message": {
+                    "type": "integer",
+                    "description": "Your Message_ID like, \"111111\" you can get your approved Message ID here."
+                  },
+                  "variables_values": {
+                    "type": "string",
+                    "description": "If you've used {#var#} inside your DLT approved SMS then you can submit values for those variables like: \"Rahul|8888888888|6695\" seperated by pipe \"|\".",
+                    "default": "var1|var2"
+                  },
+                  "route": {
+                    "type": "string",
+                    "description": "For DLT SMS route use \"dlt\"",
+                    "default": "dlt"
+                  },
+                  "numbers": {
+                    "type": "string",
+                    "description": "You can send multiple mobile numbers seperated by comma like: \"8888888888,9999999999,6666666666\""
+                  },
+                  "flash": {
+                    "type": "string",
+                    "enum": [
+                      "0",
+                      "1"
+                    ],
+                    "default": "0"
+                  },
+                  "schedule_time": {
+                    "type": "string",
+                    "description": "This field is optional, it will use \"null\" as default value or you can set to a future date and time in format YYYY-MM-DD-HH-MM"
+                  }
+                },
+                "required": [
+                  "sender_id",
+                  "variables_values",
+                  "route",
+                  "numbers"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/custom": {
+      "post": {
+        "description": "",
+        "operationId": "post_devbulkV2-1",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean",
+                      "default": "true"
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "default": "KPBjLltJT9Ni4kR"
+                    },
+                    "message": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "default": "SMS sent successfully",
+                      "description": ""
+                    }
+                  },
+                  "required": [
+                    "return"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "schema": {
+              "type": "string",
+              "default": "YOUR_API_KEY"
+            },
+            "required": true,
+            "description": "Provide \"YOUR_API_KEY\"."
+          }
+        ],
+        "summary": "Copy of Copy of ",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "route": {
+                    "type": "string",
+                    "default": "dlt",
+                    "description": "The SMS route. For DLT SMS, always use \"dlt\"."
+                  },
+                  "requests": {
+                    "type": "array",
+                    "items": {
+                      "properties": {
+                        "sender_id": {
+                          "type": "string",
+                          "description": "Your 3-6 letter DLT approved Sender ID like \"FSTSMS\", before using you need to first submit it to Fast2SMS for approval."
+                        },
+                        "message": {
+                          "type": "integer",
+                          "description": "Your Message_ID like, \"111111\" you can get your approved Message ID here."
+                        },
+                        "variables_values": {
+                          "type": "string",
+                          "description": "If you've used {#var#} inside your DLT approved SMS then you can submit values for those variables like: \"Rahul|8888888888|6695\" seperated by pipe \"|\".",
+                          "default": "var1|var2"
+                        },
+                        "numbers": {
+                          "type": "string",
+                          "description": "Add mobile numbers"
+                        },
+                        "flash": {
+                          "type": "string",
+                          "enum": [
+                            "0",
+                            "1"
+                          ],
+                          "default": "0",
+                          "description": "This field is optional, it will use \"0\" as default value or you can set to \"1\" for sending flash message."
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "sender_id",
+                        "numbers",
+                        "variables_values",
+                        "message"
+                      ]
+                    },
+                    "description": "An array of objects containing SMS details."
+                  }
+                },
+                "required": [
+                  "route",
+                  "requests"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dev/dlt_manager": {
+      "get": {
+        "description": "",
+        "operationId": "get_devdlt-1",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "default": "true"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "sender_id": {
+                            "type": "string"
+                          },
+                          "entity_id": {
+                            "type": "string"
+                          },
+                          "entity_name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object",
+                        "required": [
+                          "sender_id",
+                          "entity_id",
+                          "entity_name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "authorization",
+            "schema": {
+              "type": "string",
+              "default": "YOUR_API_KEY"
+            },
+            "required": true,
+            "description": "Provide \"YOUR_API_KEY\"."
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "template",
+                "sender"
+              ],
+              "default": "sender"
+            },
+            "required": true,
+            "description": "Set to \"template\" for template information or \"sender\" for sender information."
+          }
+        ],
+        "summary": "Copy of "
+      },
+      "post": {
+        "description": "",
+        "operationId": "get_devdlt",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "default": "true"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "sender_id": {
+                            "type": "string"
+                          },
+                          "entity_id": {
+                            "type": "string"
+                          },
+                          "entity_name": {
+                            "type": "string"
+                          },
+                          "templates": {
+                            "type": "array",
+                            "items": {
+                              "properties": {
+                                "message_id": {
+                                  "type": "string"
+                                },
+                                "message": {
+                                  "type": "string"
+                                },
+                                "var_count": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object",
+                              "required": [
+                                "message_id",
+                                "message",
+                                "var_count"
+                              ]
+                            }
+                          }
+                        },
+                        "type": "object",
+                        "required": [
+                          "sender_id",
+                          "entity_id",
+                          "templates"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sender",
+                "template"
+              ],
+              "default": "template"
+            },
+            "required": true,
+            "description": "Set to \"template\" for template information or \"sender\" for sender information."
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "schema": {
+              "type": "string",
+              "default": "YOUR_API_KEY"
+            },
+            "required": true,
+            "description": "Provide \"YOUR_API_KEY\"."
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "authorization": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "authorization"
+      }
+    }
+  },
+  "x-readme": {
+    "explorer-enabled": true,
+    "proxy-enabled": true
+  }
+}

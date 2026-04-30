@@ -69,6 +69,13 @@ import StudyMaterialDetails from "../../pages/study_material/StudyMaterialDetail
 import DeliveryTimeLine from "../../pages/study_material/DeliveryTimeLine";
 import AllStudyMaterialsOrders from "../../pages/Profile/AllStudyMaterialsOrders";
 import EnrollSubject from "../../screens/courses/EnrollSubject";
+import NewTestSeries from "../../pages/NewTestSeries/NewTestSeries";
+import SeriesDetail from "../../pages/NewTestSeries/SeriesDetail";
+import NewTestScreen from "../../pages/NewTestSeries/TestScreen";
+import StartTestPrelims from "../../pages/NewTestSeries/StartTestPrelims";
+import NewResultScreen from "../../pages/NewTestSeries/ResultScreen";
+import TestScreenResultsAttemps from "../../pages/NewTestSeries/TestScreenResultsAttemps";
+import QuestionListScreen from "../../pages/NewTestSeries/QuestionListScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -140,6 +147,37 @@ export default function AppRouter({ navigationRef }) {
 
         {/* Test Series */}
         <Stack.Screen name="TestSeries" component={TestSeries} />
+        <Stack.Screen name="NewTestSeries" component={NewTestSeries} />
+        <Stack.Screen name="SeriesDetail" options={{
+          headerShown: true,
+          headerTitle: "Testseries Informations"
+        }} component={SeriesDetail} />
+        <Stack.Screen name="TestScreen" options={{
+          headerShown: true,
+          headerTitle: "Ready To Start Test"
+        }} component={NewTestScreen} />
+        <Stack.Screen name="StartTestPrelims" options={{
+          headerShown: true,
+          headerTitle: "Ready To Start Test"
+        }} component={StartTestPrelims} />
+
+        {/*  */}
+        <Stack.Screen name="TestScreenResultsAttemps" options={{
+          headerShown: false,
+          headerTitle: "Ready To Start Test"
+        }} component={TestScreenResultsAttemps} />
+
+        {/* QuestionListScreen */}
+        <Stack.Screen name="QuestionListScreen" options={{
+          headerShown: false,
+          headerTitle: "Ready To Start Test"
+        }} component={QuestionListScreen} />
+        <Stack.Screen name="NewResultScreen" options={{
+          headerShown: true,
+          headerTitle: "Prelims Test Result"
+        }} component={NewResultScreen} />
+        {/*  card h kya konsa debit card ha yhi hai.>?? ha hai do */}
+
         <Stack.Screen name="IntroTestSeries" component={IntroTestSeries} />
         <Stack.Screen name="testseries-view" component={TestSeriesView} />
         <Stack.Screen name="bundle-view" component={TestSeriesBundleView} />
@@ -164,6 +202,8 @@ export default function AppRouter({ navigationRef }) {
         {/* Scholarship */}
         <Stack.Screen name="apply-sch" component={Scholarship} />
         <Stack.Screen name="ApplyScholarship" component={ApplyScholarship} />
+
+
 
         {/* Study Material  */}
         <Stack.Screen name="study_material" component={AllStudyMaterialCats} />

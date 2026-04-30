@@ -73,6 +73,10 @@ import AssignStudyMaterial from "./pages/StudyMaterial/AssignStudyMaterial";
 import BatchSubjectAssign from "./pages/Assigns/BatchSubjectAssign";
 import AssignQuiz from "./pages/Assigns/AssignQuiz";
 import AssignTestSeries from "./pages/Assigns/AssignTestSeries";
+import DikshantAdmin from "./pages/NewTest/DikshantAdmin";
+import TestSeriesPage from "./pages/NewTest/Testseriespage";
+import TestsPage from "./pages/NewTest/TestPages";
+import QuestionsPage from "./pages/NewTest/QuestionTestSeries";
 export default function App() {
   return (
     <>
@@ -186,6 +190,17 @@ export default function App() {
                 path="/create-questions/:quizId"
                 element={<CreateQuestions />}
               />
+
+              <Route path="/new-admin" element={<TestSeriesPage />} />
+              <Route path="/new-questions" element={<QuestionsPage />} />
+
+              <Route path="/new-testsPage" element={<TestsPage />} />
+
+
+
+
+
+
               <Route
                 path="/view-studnets-joined/:id"
                 element={<StudnetsJoined />}

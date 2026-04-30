@@ -27,7 +27,9 @@ export default function IntroTestSeries({ navigation }) {
     navigation.dispatch(
       CommonActions.reset({
         index: 1,
-        routes: [{ name: "Home" }, { name: "TestSeries" }]
+        // routes: [{ name: "Home" }, { name: "TestSeries" }]
+        routes: [{ name: "Home" }, { name: "NewTestSeries" }]
+
       })
     )
   }
@@ -85,6 +87,7 @@ export default function IntroTestSeries({ navigation }) {
   const player = useVideoPlayer(videoUri ? { uri: videoUri } : null, player => {
     if (player) {
       player.loop = false
+      player.muted = true
       player.play()
     }
   })
