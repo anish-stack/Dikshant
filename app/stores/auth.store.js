@@ -76,6 +76,83 @@ export const useAuthStore = create((set, get) => ({
       throw new Error(errorMessage);
     }
   },
+  requestLoginOtp: async (mobile) => {
+  try {
+    if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
+      throw new Error("Invalid mobile number");
+    }
+
+    const response = await axios.post("/auth/request-otp", {
+      mobile,
+    });
+
+    const { user_id } = response.data;
+
+    await AsyncStorage.setItem("userId", user_id.toString());
+
+    set({
+      phone: mobile,
+      userId: user_id,
+      otpSent: true,
+    });
+
+    return {
+      success: true,
+      userId: user_id,
+      message: "OTP sent successfully",
+    };
+  } catch (error) {
+    const msg =
+      error.response?.data?.error ||
+      error.message ||
+      "Failed to send OTP";
+    throw new Error(msg);
+  }
+},
+loginWithOtp: async (userId, otp) => {
+  try {
+    if (!userId) throw new Error("User ID missing");
+
+    if (!/^\d{6}$/.test(otp)) {
+      throw new Error("Invalid OTP");
+    }
+
+    const response = await axios.post("/auth/verify-otp", {
+      user_id: userId,
+      otp,
+    });
+
+    const { token, refresh_token, user } = response.data;
+
+    await AsyncStorage.multiSet([
+      ["authToken", token],
+      ["refresh_token", refresh_token],
+    ]);
+
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    set({
+      loggedIn: true,
+      token,
+      refreshtoken: refresh_token,
+      user,
+      userId: user.id,
+      otpSent: false,
+    });
+
+    return {
+      success: true,
+      user,
+      message: "Login successful",
+    };
+  } catch (error) {
+    const msg =
+      error.response?.data?.error ||
+      error.message ||
+      "OTP verification failed";
+    throw new Error(msg);
+  }
+},
 
   // 🔹 Step 2: Request OTP (for login or signup verification)
   requestOtp: async (phone) => {

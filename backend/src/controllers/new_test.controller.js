@@ -540,7 +540,7 @@ exports.updateTest = asyncHandler(async (req, res) => {
   const updates = {};
   allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
 
-  if (req.file) updates.syllabus_pdf = await uploadToS3(req.file, 'syllabus');
+  if (req.file) updates.model_answer_pdf_url = await uploadToS3(req.file, 'model_answer_pdf_url');
 
   await test.update(updates);
   res.json({ status: 'success', data: { test } });
@@ -660,148 +660,148 @@ exports.adminListTests = asyncHandler(async (req, res) => {
 });
 
 exports.mainsTestDetails = asyncHandler(async (req, res) => {
-    try {
-        const userId = req.user?.id;
-        const { testId } = req.params;
+  try {
+    const userId = req.user?.id;
+    const { testId } = req.params;
 
-        if (!userId) {
-            return res.status(401).json({ 
-                success: false, 
-                message: "Unauthorized" 
-            });
-        }
-
-        if (!testId) {
-            return res.status(400).json({ 
-                success: false, 
-                message: "testId is required" 
-            });
-        }
-
-        // Get Mains Paper with more useful fields
-        const paper = await MainsTestPaperDikshant.findOne({
-            where: {
-                test_id: testId,
-                is_active: true
-            },
-            attributes: [
-                'id', 'test_id', 'paper_title',
-                'duration_minutes', 'total_marks', 'total_questions',
-                'question_pdf_url', 'model_answer_pdf_url', 'sample_copy_pdf_url',
-                'instructions', 'submission_type',
-                'paper_status', 'start_at', 'end_at', 'result_publish_at',
-                'publish_at'
-            ]
-        });
-
-        if (!paper) {
-            return res.status(404).json({
-                success: false,
-                message: "Mains test paper not found"
-            });
-        }
-
-        // Get User's Submission
-        const submission = await MainsAnswerSubmissionDikshant.findOne({
-            where: {
-                user_id: userId,
-                paper_id: paper.id
-            },
-            attributes: [
-                'id', 'answer_pdf_url', 'evaluated_pdf_url',
-                'marks_obtained', 'status', 'result_status',
-                'submitted_at'
-            ]
-        });
-
-        const now = new Date();
-
-        // ─── Improved Flags Logic ─────────────────────────────────
-        const isPublished = ['published', 'live', 'closed', 'result_declared'].includes(paper.paper_status);
-
-        const isLive = paper.paper_status === 'published' &&
-            (!paper.start_at || new Date(paper.start_at) <= now) &&
-            (!paper.end_at || new Date(paper.end_at) >= now);
-
-        const isClosed = paper.paper_status === 'closed' ||
-            (paper.end_at && new Date(paper.end_at) < now);
-
-        const isResultDeclared = 
-            paper.paper_status === 'result_declared' ||
-            (paper.result_publish_at && new Date(paper.result_publish_at) <= now);
-
-        const hasSubmitted = !!submission;
-
-        // More accurate permission flags
-        const canDownloadPaper = isPublished || isLive;
-        const canUploadAnswer = isLive && !hasSubmitted;
-        const canViewResult = isResultDeclared && hasSubmitted;
-
-        // Calculate time left (in minutes) if live
-        let timeLeftMinutes = null;
-        if (isLive && paper.end_at) {
-            const endTime = new Date(paper.end_at).getTime();
-            const currentTime = now.getTime();
-            timeLeftMinutes = Math.max(0, Math.floor((endTime - currentTime) / 60000));
-        }
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                paper_id: paper.id,
-                test_id: paper.test_id,
-                paper_title: paper.paper_title,
-
-                duration_minutes: paper.duration_minutes,
-                total_marks: paper.total_marks,
-                total_questions: paper.total_questions,
-
-                // Files
-                question_pdf_url: paper.question_pdf_url,
-                model_answer_pdf_url: isResultDeclared ? paper.model_answer_pdf_url : null,
-                sample_copy_pdf_url: isResultDeclared ? paper.sample_copy_pdf_url : null,
-
-                // Extra useful fields
-                instructions: paper.instructions,
-                submission_type: paper.submission_type,
-                start_at: paper.start_at,
-                end_at: paper.end_at,
-                time_left_minutes: timeLeftMinutes,     // New field for frontend countdown
-
-                // Submission Data
-                submission: submission ? {
-                    id: submission.id,
-                    answer_pdf_url: submission.answer_pdf_url,
-                    evaluated_pdf_url: submission.evaluated_pdf_url,
-                    marks_obtained: submission.marks_obtained,
-                    status: submission.status,
-                    result_status: submission.result_status,
-                    submitted_at: submission.submitted_at,
-                } : null,
-
-                // Flags for frontend decision making
-                flags: {
-                    is_published: isPublished,
-                    is_live: isLive,
-                    is_closed: isClosed,
-                    is_result_declared: isResultDeclared,
-
-                    has_submitted: hasSubmitted,
-
-                    can_download_paper: canDownloadPaper,
-                    can_upload_answer: canUploadAnswer,
-                    can_view_result: canViewResult,
-                }
-            }
-        });
-
-    } catch (error) {
-        console.error("❌ mainsTestDetails ERROR:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Internal server error"
-        });
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      });
     }
+
+    if (!testId) {
+      return res.status(400).json({
+        success: false,
+        message: "testId is required"
+      });
+    }
+
+    // Get Mains Paper with more useful fields
+    const paper = await MainsTestPaperDikshant.findOne({
+      where: {
+        test_id: testId,
+        is_active: true
+      },
+      attributes: [
+        'id', 'test_id', 'paper_title',
+        'duration_minutes', 'total_marks', 'total_questions',
+        'question_pdf_url', 'model_answer_pdf_url', 'sample_copy_pdf_url',
+        'instructions', 'submission_type',
+        'paper_status', 'start_at', 'end_at', 'result_publish_at',
+        'publish_at'
+      ]
+    });
+
+    if (!paper) {
+      return res.status(404).json({
+        success: false,
+        message: "Mains test paper not found"
+      });
+    }
+
+    // Get User's Submission
+    const submission = await MainsAnswerSubmissionDikshant.findOne({
+      where: {
+        user_id: userId,
+        paper_id: paper.id
+      },
+      attributes: [
+        'id', 'answer_pdf_url', 'evaluated_pdf_url',
+        'marks_obtained', 'status', 'result_status',
+        'submitted_at'
+      ]
+    });
+
+    const now = new Date();
+
+    // ─── Improved Flags Logic ─────────────────────────────────
+    const isPublished = ['published', 'live', 'closed', 'result_declared'].includes(paper.paper_status);
+
+    const isLive = paper.paper_status === 'published' &&
+      (!paper.start_at || new Date(paper.start_at) <= now) &&
+      (!paper.end_at || new Date(paper.end_at) >= now);
+
+    const isClosed = paper.paper_status === 'closed' ||
+      (paper.end_at && new Date(paper.end_at) < now);
+
+    const isResultDeclared =
+      paper.paper_status === 'result_declared' ||
+      (paper.result_publish_at && new Date(paper.result_publish_at) <= now);
+
+    const hasSubmitted = !!submission;
+
+    // More accurate permission flags
+    const canDownloadPaper = isPublished || isLive;
+    const canUploadAnswer = isLive && !hasSubmitted;
+    const canViewResult = isResultDeclared && hasSubmitted;
+
+    // Calculate time left (in minutes) if live
+    let timeLeftMinutes = null;
+    if (isLive && paper.end_at) {
+      const endTime = new Date(paper.end_at).getTime();
+      const currentTime = now.getTime();
+      timeLeftMinutes = Math.max(0, Math.floor((endTime - currentTime) / 60000));
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        paper_id: paper.id,
+        test_id: paper.test_id,
+        paper_title: paper.paper_title,
+
+        duration_minutes: paper.duration_minutes,
+        total_marks: paper.total_marks,
+        total_questions: paper.total_questions,
+
+        // Files
+        question_pdf_url: paper.question_pdf_url,
+        model_answer_pdf_url: isResultDeclared ? paper.model_answer_pdf_url : null,
+        sample_copy_pdf_url: isResultDeclared ? paper.sample_copy_pdf_url : null,
+
+        // Extra useful fields
+        instructions: paper.instructions,
+        submission_type: paper.submission_type,
+        start_at: paper.start_at,
+        end_at: paper.end_at,
+        time_left_minutes: timeLeftMinutes,     // New field for frontend countdown
+
+        // Submission Data
+        submission: submission ? {
+          id: submission.id,
+          answer_pdf_url: submission.answer_pdf_url,
+          evaluated_pdf_url: submission.evaluated_pdf_url,
+          marks_obtained: submission.marks_obtained,
+          status: submission.status,
+          result_status: submission.result_status,
+          submitted_at: submission.submitted_at,
+        } : null,
+
+        // Flags for frontend decision making
+        flags: {
+          is_published: isPublished,
+          is_live: isLive,
+          is_closed: isClosed,
+          is_result_declared: isResultDeclared,
+
+          has_submitted: hasSubmitted,
+
+          can_download_paper: canDownloadPaper,
+          can_upload_answer: canUploadAnswer,
+          can_view_result: canViewResult,
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ mainsTestDetails ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
 });
 exports.getMySubmission = asyncHandler(async (req, res) => {
   const userId = req.user.id;
@@ -961,19 +961,66 @@ exports.checkMainsAnswer = asyncHandler(async (req, res) => {
 });
 
 exports.getAllSubmissions = asyncHandler(async (req, res) => {
-  const { status } = req.query;
+  const { status, testId } = req.query;
 
   const where = {};
-  if (status) where.status = status;
 
+  if (status) {
+    where.status = status;
+  }
+
+  /* ===============================
+     GET PAPER FROM TEST
+  =============================== */
+  const paper = await MainsTestPaperDikshant.findOne({
+    where: {
+      test_id: testId,
+      is_active: true
+    },
+    attributes: ['id', 'paper_title']
+  });
+
+  if (!paper) {
+    return res.status(404).json({
+      message: "Paper not found"
+    });
+  }
+
+  /* ===============================
+     FILTER BY PAPER
+  =============================== */
+  where.paper_id = paper.id;
+
+  /* ===============================
+     GET SUBMISSIONS + USER
+  =============================== */
   const submissions = await MainsAnswerSubmissionDikshant.findAll({
     where,
+    include: [
+      {
+        model: User, // ✅ IMPORTANT
+        as: 'user',
+        attributes: ['id', 'name', 'mobile', 'email']
+      }
+    ],
     order: [['createdAt', 'DESC']]
   });
 
+  /* ===============================
+     STATS (FOR DASHBOARD)
+  =============================== */
+  const total = submissions.length;
+  const checked = submissions.filter(s => s.status === 'checked').length;
+  const pending = submissions.filter(s => s.status === 'submitted').length;
+
   return res.json({
     success: true,
-    total: submissions.length,
+    paper,
+    stats: {
+      total,
+      checked,
+      pending
+    },
     data: submissions
   });
 });

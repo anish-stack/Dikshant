@@ -4,6 +4,7 @@ const { StudentPurchaseDikshant: StudentPurchase, TestSeriesDikshant: TestSeries
 const { AppError, asyncHandler } = require('../utils/NewHelpers');
 // const { sendEmail } = require('../services/email.service');
 const { notificationQueue } = require('../queue');
+const NotificationController = require('./NotificationController');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY,
@@ -262,6 +263,95 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
   });
 
   res.json({ status: 'success', message: 'Payment verified', data: { purchase_id: purchase.id } });
+});
+
+
+exports.assignTestSeriesViaAdmin = asyncHandler(async (req, res) => {
+  try {
+    const { user_id, series_id, test_id, purchase_type } = req.body;
+
+    /* =========================================
+       VALIDATION
+    ========================================= */
+    if (!user_id) {
+      throw new AppError("user_id is required", 400);
+    }
+
+    if (purchase_type === "series" && !series_id) {
+      throw new AppError("series_id required", 400);
+    }
+
+    if (purchase_type === "single_test" && !test_id) {
+      throw new AppError("test_id required", 400);
+    }
+
+    /* =========================================
+       CHECK ALREADY PURCHASED
+    ========================================= */
+    const existing = await StudentPurchase.findOne({
+      where: {
+        user_id,
+        series_id: series_id || null,
+        test_id: test_id || null,
+        payment_status: "success",
+      },
+    });
+
+    if (existing) {
+      throw new AppError("Already assigned", 409);
+    }
+
+    /* =========================================
+       CREATE FREE PURCHASE (ADMIN ASSIGN)
+    ========================================= */
+    const purchase = await StudentPurchase.create({
+      user_id,
+      series_id: series_id || null,
+      test_id: test_id || null,
+      purchase_type,
+      amount_paid: 0,
+      payment_id: `admin_${Date.now()}`,
+      payment_status: "success",
+      assigned_by_admin: true, // optional column (recommended)
+    });
+
+    /* =========================================
+       NOTIFICATION (OPTIONAL)
+    ========================================= */
+    await notificationQueue.add("send-notification", {
+      user_id,
+      title: "Access Granted 🎉",
+      body: "You have been granted access by admin.",
+      type: "purchase",
+    });
+
+    await NotificationController.createNotification({
+      userId: user_id,
+      title: "Access Granted 🎉",
+      message: `You have been granted access by admin.`,
+      type: "purchase",
+      relatedId: test_id
+    });
+
+    return res.json({
+      status: "success",
+      message: "Access assigned successfully",
+      data: {
+        purchase_id: purchase.id,
+        user_id,
+        series_id,
+        test_id,
+      },
+    });
+
+  } catch (error) {
+    console.error("assignTestSeriesViaAdmin Error:", error);
+
+    return res.status(error.statusCode || 500).json({
+      status: "error",
+      message: error.message || "Failed to assign",
+    });
+  }
 });
 
 // POST /purchases/webhook  — Razorpay server webhook

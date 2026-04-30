@@ -77,6 +77,7 @@ import DikshantAdmin from "./pages/NewTest/DikshantAdmin";
 import TestSeriesPage from "./pages/NewTest/Testseriespage";
 import TestsPage from "./pages/NewTest/TestPages";
 import QuestionsPage from "./pages/NewTest/QuestionTestSeries";
+import CheckSubmission from "./pages/NewTest/CheckSubmission";
 export default function App() {
   return (
     <>
@@ -195,6 +196,8 @@ export default function App() {
               <Route path="/new-questions" element={<QuestionsPage />} />
 
               <Route path="/new-testsPage" element={<TestsPage />} />
+              <Route path="/check-submission/:id" element={<CheckSubmission />} />
+
 
 
 

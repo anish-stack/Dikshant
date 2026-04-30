@@ -7,6 +7,7 @@ const http = require("http");
 const { initSocket } = require("./socket");
 const { initializeFirebase } = require("./utils/sendNotifications");
 const setupBullBoard = require("./bullboard");
+const sendDltOtp = require('./utils/sendDlt');
 
 const PORT = process.env.PORT || 5001;
 

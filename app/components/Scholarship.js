@@ -4,9 +4,10 @@ import { useNavigation } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSettings } from "../hooks/useSettings";
 const Scholarship = () => {
   const navigation = useNavigation();
-
+  const { settings } = useSettings()
   const goToApply = () => navigation.navigate("apply-sch");
 
   return (
@@ -20,7 +21,7 @@ const Scholarship = () => {
         <View style={styles.imageWrapper}>
           <Image
             source={{
-              uri: "https://api.imagecloud.adsdigitalmedia.com/uploads/u/716d5d94-9e7a-4a4f-ad1e-26afcbd5abf1/o/953ebda7-dd30-4f7e-b86a-0166b36504c5.webp",
+              uri: settings?.scholorship_image || "https://api.imagecloud.adsdigitalmedia.com/uploads/u/716d5d94-9e7a-4a4f-ad1e-26afcbd5abf1/o/953ebda7-dd30-4f7e-b86a-0166b36504c5.webp",
             }}
             style={styles.bannerImage}
             contentFit="contain"
@@ -45,7 +46,7 @@ const Scholarship = () => {
           >
             <Text style={styles.ctaButtonText}>Apply Now</Text>
             <View style={styles.arrow}>
-              <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.buttonIcon} />
+              <Ionicons name="arrow-forward" size={12} color="#fff" style={styles.buttonIcon} />
             </View>
           </TouchableOpacity>
         </View>
@@ -124,28 +125,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#DC2626",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 14,
 
   },
   ctaButtonText: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
     color: "#fff",
     marginRight: 8,
     letterSpacing: 0.3,
   },
   arrow: {
-    width: 24,
-    height: 24,
+    width: 18,
+    height: 18,
     backgroundColor: "rgba(0, 0, 0, 0.1)",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   arrowText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "700",
     color: "#000",
   },

@@ -487,7 +487,7 @@ export default function QuestionListScreen({ route, navigation }) {
                     borderColor={COLORS.border}
                     rightIcon={<Feather name="download" size={22} color={model_answer_pdf_url ? COLORS.success : COLORS.disabled} />}
                 />
-                <ResourceRow
+                {/* <ResourceRow
                     icon={<Feather name="file" size={26} color={sample_copy_pdf_url ? COLORS.purple : COLORS.disabled} />}
                     title="Sample Answer Copy"
                     desc={sample_copy_pdf_url ? "Reference answer sheet PDF" : "Not available"}
@@ -495,7 +495,7 @@ export default function QuestionListScreen({ route, navigation }) {
                     disabled={!sample_copy_pdf_url}
                     borderColor={COLORS.border}
                     rightIcon={<Feather name="download" size={22} color={sample_copy_pdf_url ? COLORS.purple : COLORS.disabled} />}
-                />
+                /> */}
 
                 {/* Upload */}
                 <SectionHeader title="Submit Answer Sheet" />

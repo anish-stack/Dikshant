@@ -3,7 +3,7 @@ import axios from "axios";
 
 // ─── AXIOS INSTANCE ──────────────────────────────────────────────────────────
 const api = axios.create({
-  baseURL: "http://localhost:5001/api/new",
+  baseURL: "https://www.app.api.dikshantias.com/new",
   timeout: 10000,
   headers: { "Content-Type": "application/json" },
 });

@@ -361,7 +361,7 @@ export default function Signup({ navigation }) {
             <View style={styles.formContainer}>
               <Text style={styles.stepTitle}>Verify OTP</Text>
               <Text style={styles.stepSubtitle}>
-                We sent a 6-digit code to {formData.email}
+                We sent a 6-digit code to {formData.phone}
               </Text>
 
               <View style={styles.inputContainer}>

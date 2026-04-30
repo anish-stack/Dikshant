@@ -11,7 +11,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(5000),
         allowNull: true,
       },
-
+      scholorship_image: {
+        type: DataTypes.STRING(5000),
+        allowNull: true,
+      },
       // 🔧 App Meta
       appName: {
         type: DataTypes.STRING,
@@ -24,8 +27,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: true,
       },
-
-
       appVersion: {
         type: DataTypes.STRING,
         allowNull: true,

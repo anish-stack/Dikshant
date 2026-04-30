@@ -92,7 +92,8 @@ export interface SeriesForm {
 }
 
 export interface TestForm {
-  series_id: string; title: string; test_number: string; type: "prelims" | "mains";
+  series_id: string;
+  model_answer_pdf_url: string, title: string; test_number: string; type: "prelims" | "mains";
   status: "draft" | "scheduled" | "live" | "closed" | "result_published";
   scheduled_start: string; scheduled_end: string; duration_minutes: string;
   total_marks: string; negative_marking: string; is_free: boolean; instructions: string;

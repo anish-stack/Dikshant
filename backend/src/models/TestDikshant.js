@@ -60,6 +60,11 @@ module.exports = (sequelize) => {
         allowNull: false,
         validate: { notEmpty: true },
       },
+      model_answer_pdf_url: {
+        type: DataTypes.STRING(1000),
+        allowNull: true
+
+      },
       test_number: {
         type: DataTypes.INTEGER,
         allowNull: false,

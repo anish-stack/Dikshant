@@ -4,11 +4,13 @@ import api from "../../utils/axiosInstance";
 import type { ToastAPI, Series, Test, TestForm, BadgeColor } from "../../utils/types";
 import toast from "react-hot-toast";
 import MainsPaperPage from "./MainsPaperPage";
+import { Link } from "react-router";
 
 const defaultForm: TestForm = {
   series_id: "",
   title: "",
   test_number: "",
+  model_answer_pdf_url: "",
   type: "prelims",
   status: "draft",
   scheduled_start: "",
@@ -52,7 +54,7 @@ export default function TestsPage() {
   const [loading, setLoading] = useState(false);
   const [mainsTestId, setMainsTestId] = useState<string | null>(null);
   const [mainsTestTitle, setMainsTestTitle] = useState<string>("");
-
+  const [answerKeyFile, setAnswerKeyFile] = useState<File | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     search: "", seriesId: "", status: "", type: "", isFree: "all",
   });
@@ -80,7 +82,7 @@ export default function TestsPage() {
   }, [allTests, filters]);
 
   useEffect(() => {
-    if (mode === "create") { setForm(defaultForm); setEditingId(null); }
+    if (mode === "create") { setForm(defaultForm); setEditingId(null); setAnswerKeyFile(null); }
   }, [mode]);
 
   const handleChange = <K extends keyof TestForm>(key: K) =>
@@ -98,6 +100,7 @@ export default function TestsPage() {
       test_number: test.test_number?.toString() || "",
       type: test.type || "prelims",
       status: test.status || "draft",
+      model_answer_pdf_url: test.model_answer_pdf_url || "",
       scheduled_start: test.scheduled_start ? test.scheduled_start.slice(0, 16) : "",
       scheduled_end: test.scheduled_end ? test.scheduled_end.slice(0, 16) : "",
       duration_minutes: test.duration_minutes?.toString() || "120",
@@ -114,20 +117,46 @@ export default function TestsPage() {
     if (!form.series_id || !form.title?.trim()) return toast.error("Series and title required");
     setLoading(true);
     try {
-      const payload = {
-        ...form,
-        test_number: parseInt(form.test_number) || 1,
-        duration_minutes: parseInt(form.duration_minutes) || 120,
-        total_marks: parseInt(form.total_marks) || 200,
-        negative_marking: parseFloat(form.negative_marking) || 0,
-      };
       const isEdit = mode === "edit" && editingId;
-      await api({ method: isEdit ? "put" : "post", url: isEdit ? `/new/tests/${editingId}` : "/new/tests", data: payload });
+      let response;
+
+      if (answerKeyFile) {
+        const fd = new FormData();
+        fd.append("answerKey", answerKeyFile);
+        const payload = {
+          ...form,
+          test_number: parseInt(form.test_number) || 1,
+          duration_minutes: parseInt(form.duration_minutes) || 120,
+          total_marks: parseInt(form.total_marks) || 200,
+          negative_marking: parseFloat(form.negative_marking) || 0,
+        };
+        Object.entries(payload).forEach(([k, v]) => fd.append(k, String(v)));
+        response = await api({
+          method: isEdit ? "put" : "post",
+          url: isEdit ? `/new/tests/${editingId}` : "/new/tests",
+          data: fd,
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else {
+        const payload = {
+          ...form,
+          test_number: parseInt(form.test_number) || 1,
+          duration_minutes: parseInt(form.duration_minutes) || 120,
+          total_marks: parseInt(form.total_marks) || 200,
+          negative_marking: parseFloat(form.negative_marking) || 0,
+        };
+        response = await api({
+          method: isEdit ? "put" : "post",
+          url: isEdit ? `/new/tests/${editingId}` : "/new/tests",
+          data: payload,
+        });
+      }
+
       toast.success(isEdit ? "Test updated!" : "Test created!");
       const r = await api.get("/new/tests/admin/list");
       const raw = r.data;
       setTests(Array.isArray(raw) ? raw : (raw as any).data ?? []);
-      setForm(defaultForm); setMode("list"); setEditingId(null);
+      setForm(defaultForm); setMode("list"); setEditingId(null); setAnswerKeyFile(null);
     } catch (e: any) {
       toast.error(e.response?.data?.message || e.message);
     } finally { setLoading(false); }
@@ -280,6 +309,41 @@ export default function TestsPage() {
                 <div className="lg:col-span-3">
                   <label className={labelCls}>Instructions</label>
                   <textarea className={`${inputCls} resize-none`} rows={3} value={form.instructions} onChange={handleChange("instructions")} placeholder="Test instructions shown to students..." />
+                </div>
+                {/* Answer Key PDF */}
+                <div className="lg:col-span-3">
+                  <label className={labelCls}>Answer Key PDF</label>
+                  <div className="flex items-center gap-3">
+                    <label className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50 cursor-pointer transition group">
+                      <svg className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        {answerKeyFile ? (
+                          <p className="text-sm font-medium text-indigo-700 truncate">{answerKeyFile.name}</p>
+                        ) : form.model_answer_pdf_url ? (
+                          <p className="text-sm text-slate-500 truncate">Current: <a href={form.model_answer_pdf_url} target="_blank" rel="noreferrer" className="text-indigo-600 underline" onClick={e => e.stopPropagation()}>View PDF</a> — upload new to replace</p>
+                        ) : (
+                          <p className="text-sm text-slate-400">Click to upload answer key PDF</p>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        onChange={(e) => setAnswerKeyFile(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                    {answerKeyFile && (
+                      <button
+                        type="button"
+                        onClick={() => setAnswerKeyFile(null)}
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -478,13 +542,45 @@ export default function TestsPage() {
                         <div className="flex items-center gap-2 flex-shrink-0">
                           {/* Mains paper button — only for mains type */}
                           {t.type === "mains" && (
-                            <button
-                              onClick={() => { setMainsTestId(t.id); setMainsTestTitle(t.title); }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                              Question Paper
-                            </button>
+                            <>
+
+                              <button
+                                onClick={() => { setMainsTestId(t.id); setMainsTestTitle(t.title); }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 hover:bg-purple-100 transition"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                Question Paper
+                              </button>
+
+
+                              <Link to={`/check-submission/${t.id}`}>
+                                <button className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+
+                                  {/* Icon */}
+                                  <span className="flex items-center justify-center w-5 h-5 rounded-md bg-white/20 group-hover:bg-white/30 transition">
+                                    <svg
+                                      className="w-3.5 h-3.5 text-white"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                      />
+                                    </svg>
+                                  </span>
+
+                                  {/* Text */}
+                                  <span>Check Submissions</span>
+
+                                  {/* Hover glow */}
+                                  <span className="absolute inset-0 rounded-xl bg-white/10 opacity-0 group-hover:opacity-100 transition" />
+                                </button>
+                              </Link>
+                            </>
                           )}
 
                           <button

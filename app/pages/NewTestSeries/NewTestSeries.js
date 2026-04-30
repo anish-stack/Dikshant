@@ -21,8 +21,8 @@ const { width } = Dimensions.get('window');
 const TABS = [
     { key: 'all', label: 'All' },
     { key: 'prelims', label: 'Prelims' },
-    { key: 'combined', label: 'COMBO' },
     { key: 'mains', label: 'Mains' },
+    { key: 'combined', label: 'COMBO' },
     { key: 'mine', label: 'My Tests' },
 ];
 
@@ -41,8 +41,8 @@ const STATUS_COLOR = {
 };
 
 function getSeriesType(series) {
-   
-    return series.type 
+
+    return series.type
 }
 
 function formatPrice(price, discountPrice) {
@@ -63,7 +63,7 @@ function SeriesCard({ item, onPress }) {
     const pricing = formatPrice(item.price, item.discount_price);
     const liveCount = item.total_live || 0;
     const totalTests = item.total_tests || 0;
-        console.log(item?.is_purchased)
+    console.log(item?.is_purchased)
     return (
         <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.85}>
             {/* Thumbnail */}

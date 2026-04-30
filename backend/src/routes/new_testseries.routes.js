@@ -27,7 +27,7 @@ router.post('/test-series/:id/toggle-active', protect, seriesController.toggleAc
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 router.get('/tests/admin/list', testController.adminListTests);
-router.get('/tests/:id',protect, testController.getTest);
+router.get('/tests/:id', protect, testController.getTest);
 router.post('/tests/:id/start', protect, testController.startTest);
 router.post('/tests/:id/autosave', protect, testController.autoSave);
 router.post('/tests/:id/submit', protect, testController.submitTest);
@@ -35,7 +35,7 @@ router.post('/tests/:id/submit', protect, testController.submitTest);
 router.get('/test/new/:id/result', protect, getResult);
 
 router.get('/tests/all/:testId', protect, getAllAttempts);
-router.get('/mains-test/:testId', protect,testController.mainsTestDetails);
+router.get('/mains-test/:testId', protect, testController.mainsTestDetails);
 router.post(
   '/mains/submit/:paperId',
   protect,
@@ -88,8 +88,8 @@ router.put(
 
 router.get('/tests/:id/solutions', protect, testController.getSolutions);
 router.get('/tests/:id/leaderboard', testController.getLeaderboard);
-router.post('/tests', protect, upload.single('syllabus_pdf'), testController.createTest);
-router.put('/tests/:id', protect, upload.single('syllabus_pdf'), testController.updateTest);
+router.post('/tests', protect, upload.single('answerKey'), testController.createTest);
+router.put('/tests/:id', protect, upload.single('answerKey'), testController.updateTest);
 router.put('/tests/:id/status', protect, testController.updateTestStatus);
 router.delete('/tests/:id', protect, testController.deleteTest);
 
@@ -120,7 +120,10 @@ router.post("/mains-paper", upload.fields([
 ]), questionController.createMainsPaper);
 
 router.get("/mains-paper/:test_id", questionController.getMainsPaper);
-router.put("/mains-paper/:id", questionController.updateMainsPaper);
+router.put("/mains-paper/:id", upload.fields([
+  { name: "question_pdf", maxCount: 1 },
+  { name: "model_answer_pdf", maxCount: 1 },
+]), questionController.updateMainsPaper);
 router.delete("/mains-paper/:id", questionController.deleteMainsPaper);
 router.patch("/mains-paper/:id/status", questionController.updatePaperStatus);
 
@@ -129,6 +132,11 @@ router.patch("/mains-paper/:id/status", questionController.updatePaperStatus);
 // ─── Purchases ────────────────────────────────────────────────────────────────
 
 router.post('/purchases', protect, purchaseController.initiatePurchase);
+router.post(
+  "/admin/assign-series",
+  protect,
+  purchaseController.assignTestSeriesViaAdmin
+);
 router.post('/purchases/verify', protect, purchaseController.verifyPayment);
 router.post('/purchases/webhook', purchaseController.razorpayWebhook); // No auth — Razorpay webhook
 router.get('/purchases/my', protect, purchaseController.getMyPurchases);

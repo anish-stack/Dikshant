@@ -4,14 +4,12 @@ const { sign, verify } = require("../utils/generateToken");
 const redis = require("../config/redis");
 const { Op } = require("sequelize");
 const sendEmail = require("../utils/sendEmail");
-
+const sendDltOtp = require("../utils/sendDlt");
 // ==================== HELPER FUNCTIONS ====================
 
 function genOtp() {
   return Math.floor(100000 + Math.random() * 900000);
 }
-
-
 
 const otpEmailTemplate = (title = "Verify Your Account", otp, user = {}, logoUrl = "https://i.ibb.co/V0rVWKYm/image.png") => {
   const userName = user.name?.trim() || "there";
@@ -163,7 +161,6 @@ const otpEmailTemplate = (title = "Verify Your Account", otp, user = {}, logoUrl
   `.trim();
 };
 
-
 function generateTokens(user) {
   const payload = {
     id: user.id,
@@ -198,138 +195,88 @@ function getUserResponse(user) {
 exports.signup = async (req, res) => {
   try {
     const {
-      name,
-      email,
-      mobile,
-      password,
-      state,
-      city,
-      address,
-      device_id,
-      fcm_token,
-      platform,
-      appVersion,
+      name, email, mobile, password,
+      state, city, address,
+      device_id, fcm_token, platform, appVersion,
     } = req.body;
-    // Validation
-    if (!email && !mobile) {
-      return res.status(400).json({
-        error:
-          "Please provide either an email address or mobile number to create your account",
-      });
-    }
 
-    if (!name || name.trim().length === 0) {
-      return res.status(400).json({ error: "Please enter your name" });
-    }
+    if (!email && !mobile)
+      return res.status(400).json({ error: "Provide email or mobile" });
+    if (!name || !name.trim())
+      return res.status(400).json({ error: "Name required" });
+    if (password && password.length < 6)
+      return res.status(400).json({ error: "Password min 6 chars" });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      return res.status(400).json({ error: "Invalid email" });
+    if (mobile && !/^\d{10}$/.test(mobile))
+      return res.status(400).json({ error: "Invalid mobile (10 digits)" });
 
-    if (password && password.length < 6) {
-      return res.status(400).json({
-        error: "Password must be at least 6 characters long",
-      });
-    }
-
-    // Email validation
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res
-        .status(400)
-        .json({ error: "Please enter a valid email address" });
-    }
-
-    // Mobile validation
-    if (mobile && !/^\d{10}$/.test(mobile)) {
-      return res
-        .status(400)
-        .json({ error: "Please enter a valid 10-digit mobile number" });
-    }
-
-    // Check if user already exists
     const existingUser = await User.findOne({
       where: {
-        [Op.or]: [email ? { email } : null, mobile ? { mobile } : null].filter(
-          Boolean
-        ),
+        [Op.or]: [email ? { email } : null, mobile ? { mobile } : null].filter(Boolean),
       },
     });
 
     if (existingUser) {
-      if (existingUser.email === email && existingUser.mobile === mobile) {
-        return res.status(409).json({
-          error:
-            "This email and mobile number are already registered. Please login.",
-        });
-      } else if (existingUser.email === email) {
-        return res.status(409).json({
-          error:
-            "This email is already registered. Please login or use a different email.",
-        });
-      } else if (existingUser.mobile === mobile) {
-        return res.status(409).json({
-          error:
-            "This mobile number is already registered. Please login or use a different number.",
-        });
+      if (existingUser.email === email && existingUser.mobile === mobile)
+        return res.status(409).json({ error: "Email and mobile already registered. Please login." });
+      if (existingUser.email === email)
+        return res.status(409).json({ error: "Email already registered." });
+      if (existingUser.mobile === mobile)
+        return res.status(409).json({ error: "Mobile already registered." });
+    }
+
+    const hashed = password ? await bcrypt.hash(password, 10) : null;
+
+    const user = await User.create({
+      name: name.trim(), email, mobile, password: hashed,
+      state, city, address, device_id, fcm_token,
+      fcm_update_at: fcm_token ? new Date() : null,
+      platform, appVersion,
+    });
+
+    const otp = genOtp();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    await redis.set(`otp:${user.id}`, String(otp), "EX", 600);
+    await user.update({ otp, otp_expiry: expiry });
+
+    console.log(`OTP for user ${user.id}: ${otp}`);
+
+    // Send OTP via SMS (DLT)
+    if (mobile) {
+      try {
+        await sendDltOtp(mobile, otp);
+      } catch (err) {
+        console.error("DLT SMS Error:", err);
       }
     }
 
-    // Hash password
-    const hashed = password ? await bcrypt.hash(password, 10) : null;
-
-    // Create user
-    const user = await User.create({
-      name: name.trim(),
-      email,
-      mobile,
-      password: hashed,
-      state,
-      city,
-      address,
-      device_id,
-      fcm_token,
-      fcm_update_at: fcm_token ? new Date() : "",
-      platform,
-      appVersion,
-    });
-
-    // Generate OTP
-    const otp = genOtp();
-    await redis.set(`otp:${user.id}`, otp, "EX", 600); // 10 mins
-    await user.update({
-      otp,
-      otp_expiry: new Date(Date.now() + 10 * 60 * 1000),
-    });
-
-    console.log(otp)
-    // TODO: Send OTP via SMS/Email
-    console.log(`📧 OTP for user ${user.id}: ${otp}`);
-    try {
-      const html = otpEmailTemplate(
-        "Your OTP Verification Code",
-        otp,
-        user
-      );
-
-      const res = await sendEmail(html, {
-        receiver_email: user.email,
-        subject: "Your Dikshant IAS OTP Verification Code",
-      });
-      console.log("Email response", res)
-    } catch (error) {
-      console.log("Email Error", error)
-    }
+    // Send OTP via Email
+    // if (email) {
+    //   try {
+    //     const html = otpEmailTemplate("Your OTP Verification Code", otp, user);
+    //     await sendEmail(html, {
+    //       receiver_email: email,
+    //       subject: "Your Dikshant IAS OTP Verification Code",
+    //     });
+    //   } catch (err) {
+    //     console.error("Email Error:", err);
+    //   }
+    // }
 
     return res.status(201).json({
       status: "success",
-      message:
-        "Account created successfully! Please verify your OTP to continue.",
+      message: "Account created! Verify OTP to continue.",
       user: getUserResponse(user),
       otp_sent: true,
     });
   } catch (err) {
     console.error("Signup Error:", err);
-    return res.status(500).json({
-      error: "Unable to create account. Please try again later.",
-    });
+    return res.status(500).json({ error: "Unable to create account. Try again." });
   }
 };
+
 
 // ==================== SIGNUP FROM WEB ====================
 
@@ -443,50 +390,52 @@ exports.requestOtp = async (req, res) => {
   try {
     const { mobile, email } = req.body;
 
-    if (!mobile && !email) {
-      return res.status(400).json({
-        error: "Please provide your mobile number or email address",
-      });
-    }
+    if (!mobile && !email)
+      return res.status(400).json({ error: "Provide mobile or email" });
 
-    const user = await User.findOne({
-      where: mobile ? { mobile } : { email },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        error: "No account found with this information. Please sign up first.",
-      });
-    }
-
-    if (!user.is_active) {
-      return res.status(403).json({
-        error: "Your account has been deactivated. Please contact support.",
-      });
-    }
+    const user = await User.findOne({ where: mobile ? { mobile } : { email } });
+    if (!user) return res.status(404).json({ error: "No account found. Sign up first." });
+    if (!user.is_active) return res.status(403).json({ error: "Account deactivated. Contact support." });
 
     const otp = genOtp();
-    await redis.set(`otp:${user.id}`, otp, "EX", 600); // 10 mins
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    await user.update({
-      otp,
-      otp_expiry: new Date(Date.now() + 10 * 60 * 1000),
-    });
+    await redis.set(`otp:${user.id}`, String(otp), "EX", 600);
+    await user.update({ otp, otp_expiry: expiry });
 
-    // TODO: Send OTP via SMS/Email
-    console.log(`📧 OTP for user ${user.id}: ${otp}`);
+    console.log(`OTP for user ${user.id}: ${otp}`);
 
-    res.json({
+    // Send via SMS
+    if (user.mobile) {
+      try {
+        await sendDltOtp(user.mobile, otp);
+      } catch (err) {
+        console.error("DLT SMS Error:", err);
+      }
+    }
+
+    // Send via Email
+    // if (user.email) {
+    //   try {
+    //     const html = otpEmailTemplate("Your OTP Verification Code", otp, user);
+    //     await sendEmail(html, {
+    //       receiver_email: user.email,
+    //       subject: "Your Dikshant IAS OTP Verification Code",
+    //     });
+    //   } catch (err) {
+    //     console.error("Email Error:", err);
+    //   }
+    // }
+
+    return res.json({
       success: true,
-      message: "OTP sent successfully! Please check your messages.",
+      message: "OTP sent! Check messages.",
       user_id: user.id,
       expires_in: "10 minutes",
     });
   } catch (err) {
     console.error("Request OTP Error:", err);
-    res.status(500).json({
-      error: "Unable to send OTP. Please try again.",
-    });
+    return res.status(500).json({ error: "Unable to send OTP. Try again." });
   }
 };
 
@@ -495,6 +444,7 @@ exports.requestOtp = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { user_id, otp } = req.body;
+    console.log(req.body)
 
     if (!user_id || !otp) {
       return res.status(400).json({
@@ -558,170 +508,64 @@ exports.verifyOtp = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const {
-      mobile,
-      password,
+      mobile, password,
       login_from = "App",
-      device_id,
-      fcm_token,
-      platform,
-      appVersion,
+      device_id, fcm_token, platform, appVersion,
     } = req.body;
 
     const ip = req.ip;
 
-    if (!mobile) {
-      return res.status(400).json({
-        error: "Mobile number required",
-      });
-    }
+    if (!mobile)
+      return res.status(400).json({ error: "Mobile required" });
 
     const user = await User.findOne({ where: { mobile } });
+    if (!user) return res.status(404).json({ error: "Account not found" });
+    if (!user.is_active) return res.status(403).json({ error: "Account disabled" });
 
-    if (!user) {
-      return res.status(404).json({
-        error: "Account not found",
-      });
-    }
-
-    if (!user.is_active) {
-      return res.status(403).json({
-        error: "Account disabled",
-      });
-    }
-
-    // PASSWORD VERIFY
     const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(401).json({ error: "Invalid credentials" });
 
-    if (!validPassword) {
-      return res.status(401).json({
-        error: "Invalid credentials",
-      });
+    // ── Always send OTP for verification ──
+    const otp = genOtp();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    await redis.set(`otp:${user.id}`, String(otp), "EX", 600);
+    await user.update({ otp, otp_expiry: expiry });
+
+    console.log(`Login OTP for user ${user.id}: ${otp}`);
+
+    // Send via SMS
+    if (mobile) {
+      try {
+        await sendDltOtp(mobile, otp);
+      } catch (err) {
+        console.error("DLT SMS Error:", err);
+      }
     }
 
-    // =========================================
-    // WEB LOGIN OTP VERIFICATION
-    // =========================================
-
-    if (login_from === "Web" && !user.is_verified) {
-
-      const otp = genOtp();
-
-      await redis.set(`otp:${user.id}`, otp, "EX", 600);
-
-      await user.update({
-        otp,
-        otp_expiry: new Date(Date.now() + 10 * 60 * 1000),
-      });
-
-      console.log(`OTP for user ${user.id}: ${otp}`);
-
+    // Send via Email (web or if email exists)
+    if (user.email) {
       try {
-        const html = otpEmailTemplate(
-          "Your OTP Verification Code",
-          otp,
-          user
-        );
-
+        const html = otpEmailTemplate("Your OTP Verification Code", otp, user);
         await sendEmail(html, {
           receiver_email: user.email,
           subject: "Your Dikshant IAS OTP Verification Code",
         });
-
-      } catch (error) {
-        console.log("Email Error", error);
-      }
-
-      return res.status(200).json({
-        status: "otp_sent",
-        message: "Account not verified. OTP sent to your email.",
-        isLoginOtpSent: true,
-        user_id: user.id
-      });
-    }
-
-    // =========================================
-    // BLOCK CHECK
-    // =========================================
-
-    if (user.blocked_until && user.blocked_until > new Date()) {
-      return res.status(403).json({
-        error: "Account blocked for 1 hours due to multiple device changes.",
-      });
-    }
-
-    // =========================================
-    // DEVICE CHECK
-    // =========================================
-
-    if (!user.device_id) {
-      user.device_id = device_id;
-    }
-    else if (user.device_id !== device_id) {
-
-      await DeviceHistory.create({
-        user_id: user.id,
-        old_device: user.device_id,
-        new_device: device_id,
-        platform,
-        appVersion,
-        ip_address: ip,
-        changed_at: new Date(),
-      });
-
-      user.active_token = null;
-      user.refresh_token = null;
-
-      user.device_id = device_id;
-      user.device_change_count += 1;
-      user.last_device_change_at = new Date();
-
-      if (user.device_change_count >= 10) {
-        user.blocked_until = new Date(Date.now() + 60 * 60 * 1000);
-
-        await user.save();
-
-        return res.status(403).json({
-          error: "Too many device changes. Account blocked for 1 hours.",
-        });
+      } catch (err) {
+        console.error("Email Error:", err);
       }
     }
 
-    // =========================================
-    // GENERATE TOKENS
-    // =========================================
-
-    const { accessToken, refreshToken } = generateTokens(user);
-
-    user.active_token = accessToken;
-    user.refresh_token = refreshToken;
-
-    user.last_login_at = new Date();
-    user.last_login_device = device_id;
-
-    if (fcm_token) {
-      user.fcm_token = fcm_token;
-      user.fcm_update_at = new Date();
-    }
-
-    if (platform) user.platform = platform;
-    if (appVersion) user.appVersion = appVersion;
-
-    await user.save();
-
-    return res.json({
-      status: "success",
-      message: "Login successful",
-      token: accessToken,
-      refresh_token: refreshToken,
-      user,
+    return res.status(200).json({
+      status: "otp_sent",
+      message: "OTP sent. Verify to complete login.",
+      isLoginOtpSent: true,
+      user_id: user.id,
     });
 
   } catch (err) {
     console.error("Login Error:", err);
-
-    return res.status(500).json({
-      error: "Server error",
-    });
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -1148,56 +992,50 @@ exports.sendForgotPasswordOtp = async (req, res) => {
   try {
     const { mobile } = req.body;
 
-    if (!mobile) {
-      return res.status(400).json({
-        error: "Mobile number is required",
-      });
-    }
+    if (!mobile)
+      return res.status(400).json({ error: "Mobile required" });
 
     const user = await User.findOne({ where: { mobile } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user) {
-      return res.status(404).json({
-        error: "User with this mobile not found",
-      });
-    }
-
-    if (!user.email) {
-      return res.status(400).json({
-        error: "User email not found",
-      });
-    }
-
-    // ✅ Generate 6 digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
-    // ✅ Expire in 5 minutes
-    const expireTime = new Date(Date.now() + 5 * 60 * 1000);
-
-    // ✅ Save OTP in DB
     await user.update({
       forgetPasswordOtp: otp,
-      timeOfExipreOtp: expireTime,
+      timeOfExipreOtp: expiry,
       tempPassword: null,
     });
 
-    // ✅ Send Email
-    const html = otpEmailTemplate("Your OTP Password Reset Code", otp, user);
+    console.log(`Forgot password OTP for user ${user.id}: ${otp}`);
 
-    await sendEmail(html, {
-      receiver_email: user.email,
-      subject: "Your Dikshant IAS OTP Verification Code",
-    });
+    // Send via SMS
+    try {
+      await sendDltOtp(mobile, otp);
+    } catch (err) {
+      console.error("DLT SMS Error:", err);
+    }
+
+    // Send via Email (if exists)
+    if (user.email) {
+      try {
+        const html = otpEmailTemplate("Your OTP Password Reset Code", otp, user);
+        await sendEmail(html, {
+          receiver_email: user.email,
+          subject: "Your Dikshant IAS OTP Verification Code",
+        });
+      } catch (err) {
+        console.error("Email Error:", err);
+      }
+    }
 
     return res.json({
       success: true,
-      message: "OTP sent successfully to registered email",
+      message: "OTP sent to mobile and email",
     });
   } catch (err) {
-    console.error("Send Forgot Password OTP Error:", err);
-    return res.status(500).json({
-      error: "Unable to send OTP. Please try again",
-    });
+    console.error("Forgot Password OTP Error:", err);
+    return res.status(500).json({ error: "Unable to send OTP. Try again." });
   }
 };
 
@@ -1466,9 +1304,9 @@ exports.getPerformanceOfUser = async (req, res) => {
     const getAmount = (arr) =>
       arr.reduce((sum, o) => sum + (o.totalAmount || o.amount || 0), 0);
 
-    const batchOrders  = orders.filter(o => o.type === "batch");
-    const testOrders   = orders.filter(o => o.type === "test");
-    const quizOrders   = orders.filter(o => o.type === "quiz");
+    const batchOrders = orders.filter(o => o.type === "batch");
+    const testOrders = orders.filter(o => o.type === "test");
+    const quizOrders = orders.filter(o => o.type === "quiz");
     const bundleOrders = orders.filter(o => ["quiz_bundle", "test_series_bundle"].includes(o.type));
 
     const totalSpent = getAmount(orders);
@@ -1540,9 +1378,9 @@ exports.getPerformanceOfUser = async (req, res) => {
       });
 
       totalAnswered = Number(stats?.totalAnswered || 0);
-      totalCorrect  = Number(stats?.totalCorrect || 0);
-      totalWrong    = Number(stats?.totalWrong || 0);
-      totalSkipped  = Number(stats?.totalSkipped || 0);
+      totalCorrect = Number(stats?.totalCorrect || 0);
+      totalWrong = Number(stats?.totalWrong || 0);
+      totalSkipped = Number(stats?.totalSkipped || 0);
     }
 
     const accuracy = totalAnswered
