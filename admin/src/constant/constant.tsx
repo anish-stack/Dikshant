@@ -1,1 +1,1 @@
-export const API_URL="https://www.app.api.dikshantias.com/"
+export const API_URL="https://www.app.api.dikshantias.com/api/"

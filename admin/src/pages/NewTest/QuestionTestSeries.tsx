@@ -54,6 +54,44 @@ const diffColor: Record<string, BadgeColor> = {
 type Mode = "list" | "create" | "edit";
 type QuestionWithOptions = Question & { options?: any[] };
 
+// ── Hindi-aware textarea ──────────────────────────────────────────────────────
+// - lang="hi" hints IME for Hindi keyboard / Indic input
+// - onKeyDown: Enter inserts \n instead of submitting
+// - spellCheck false (Hindi spellcheck often wrong)
+interface MultilineProps {
+    className?: string;
+    rows?: number;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    placeholder?: string;
+}
+
+function HindiTextarea({ className, rows = 4, value, onChange, placeholder }: MultilineProps) {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        // Enter (without Shift) still inserts newline — default textarea behaviour
+        // We just stop any parent form submission that might intercept Enter
+        if (e.key === "Enter") {
+            e.stopPropagation(); // don't bubble to modal / form
+            // Let browser insert \n naturally — do NOT e.preventDefault()
+        }
+    };
+
+    return (
+        <textarea
+            className={className}
+            rows={rows}
+            value={value}
+            onChange={onChange}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            lang="hi"           // IME hint for Hindi
+            spellCheck={false}  // avoid bad Hindi spellcheck underlines
+            style={{ fontFamily: "'Noto Sans Devanagari', 'Mangal', sans-serif" }}
+        />
+    );
+}
+
+// ── Sortable row ──────────────────────────────────────────────────────────────
 function SortableQuestionItem({
     question,
     index,
@@ -107,22 +145,13 @@ function SortableQuestionItem({
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
-                        <p className="text-slate-900 font-medium leading-relaxed pr-4">
+                        {/* whitespace-pre-wrap preserves \n in display */}
+                        <p className="text-slate-900 font-medium leading-relaxed pr-4 whitespace-pre-wrap">
                             {question.question_text}
                         </p>
                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={() => onEdit(question)}
-                                className="text-blue-600 hover:text-blue-700 text-lg"
-                            >
-                                ✏️
-                            </button>
-                            <button
-                                onClick={() => onDelete(question.id)}
-                                className="text-red-600 hover:text-red-700 text-lg"
-                            >
-                                🗑️
-                            </button>
+                            <button onClick={() => onEdit(question)} className="text-blue-600 hover:text-blue-700 text-lg">✏️</button>
+                            <button onClick={() => onDelete(question.id)} className="text-red-600 hover:text-red-700 text-lg">🗑️</button>
                         </div>
                     </div>
 
@@ -133,7 +162,6 @@ function SortableQuestionItem({
                         <Badge color="amber">{question.marks} marks</Badge>
                     </div>
 
-                    {/* Options Preview */}
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
                         {question.options?.slice(0, 4).map((opt: any, i: number) => (
                             <div
@@ -145,9 +173,7 @@ function SortableQuestionItem({
                                         : "border-slate-200 bg-slate-50"
                                 )}
                             >
-                                <span className="font-mono font-bold mr-2">
-                                    {String.fromCharCode(65 + i)}.
-                                </span>
+                                <span className="font-mono font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                 {opt.option_text}
                                 {parseInt(String(question.correct_option)) === opt.option_number && (
                                     <span className="ml-2 text-emerald-600 font-medium">✓ Correct</span>
@@ -161,6 +187,7 @@ function SortableQuestionItem({
     );
 }
 
+// ── main page ─────────────────────────────────────────────────────────────────
 export default function QuestionsPage() {
     const [mode, setMode] = useState<Mode>("list");
     const [form, setForm] = useState<QuestionForm>(defaultForm);
@@ -171,24 +198,19 @@ export default function QuestionsPage() {
     const [questions, setQuestions] = useState<QuestionWithOptions[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-    // Filters
     const [searchTerm, setSearchTerm] = useState("");
     const [filterSubject, setFilterSubject] = useState("");
     const [filterDifficulty, setFilterDifficulty] = useState("");
 
     const { data: testsData } = useFetch<Test>("/new/tests/admin/list?type=prelims&limit=100");
     const allTests = testsData?.tests ?? (Array.isArray(testsData) ? testsData : []);
+    const tests = allTests;
 
-    // Only prelims tests in this page — mains handled via MainsPaperPage
-    const tests = allTests
-
-    // Sensors for drag and drop
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor)
     );
 
-    // Set default first prelims test
     useEffect(() => {
         if (tests.length > 0 && !selectedTest) {
             const firstId = tests[0].id;
@@ -197,7 +219,6 @@ export default function QuestionsPage() {
         }
     }, [tests, selectedTest]);
 
-    // Fetch questions
     const fetchQuestions = async () => {
         if (!selectedTest) return;
         try {
@@ -211,15 +232,12 @@ export default function QuestionsPage() {
         }
     };
 
-    useEffect(() => {
-        fetchQuestions();
-    }, [selectedTest]);
+    useEffect(() => { fetchQuestions(); }, [selectedTest]);
 
     const filteredQuestions = useMemo(() => {
         return questions
             .filter(q => {
-                const matchesSearch = !searchTerm ||
-                    q.question_text.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = !searchTerm || q.question_text.toLowerCase().includes(searchTerm.toLowerCase());
                 const matchesSubject = !filterSubject || q.subject === filterSubject;
                 const matchesDifficulty = !filterDifficulty || q.difficulty === filterDifficulty;
                 return matchesSearch && matchesSubject && matchesDifficulty;
@@ -232,12 +250,13 @@ export default function QuestionsPage() {
             setForm(prev => ({ ...prev, [key]: e.target.value }));
         };
 
-    const handleOptionChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
-        setOptions(prev => {
-            const newOpts = [...prev];
-            newOpts[index] = e.target.value;
-            return newOpts;
-        });
+    const handleOptionChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setOptions(prev => { const n = [...prev]; n[index] = e.target.value; return n; });
+    };
+
+    // Stop Enter from closing modal in option inputs
+    const handleOptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Enter") e.stopPropagation();
     };
 
     const openCreate = () => {
@@ -248,14 +267,8 @@ export default function QuestionsPage() {
     };
 
     const openEdit = (q: QuestionWithOptions) => {
-        const sortedOpts =
-            q.options
-                ?.slice()
-                .sort((a, b) => a.option_number - b.option_number) || [];
-
-        const cleanOptions = sortedOpts
-            .map((opt) => (opt.option_text || "").trim())
-            .filter(Boolean);
+        const sortedOpts = q.options?.slice().sort((a, b) => a.option_number - b.option_number) || [];
+        const cleanOptions = sortedOpts.map(opt => (opt.option_text || "").trim()).filter(Boolean);
 
         setForm({
             test_id: q.test_id || selectedTest,
@@ -286,28 +299,19 @@ export default function QuestionsPage() {
     };
 
     const submitQuestion = async () => {
-        if (!form.test_id || !form.question_text?.trim()) {
-            return toast.error("Test and question text are required");
-        }
+        if (!form.test_id || !form.question_text?.trim()) return toast.error("Test and question text are required");
 
-        const cleanOptions = options
-            .map((opt) => opt.trim())
-            .filter(Boolean);
-
-        if (cleanOptions.length < 2) {
-            return toast.error("Minimum 2 options required");
-        }
+        const cleanOptions = options.map(opt => opt.trim()).filter(Boolean);
+        if (cleanOptions.length < 2) return toast.error("Minimum 2 options required");
 
         setLoading(true);
-
         try {
             const payload = {
                 ...form,
                 options: cleanOptions,
                 correct_option: parseInt(form.correct_option),
                 marks: parseFloat(form.marks) || 2,
-                order_index:
-                    parseInt(form.order_index) || filteredQuestions.length + 1,
+                order_index: parseInt(form.order_index) || filteredQuestions.length + 1,
             };
 
             if (mode === "edit" && editingId) {
@@ -321,9 +325,7 @@ export default function QuestionsPage() {
             await fetchQuestions();
             closeForm();
         } catch (e: any) {
-            toast.error(
-                e.response?.data?.message || "Failed to save question"
-            );
+            toast.error(e.response?.data?.message || "Failed to save question");
         } finally {
             setLoading(false);
         }
@@ -335,15 +337,11 @@ export default function QuestionsPage() {
             await api.delete(`/new/questions/${id}`);
             toast.success("Question deleted");
             fetchQuestions();
-        } catch (e) {
-            toast.error("Failed to delete question");
-        }
+        } catch { toast.error("Failed to delete question"); }
     };
 
     const toggleSelect = (id: string) => {
-        setSelectedIds(prev =>
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
     const bulkDelete = async () => {
@@ -353,9 +351,7 @@ export default function QuestionsPage() {
             toast.success(`${selectedIds.length} questions deleted`);
             setSelectedIds([]);
             fetchQuestions();
-        } catch (e) {
-            toast.error("Bulk delete failed");
-        }
+        } catch { toast.error("Bulk delete failed"); }
     };
 
     const onDragEnd = async (event: DragEndEvent) => {
@@ -364,22 +360,15 @@ export default function QuestionsPage() {
 
         const oldIndex = filteredQuestions.findIndex(q => q.id === active.id);
         const newIndex = filteredQuestions.findIndex(q => q.id === over.id);
-
         if (oldIndex === -1 || newIndex === -1) return;
 
         const reordered = arrayMove(filteredQuestions, oldIndex, newIndex);
+        const updatedQuestions = reordered.map((q, idx) => ({ ...q, order_index: idx + 1 }));
 
-        const updatedQuestions = reordered.map((q, idx) => ({
-            ...q,
-            order_index: idx + 1,
+        setQuestions(prev => prev.map(q => {
+            const updated = updatedQuestions.find(uq => uq.id === q.id);
+            return updated || q;
         }));
-
-        setQuestions(prev =>
-            prev.map(q => {
-                const updated = updatedQuestions.find(uq => uq.id === q.id);
-                return updated || q;
-            })
-        );
 
         try {
             await api.post("/new/questions/reorder", {
@@ -387,9 +376,9 @@ export default function QuestionsPage() {
                 order: updatedQuestions.map(q => ({ id: q.id, order_index: q.order_index })),
             });
             toast.success("Question order updated");
-        } catch (e) {
+        } catch {
             toast.error("Failed to save new order");
-            fetchQuestions(); // rollback
+            fetchQuestions();
         }
     };
 
@@ -404,98 +393,62 @@ export default function QuestionsPage() {
                 <Card>
                     <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
                         <SectionHeader title={`Questions in Test (${filteredQuestions.length})`} />
-
-                        <select
-                            className={inputCls}
-                            value={selectedTest}
-                            onChange={(e) => setSelectedTest(e.target.value)}
-                        >
+                        <select className={inputCls} value={selectedTest}
+                            onChange={(e) => setSelectedTest(e.target.value)}>
                             {tests.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                    {t.title}
-                                </option>
+                                <option key={t.id} value={t.id}>{t.title}</option>
                             ))}
                         </select>
                     </div>
 
-                    {/* Filters */}
                     {selectedTest && (
                         <div className="flex flex-wrap gap-3 mb-6 items-end">
                             <div className="flex-1 min-w-[260px]">
-                                <input
-                                    type="text"
-                                    placeholder="Search by question text..."
-                                    className={inputCls}
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                                <input type="text" placeholder="Search by question text..."
+                                    className={inputCls} value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
-
                             <Field label="Subject" className="w-52">
-                                <select
-                                    className={inputCls}
-                                    value={filterSubject}
-                                    onChange={(e) => setFilterSubject(e.target.value)}
-                                >
+                                <select className={inputCls} value={filterSubject}
+                                    onChange={(e) => setFilterSubject(e.target.value)}>
                                     <option value="">All Subjects</option>
                                     {Array.from(new Set(questions.map(q => q.subject).filter(Boolean)))
-                                        .map(sub => (
-                                            <option key={sub} value={sub}>{sub}</option>
-                                        ))}
+                                        .map(sub => <option key={sub} value={sub}>{sub}</option>)}
                                 </select>
                             </Field>
-
                             <Field label="Difficulty" className="w-44">
-                                <select
-                                    className={inputCls}
-                                    value={filterDifficulty}
-                                    onChange={(e) => setFilterDifficulty(e.target.value)}
-                                >
+                                <select className={inputCls} value={filterDifficulty}
+                                    onChange={(e) => setFilterDifficulty(e.target.value)}>
                                     <option value="">All</option>
                                     <option value="easy">Easy</option>
                                     <option value="medium">Medium</option>
                                     <option value="hard">Hard</option>
                                 </select>
                             </Field>
-
                             {selectedIds.length > 0 && (
                                 <button onClick={bulkDelete} className={btnDanger}>
                                     Delete {selectedIds.length} Selected
                                 </button>
                             )}
-
-                            <button onClick={openCreate} className={btnPrimary}>
-                                + New Question
-                            </button>
+                            <button onClick={openCreate} className={btnPrimary}>+ New Question</button>
                         </div>
                     )}
 
                     {!selectedTest ? (
                         <EmptyState message="Select a test to manage questions" />
                     ) : tests.length === 0 ? (
-                        <EmptyState message="No prelims tests found. Mains tests are managed via the Tests → Question Paper section." />
+                        <EmptyState message="No prelims tests found." />
                     ) : filteredQuestions.length === 0 ? (
                         <EmptyState message="No questions found matching filters" />
                     ) : (
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={onDragEnd}
-                        >
-                            <SortableContext
-                                items={filteredQuestions.map(q => q.id)}
-                                strategy={verticalListSortingStrategy}
-                            >
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                            <SortableContext items={filteredQuestions.map(q => q.id)} strategy={verticalListSortingStrategy}>
                                 <div className="space-y-3">
                                     {filteredQuestions.map((q, idx) => (
                                         <SortableQuestionItem
-                                            key={q.id}
-                                            question={q}
-                                            index={idx}
+                                            key={q.id} question={q} index={idx}
                                             isSelected={selectedIds.includes(q.id)}
-                                            onSelect={toggleSelect}
-                                            onEdit={openEdit}
-                                            onDelete={deleteQuestion}
+                                            onSelect={toggleSelect} onEdit={openEdit} onDelete={deleteQuestion}
                                         />
                                     ))}
                                 </div>
@@ -505,7 +458,7 @@ export default function QuestionsPage() {
                 </Card>
             )}
 
-            {/* Create / Edit Modal */}
+            {/* ── Create / Edit Modal ────────────────────────────────────── */}
             {(mode === "create" || mode === "edit") && (
                 <Modal
                     isOpen={true}
@@ -516,53 +469,39 @@ export default function QuestionsPage() {
                     <div className="space-y-8 py-2">
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                             <Field label="Subject">
-                                <input
-                                    className={inputCls}
-                                    value={form.subject}
-                                    onChange={handleInputChange("subject")}
-                                    placeholder="Polity"
-                                />
+                                <input className={inputCls} value={form.subject}
+                                    onChange={handleInputChange("subject")} placeholder="Polity" />
                             </Field>
-
                             <Field label="Topic">
-                                <input
-                                    className={inputCls}
-                                    value={form.topic}
-                                    onChange={handleInputChange("topic")}
-                                    placeholder="Fundamental Rights"
-                                />
+                                <input className={inputCls} value={form.topic}
+                                    onChange={handleInputChange("topic")} placeholder="Fundamental Rights" />
                             </Field>
-
                             <Field label="Difficulty">
-                                <select
-                                    className={inputCls}
-                                    value={form.difficulty}
-                                    onChange={handleInputChange("difficulty")}
-                                >
+                                <select className={inputCls} value={form.difficulty}
+                                    onChange={handleInputChange("difficulty")}>
                                     <option value="easy">Easy</option>
                                     <option value="medium">Medium</option>
                                     <option value="hard">Hard</option>
                                 </select>
                             </Field>
-
                             <Field label="Marks">
-                                <input
-                                    type="number"
-                                    className={inputCls}
-                                    value={form.marks}
-                                    onChange={handleInputChange("marks")}
-                                />
+                                <input type="number" className={inputCls} value={form.marks}
+                                    onChange={handleInputChange("marks")} />
                             </Field>
                         </div>
 
+                        {/* ── Question text — Hindi-aware, Enter = newline ── */}
                         <Field label="Question Text *">
-                            <textarea
+                            <HindiTextarea
                                 className={cx(inputCls, "resize-none")}
                                 rows={5}
                                 value={form.question_text}
                                 onChange={handleInputChange("question_text")}
-                                placeholder="Enter the full question..."
+                                placeholder="Enter the full question... (हिंदी में भी लिख सकते हैं)"
                             />
+                            <p className="mt-1 text-xs text-slate-400">
+                                Press <kbd className="px-1 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-xs">Enter</kbd> for new line • Supports Hindi / Devanagari
+                            </p>
                         </Field>
 
                         {/* Options */}
@@ -570,81 +509,59 @@ export default function QuestionsPage() {
                             <p className="mb-3 text-sm font-semibold text-slate-500">Options (A, B, C, D)</p>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 {options.map((opt, i) => (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <span className="font-bold text-slate-400 w-6">
-                                            {String.fromCharCode(65 + i)}.
-                                        </span>
-                                        <input
-                                            className={inputCls}
+                                    <div key={i} className="flex items-start gap-3">
+                                        <span className="font-bold text-slate-400 w-6 mt-2">{String.fromCharCode(65 + i)}.</span>
+                                        <HindiTextarea
+                                            className={cx(inputCls, "resize-none flex-1")}
+                                            rows={2}
                                             value={opt}
-                                            onChange={handleOptionChange(i)}
-                                            placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                                            onChange={handleOptionChange(i) as any}
+                                            placeholder={`Option ${String.fromCharCode(65 + i)} (हिंदी में भी लिख सकते हैं)`}
                                         />
                                     </div>
                                 ))}
                             </div>
-
                             <div className="mt-6 w-56">
                                 <Field label="Correct Option">
-                                    <select
-                                        className={inputCls}
-                                        value={form.correct_option}
-                                        onChange={handleInputChange("correct_option")}
-                                    >
+                                    <select className={inputCls} value={form.correct_option}
+                                        onChange={handleInputChange("correct_option")}>
                                         {[1, 2, 3, 4].map(n => (
-                                            <option key={n} value={n}>
-                                                Option {String.fromCharCode(64 + n)}
-                                            </option>
+                                            <option key={n} value={n}>Option {String.fromCharCode(64 + n)}</option>
                                         ))}
                                     </select>
                                 </Field>
                             </div>
                         </div>
 
+                        {/* Explanation — Hindi-aware, Enter = newline */}
                         <Field label="Explanation">
-                            <textarea
+                            <HindiTextarea
                                 className={cx(inputCls, "resize-none")}
                                 rows={4}
                                 value={form.explanation}
                                 onChange={handleInputChange("explanation")}
-                                placeholder="Detailed explanation for the correct answer..."
+                                placeholder="Detailed explanation... (हिंदी में भी लिख सकते हैं)"
                             />
                         </Field>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <Field label="Source">
-                                <input
-                                    className={inputCls}
-                                    value={form.source}
-                                    onChange={handleInputChange("source")}
-                                    placeholder="Laxmikanth Chapter 1"
-                                />
+                                <input className={inputCls} value={form.source}
+                                    onChange={handleInputChange("source")} placeholder="Laxmikanth Chapter 1" />
                             </Field>
                             <Field label="Video URL">
-                                <input
-                                    className={inputCls}
-                                    value={form.video_url}
-                                    onChange={handleInputChange("video_url")}
-                                />
+                                <input className={inputCls} value={form.video_url}
+                                    onChange={handleInputChange("video_url")} />
                             </Field>
                             <Field label="Article URL">
-                                <input
-                                    className={inputCls}
-                                    value={form.article_url}
-                                    onChange={handleInputChange("article_url")}
-                                />
+                                <input className={inputCls} value={form.article_url}
+                                    onChange={handleInputChange("article_url")} />
                             </Field>
                         </div>
 
                         <div className="flex justify-end gap-3 pt-6 border-t">
-                            <button onClick={closeForm} className={btnSecondary}>
-                                Cancel
-                            </button>
-                            <button
-                                onClick={submitQuestion}
-                                disabled={loading}
-                                className={btnPrimary}
-                            >
+                            <button onClick={closeForm} className={btnSecondary}>Cancel</button>
+                            <button onClick={submitQuestion} disabled={loading} className={btnPrimary}>
                                 {loading ? "Saving..." : mode === "create" ? "Create Question" : "Update Question"}
                             </button>
                         </div>

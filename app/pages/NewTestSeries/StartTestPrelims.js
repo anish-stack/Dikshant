@@ -271,7 +271,7 @@ export default function StartTestPrelims({ route, navigation }) {
         return (
             <ResultScreen
                 result={result}
-                onCheckFull={() => navigation.replace('NewResultScreen', {attemptId, result })}
+                onCheckFull={() => navigation.replace('NewResultScreen', { attemptId, result })}
             />
         )
     }
@@ -287,7 +287,6 @@ export default function StartTestPrelims({ route, navigation }) {
 
     return (
         <SafeAreaView style={s.root}>
-            <StatusBar barStyle="light-content" backgroundColor="#B91C1C" />
 
             {/* ── HEADER ── */}
             <View style={s.header}>
@@ -380,7 +379,7 @@ export default function StartTestPrelims({ route, navigation }) {
                     onPress={() => setCurrent(p => p - 1)}
                     style={[s.navBtn, current === 0 && s.navBtnDisabled]}
                 >
-                    <Text style={[s.navBtnText, current === 0 && s.navBtnTextDisabled]}>← Prev</Text>
+                    <Text style={[s.navBtnText, current === 0 && s.navBtnTextDisabled]}> Prev</Text>
                 </TouchableOpacity>
 
                 {current === questions.length - 1 ? (
@@ -399,7 +398,7 @@ export default function StartTestPrelims({ route, navigation }) {
                         style={s.navBtnNext}
                         onPress={() => setCurrent(p => p + 1)}
                     >
-                        <Text style={s.navBtnNextText}>Next →</Text>
+                        <Text style={s.navBtnNextText}>Next </Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -527,6 +526,8 @@ const s = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
+        paddingBottom: 58,
+
         paddingVertical: 12,
         backgroundColor: '#fff',
         borderTopWidth: 1,
