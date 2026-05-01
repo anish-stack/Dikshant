@@ -1117,12 +1117,12 @@ class StudyMaterialController {
       });
 
       // featured materials
-      // const totalFeaturedMaterials = await StudyMaterial.findAll({
-      //   where: {
-      //     status: "active",
-      //     featured: true
-      //   }
-      // });
+      const featuredMaterialsRaw = await StudyMaterial.findAll({
+        where: {
+          status: "active",
+          featured: true
+        }
+      });
       const totalFeaturedMaterials = featuredMaterialsRaw.map(item => {
         const plainDescription = stripHtml(item.description);
 
