@@ -59,8 +59,8 @@ export default function TestsPage() {
     search: "", seriesId: "", status: "", type: "", isFree: "all",
   });
 
-  const { data: seriesData } = useFetch<Series>("/new/test-series");
-  const { data: testsData, loading: fetching, setData: setTests } = useFetch<Test>("/new/tests/admin/list");
+  const { data: seriesData, refetch } = useFetch<Series>("/new/test-series");
+  const { data: testsData, refetch: testRefetch, loading: fetching, setData: setTests } = useFetch<Test>("/new/tests/admin/list");
 
   const allSeries = seriesData?.series ?? (Array.isArray(seriesData) ? seriesData : []);
   const allTests = testsData?.tests ?? (Array.isArray(testsData) ? testsData : []);
@@ -166,7 +166,8 @@ export default function TestsPage() {
     if (!window.confirm("Delete this test?")) return;
     try {
       await api.delete(`/new/tests/${id}`);
-      setTests((prev) => prev.filter((t) => t.id !== id));
+      await testRefetch()
+      await refetch()
       toast.success("Deleted");
     } catch (e: any) {
       toast.error(e.response?.data?.message || "Delete failed");
@@ -387,6 +388,8 @@ export default function TestsPage() {
         {/* ── List View ── */}
         {mode === "list" && (
           <>
+
+
             {/* Filters */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
               <div className="flex flex-wrap gap-3 items-end">
@@ -470,8 +473,12 @@ export default function TestsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Tests list */}
+            <p className="text-sm text-gray-600">
+              <strong className="font-semibold">Note:</strong>
+              Please change the status to
+              <span className="font-bold text-amber-300">Draft</span>
+              before deleting any live test.
+            </p>            {/* Tests list */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               {fetching ? (
                 <div className="flex items-center justify-center py-20">
@@ -589,12 +596,25 @@ export default function TestsPage() {
                           >
                             Edit
                           </button>
-                          <button
-                            onClick={() => deleteTest(t.id)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition"
-                          >
-                            Delete
-                          </button>
+
+                          <div className="relative group/del">
+                            <button
+                              onClick={() => deleteTest(t.id)}
+                              disabled={t.status === "live"}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${t.status === "live"
+                                ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed opacity-60"
+                                : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"
+                                }`}
+                            >
+                              Delete
+                            </button>
+                            {t.status === "live" && (
+                              <div className="absolute bottom-full right-0 mb-2 w-52 px-3 py-2 rounded-lg bg-slate-800 text-white text-xs leading-snug shadow-lg pointer-events-none opacity-0 group-hover/del:opacity-100 transition-opacity z-[999999]">
+                                Change status to <span className="font-bold text-amber-300">Draft</span> before deleting a live test.
+                                <span className="absolute bottom-0 right-4 translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

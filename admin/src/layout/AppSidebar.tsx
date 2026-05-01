@@ -53,13 +53,13 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    name: "Quizzes & Test Series",
+    name: "Quizzes ",
     icon: <ListIcon />,
     subItems: [
       { name: "All Quizzes", path: "/all-quizzes" },
       { name: "All Quizzes Bundle", path: "/all-quiz-bundles" },
-      { name: "All Test Series", path: "/all-test-series" },
-      { name: "All Test Series Bundle", path: "/all-test-series-bundle" },
+      // { name: "All Test Series", path: "/all-test-series" },
+      // { name: "All Test Series Bundle", path: "/all-test-series-bundle" },
     ],
   },
   {
@@ -213,8 +213,8 @@ const AppSidebar = () => {
                   <span className="flex-1 text-left font-medium">{item.name}</span>
                   <ChevronDownIcon
                     className={`h-5 w-5 transition-transform ${openSubmenu?.type === menuType && openSubmenu?.index === idx
-                        ? "rotate-180"
-                        : ""
+                      ? "rotate-180"
+                      : ""
                       }`}
                   />
                 </>

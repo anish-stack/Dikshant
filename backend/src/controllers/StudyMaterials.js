@@ -226,212 +226,212 @@ class StudyMaterialController {
       STUDY MATERIAL CRUD (Complete)
   ======================================================= */
 
-static async createMaterial(req, res) {
-  try {
+  static async createMaterial(req, res) {
+    try {
 
-    const {
-      title,
-      slug,
-      shortDescription,
-      description,
-      categoryId,
-      isPaid,
-      price,
-      isHardCopy,
-      isDownloadable,
-      featured,
-      position,
-      status
-    } = req.body;
+      const {
+        title,
+        slug,
+        shortDescription,
+        description,
+        categoryId,
+        isPaid,
+        price,
+        isHardCopy,
+        isDownloadable,
+        featured,
+        position,
+        status
+      } = req.body;
 
-    if (!title || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Title and Category are required"
+      if (!title || !categoryId) {
+        return res.status(400).json({
+          success: false,
+          message: "Title and Category are required"
+        });
+      }
+
+      let fileUrl = null;
+      let coverImage = null;
+      let samplePdf = null;
+
+      // Upload main PDF
+      if (req.files?.pdf) {
+        fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
+      }
+
+      // Upload cover image
+      if (req.files?.image) {
+        coverImage = await uploadToS3(req.files.image[0], "study-materials");
+      }
+
+      // Upload sample PDF
+      if (req.files?.samplePdf) {
+        samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
+      }
+
+      const material = await StudyMaterial.create({
+
+        title,
+        slug: slug && slug.trim() !== "" ? slug : generateSlug(title),
+
+        shortDescription,
+        description,
+
+        fileUrl,
+        samplePdf,
+        coverImage,
+
+        categoryId: parseInt(categoryId),
+
+        isPaid: isPaid === "true" || isPaid === true,
+        price: (isPaid === "true" || isPaid === true) ? (price || 0) : 0,
+
+        isHardCopy: isHardCopy === "true" || isHardCopy === true,
+        isDownloadable: isDownloadable === "true" || isDownloadable === true,
+
+        featured: featured === "true" || featured === true,
+
+        position: position ? parseInt(position) : 0,
+
+        status: status || "active"
+
       });
-    }
 
-    let fileUrl = null;
-    let coverImage = null;
-    let samplePdf = null;
+      await redis.del("study_materials");
 
-    // Upload main PDF
-    if (req.files?.pdf) {
-      fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
-    }
-
-    // Upload cover image
-    if (req.files?.image) {
-      coverImage = await uploadToS3(req.files.image[0], "study-materials");
-    }
-
-    // Upload sample PDF
-    if (req.files?.samplePdf) {
-      samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
-    }
-
-    const material = await StudyMaterial.create({
-
-      title,
-      slug: slug && slug.trim() !== "" ? slug : generateSlug(title),
-
-      shortDescription,
-      description,
-
-      fileUrl,
-      samplePdf,
-      coverImage,
-
-      categoryId: parseInt(categoryId),
-
-      isPaid: isPaid === "true" || isPaid === true,
-      price: (isPaid === "true" || isPaid === true) ? (price || 0) : 0,
-
-      isHardCopy: isHardCopy === "true" || isHardCopy === true,
-      isDownloadable: isDownloadable === "true" || isDownloadable === true,
-
-      featured: featured === "true" || featured === true,
-
-      position: position ? parseInt(position) : 0,
-
-      status: status || "active"
-
-    });
-
-    await redis.del("study_materials");
-
-    return res.json({
-      success: true,
-      message: "Study material created successfully",
-      data: material
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-
-  }
-}
-
-static async updateMaterial(req, res) {
-  try {
-
-    const material = await StudyMaterial.findByPk(req.params.id);
-
-    if (!material) {
-      return res.status(404).json({
-        success: false,
-        message: "Study material not found"
+      return res.json({
+        success: true,
+        message: "Study material created successfully",
+        data: material
       });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+
     }
-
-    let fileUrl = material.fileUrl;
-    let coverImage = material.coverImage;
-    let samplePdf = material.samplePdf;
-
-    // Replace main PDF
-    if (req.files?.pdf) {
-      if (fileUrl) await deleteFromS3(fileUrl);
-      fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
-    }
-
-    // Replace cover image
-    if (req.files?.image) {
-      if (coverImage) await deleteFromS3(coverImage);
-      coverImage = await uploadToS3(req.files.image[0], "study-materials");
-    }
-
-    // Replace sample PDF
-    if (req.files?.samplePdf) {
-      if (samplePdf) await deleteFromS3(samplePdf);
-      samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
-    }
-
-    const {
-      title,
-      slug,
-      shortDescription,
-      description,
-      categoryId,
-      isPaid,
-      price,
-      isHardCopy,
-      isDownloadable,
-      featured,
-      position,
-      status
-    } = req.body;
-
-    await material.update({
-
-      title: title ?? material.title,
-
-      slug: slug && slug.trim() !== ""
-        ? slug
-        : title
-        ? generateSlug(title)
-        : material.slug,
-
-      shortDescription: shortDescription ?? material.shortDescription,
-
-      description: description ?? material.description,
-
-      categoryId: categoryId ?? material.categoryId,
-
-      isPaid: isPaid !== undefined
-        ? (isPaid === "true" || isPaid === true)
-        : material.isPaid,
-
-      price: price ?? material.price,
-
-      isHardCopy: isHardCopy !== undefined
-        ? (isHardCopy === "true" || isHardCopy === true)
-        : material.isHardCopy,
-
-      isDownloadable: isDownloadable !== undefined
-        ? (isDownloadable === "true" || isDownloadable === true)
-        : material.isDownloadable,
-
-      featured: featured !== undefined
-        ? (featured === "true" || featured === true)
-        : material.featured,
-
-      position: position !== undefined
-        ? parseInt(position)
-        : material.position,
-
-      status: status ?? material.status,
-
-      fileUrl,
-      coverImage,
-      samplePdf
-
-    });
-
-    await redis.del("study_materials");
-
-    return res.json({
-      success: true,
-      message: "Study material updated successfully",
-      data: material
-    });
-
-  } catch (error) {
-
-    console.error(error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message
-    });
-
   }
-}
+
+  static async updateMaterial(req, res) {
+    try {
+
+      const material = await StudyMaterial.findByPk(req.params.id);
+
+      if (!material) {
+        return res.status(404).json({
+          success: false,
+          message: "Study material not found"
+        });
+      }
+
+      let fileUrl = material.fileUrl;
+      let coverImage = material.coverImage;
+      let samplePdf = material.samplePdf;
+
+      // Replace main PDF
+      if (req.files?.pdf) {
+        if (fileUrl) await deleteFromS3(fileUrl);
+        fileUrl = await uploadToS3(req.files.pdf[0], "study-materials");
+      }
+
+      // Replace cover image
+      if (req.files?.image) {
+        if (coverImage) await deleteFromS3(coverImage);
+        coverImage = await uploadToS3(req.files.image[0], "study-materials");
+      }
+
+      // Replace sample PDF
+      if (req.files?.samplePdf) {
+        if (samplePdf) await deleteFromS3(samplePdf);
+        samplePdf = await uploadToS3(req.files.samplePdf[0], "study-materials");
+      }
+
+      const {
+        title,
+        slug,
+        shortDescription,
+        description,
+        categoryId,
+        isPaid,
+        price,
+        isHardCopy,
+        isDownloadable,
+        featured,
+        position,
+        status
+      } = req.body;
+
+      await material.update({
+
+        title: title ?? material.title,
+
+        slug: slug && slug.trim() !== ""
+          ? slug
+          : title
+            ? generateSlug(title)
+            : material.slug,
+
+        shortDescription: shortDescription ?? material.shortDescription,
+
+        description: description ?? material.description,
+
+        categoryId: categoryId ?? material.categoryId,
+
+        isPaid: isPaid !== undefined
+          ? (isPaid === "true" || isPaid === true)
+          : material.isPaid,
+
+        price: price ?? material.price,
+
+        isHardCopy: isHardCopy !== undefined
+          ? (isHardCopy === "true" || isHardCopy === true)
+          : material.isHardCopy,
+
+        isDownloadable: isDownloadable !== undefined
+          ? (isDownloadable === "true" || isDownloadable === true)
+          : material.isDownloadable,
+
+        featured: featured !== undefined
+          ? (featured === "true" || featured === true)
+          : material.featured,
+
+        position: position !== undefined
+          ? parseInt(position)
+          : material.position,
+
+        status: status ?? material.status,
+
+        fileUrl,
+        coverImage,
+        samplePdf
+
+      });
+
+      await redis.del("study_materials");
+
+      return res.json({
+        success: true,
+        message: "Study material updated successfully",
+        data: material
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+
+    }
+  }
 
   static async deleteMaterial(req, res) {
     try {
@@ -1072,7 +1072,10 @@ static async updateMaterial(req, res) {
 
   static async getStatsForAppUser(req, res) {
     try {
-
+      const stripHtml = (html) => {
+        if (!html) return "";
+        return html.replace(/<[^>]*>?/gm, "").trim();
+      };
       // total materials
       const totalMaterials = await StudyMaterial.count({
         where: { status: "active" }
@@ -1114,13 +1117,20 @@ static async updateMaterial(req, res) {
       });
 
       // featured materials
-      const totalFeaturedMaterials = await StudyMaterial.findAll({
-        where: {
-          status: "active",
-          featured: true
-        }
-      });
+      // const totalFeaturedMaterials = await StudyMaterial.findAll({
+      //   where: {
+      //     status: "active",
+      //     featured: true
+      //   }
+      // });
+      const totalFeaturedMaterials = featuredMaterialsRaw.map(item => {
+        const plainDescription = stripHtml(item.description);
 
+        return {
+          ...item.toJSON(),
+          description: plainDescription
+        };
+      });
       return res.json({
         success: true,
         data: {
