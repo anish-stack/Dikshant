@@ -12,12 +12,14 @@ const adminController = require('../controllers/new_admin.controller');
 const upload = require('../middleware/upload');
 const protect = require('../middleware/auth');
 const { getResult, getAllAttempts } = require('../controllers/result.testco');
+const optionalProtect = require('../middleware/optional_auth');
 
 
 // ─── Test Series ──────────────────────────────────────────────────────────────
-router.get('/test-series', protect, seriesController.listSeries);
+router.get('/test-series', optionalProtect, seriesController.listSeries);
+
 router.get('/test-series/admin/all', protect, seriesController.adminListSeries);
-router.get('/test-series/:slug', protect, seriesController.getSeriesDetail);
+router.get('/test-series/:slug', optionalProtect, seriesController.getSeriesDetail);
 router.post('/test-series', protect, upload.single('thumbnail'), seriesController.createSeries);
 router.put('/test-series/:id', protect, upload.single('thumbnail'), seriesController.updateSeries);
 router.delete('/test-series/:id', protect, seriesController.deleteSeries);

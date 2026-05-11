@@ -590,7 +590,7 @@ static async findOne(req, res) {
   static async findOneBySlug(req, res) {
     try {
       const slug = req.params.slug;
-      // console.log("slug",slug)
+      console.log("slug",slug)
 
       const item = await Batch.findOne({
         where: { slug },

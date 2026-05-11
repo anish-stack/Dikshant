@@ -42,7 +42,7 @@ const OTP_LENGTH = 6;
 const OTP_RESEND_SECONDS = 30;
 
 export default function Login({ navigation }) {
-  const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();®
   const { login, loginWithOtp, requestLoginOtp } = useAuthStore();
 
   // ── Onboarding images ────────────────────────────────────────────
